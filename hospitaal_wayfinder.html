@@ -1,0 +1,698 @@
+<!DOCTYPE html>
+<html lang="af">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hospitaal Wayfinding — Live API Roete</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --navy:#12222E;
+    --navy-2:#1B3446;
+    --paper:#E7EEF2;
+    --paper-line:#C7D6DD;
+    --ink:#12222E;
+    --ink-soft:#4C6270;
+    --amber:#FFB100;
+    --amber-dim:#7A5C10;
+    --red:#E14B4B;
+    --green:#2E8B57;
+    --slate:#7C8B99;
+    --violet:#6D5DD3;
+    --blue:#1E6FA8;
+    --paper-text:#F4F7F6;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:var(--navy);
+    color:var(--paper-text);
+    font-family:'Inter',sans-serif;
+    min-height:100vh;
+  }
+  header{
+    padding:22px 28px 16px;
+    border-bottom:1px solid rgba(255,255,255,0.08);
+  }
+  header h1{
+    font-family:'Space Grotesk',sans-serif;
+    font-size:22px;
+    font-weight:700;
+    letter-spacing:0.2px;
+    margin:0 0 4px;
+  }
+  header p{
+    margin:0;
+    color:#9FB4BF;
+    font-size:13px;
+    font-family:'IBM Plex Mono',monospace;
+  }
+  .layout{
+    display:grid;
+    grid-template-columns:1fr 300px;
+    gap:0;
+    align-items:start;
+  }
+  .main-col{
+    padding:20px 24px;
+  }
+  .controls{
+    display:flex;
+    flex-wrap:wrap;
+    gap:10px;
+    align-items:flex-end;
+    margin-bottom:16px;
+    background:var(--navy-2);
+    border:1px solid rgba(255,255,255,0.08);
+    border-radius:10px;
+    padding:14px 16px;
+  }
+  .field{display:flex; flex-direction:column; gap:5px;}
+  .field label{
+    font-size:10.5px;
+    text-transform:uppercase;
+    letter-spacing:0.08em;
+    color:#9FB4BF;
+    font-family:'IBM Plex Mono',monospace;
+  }
+  select, button{
+    font-family:'Inter',sans-serif;
+    font-size:13.5px;
+    border-radius:7px;
+    border:1px solid rgba(255,255,255,0.15);
+    padding:8px 10px;
+    background:#0E1B24;
+    color:var(--paper-text);
+  }
+  select{min-width:190px;}
+  button.primary{
+    background:var(--amber);
+    color:#1B1200;
+    font-weight:600;
+    border:none;
+    cursor:pointer;
+    padding:9px 18px;
+  }
+  button.primary:hover{filter:brightness(1.08);}
+  button.ghost{
+    background:transparent;
+    color:#C7D6DD;
+    cursor:pointer;
+  }
+  button.ghost:hover{background:rgba(255,255,255,0.06);}
+  .status{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:12.5px;
+    color:#9FB4BF;
+    margin-bottom:10px;
+    min-height:16px;
+  }
+  .status.blocked{color:var(--red);}
+  .status.ok{color:var(--amber);}
+
+  .tabs{
+    display:flex;
+    gap:4px;
+    margin-bottom:14px;
+    flex-wrap:wrap;
+  }
+  .tab{
+    font-family:'Space Grotesk',sans-serif;
+    font-size:12.5px;
+    font-weight:600;
+    padding:8px 12px;
+    border-radius:7px 7px 0 0;
+    background:rgba(255,255,255,0.04);
+    color:#9FB4BF;
+    cursor:pointer;
+    border:1px solid transparent;
+    border-bottom:none;
+    position:relative;
+  }
+  .tab.active{
+    background:var(--paper);
+    color:var(--ink);
+  }
+  .tab.on-route::after{
+    content:"";
+    position:absolute;
+    top:5px; right:6px;
+    width:6px; height:6px;
+    border-radius:50%;
+    background:var(--amber);
+  }
+
+  .plan-wrap{
+    background:var(--paper);
+    border-radius:2px 10px 10px 10px;
+    padding:6px;
+    box-shadow:0 10px 30px rgba(0,0,0,0.35);
+  }
+  svg{width:100%; height:auto; display:block; background:var(--paper); border-radius:6px;}
+
+  .legend{
+    display:flex;
+    flex-wrap:wrap;
+    gap:14px;
+    margin-top:12px;
+    font-size:11.5px;
+    color:#9FB4BF;
+    font-family:'IBM Plex Mono',monospace;
+  }
+  .legend span{display:flex; align-items:center; gap:6px;}
+  .swatch{width:9px; height:9px; border-radius:50%; display:inline-block;}
+
+  .side{
+    padding:20px 20px 20px 0;
+    display:flex;
+    flex-direction:column;
+    gap:16px;
+  }
+  .panel{
+    background:var(--navy-2);
+    border:1px solid rgba(255,255,255,0.08);
+    border-radius:10px;
+    padding:14px 16px;
+  }
+  .panel h2{
+    font-family:'Space Grotesk',sans-serif;
+    font-size:13px;
+    margin:0 0 10px;
+    color:#C7D6DD;
+    letter-spacing:0.03em;
+  }
+
+  /* Elevator-style floor indicator strip — signature element */
+  .indicator{display:flex; flex-direction:column-reverse; gap:2px;}
+  .ind-row{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    padding:7px 8px;
+    border-radius:5px;
+    font-family:'IBM Plex Mono',monospace;
+    font-size:11px;
+    cursor:pointer;
+    color:#7189A3;
+    background:rgba(255,255,255,0.02);
+    border:1px solid transparent;
+  }
+  .ind-row .dot{
+    width:8px;height:8px;border-radius:50%;
+    background:#33475A;
+    flex:none;
+  }
+  .ind-row.current{
+    color:#0E1B24;
+    background:var(--paper);
+    font-weight:600;
+  }
+  .ind-row.current .dot{background:var(--ink);}
+  .ind-row.onroute{color:var(--amber);}
+  .ind-row.onroute .dot{background:var(--amber); box-shadow:0 0 6px var(--amber);}
+  .ind-row.onroute.current{background:var(--amber); color:#1B1200;}
+  .ind-row.onroute.current .dot{background:#1B1200;}
+
+  .route-list{list-style:none; margin:0; padding:0; font-family:'IBM Plex Mono',monospace; font-size:12px;}
+  .route-list li{
+    padding:7px 8px;
+    border-radius:5px;
+    cursor:pointer;
+    color:#C7D6DD;
+    display:flex;
+    justify-content:space-between;
+    gap:6px;
+  }
+  .route-list li:hover{background:rgba(255,255,255,0.06);}
+  .route-list li .t{color:#7189A3; flex:none;}
+  .route-total{
+    margin-top:10px;
+    padding-top:10px;
+    border-top:1px dashed rgba(255,255,255,0.15);
+    display:flex; justify-content:space-between;
+    font-family:'IBM Plex Mono',monospace;
+    font-size:12.5px;
+    color:var(--amber);
+    font-weight:600;
+  }
+  .empty-note{color:#7189A3; font-size:12px; font-family:'IBM Plex Mono',monospace;}
+
+  @media (max-width:880px){
+    .layout{grid-template-columns:1fr;}
+    .side{padding:0 24px 24px;}
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Hospitaal Wayfinding — Live API Roete</h1>
+  <p id="apiStatusLine">koppel aan FastAPI /route eindpunt · roetes word deur die backend bereken</p>
+</header>
+
+<div class="layout">
+  <div class="main-col">
+    <div class="controls">
+      <div class="field">
+        <label>API basis-URL</label>
+        <input type="text" id="apiUrl" value="http://localhost:8000" style="min-width:190px; font-family:'IBM Plex Mono',monospace; font-size:12.5px; padding:8px 10px; border-radius:7px; border:1px solid rgba(255,255,255,0.15); background:#0E1B24; color:var(--paper-text);">
+      </div>
+      <div class="field">
+        <label>Gebruiker tipe</label>
+        <select id="userType"></select>
+      </div>
+      <div class="field">
+        <label>Vanaf</label>
+        <select id="startNode"></select>
+      </div>
+      <div class="field">
+        <label>Na</label>
+        <select id="endNode"></select>
+      </div>
+      <button class="primary" id="findBtn">Vind Roete</button>
+      <button class="ghost" id="clearBtn">Herstel</button>
+    </div>
+
+    <div class="status" id="status"></div>
+
+    <div class="tabs" id="tabs"></div>
+
+    <div class="plan-wrap">
+      <svg id="plan" viewBox="0 0 780 560"></svg>
+    </div>
+
+    <div class="legend" id="legend"></div>
+  </div>
+
+  <div class="side">
+    <div class="panel">
+      <h2>Vloer / Hysbak Aanwyser</h2>
+      <div class="indicator" id="indicator"></div>
+    </div>
+    <div class="panel">
+      <h2>Roete</h2>
+      <div id="routePanel"><div class="empty-note">Kies "Vanaf" en "Na", dan klik Vind Roete.</div></div>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ============================================================
+   DATA — transcribed directly from Skema.sql + SeedData.sql
+   ============================================================ */
+const FLOOR_CHANGE_PENALTY_S = 20.0;
+
+const buildings = [
+  {id:'MAIN',  name:'Hoofgebou'},
+  {id:'ANNEX', name:'Bygebou'},
+];
+
+const floors = [
+  {id:'MAIN-G',  building:'MAIN',  level:0, name:'Grondvloer'},
+  {id:'MAIN-1',  building:'MAIN',  level:1, name:'Vlak 1 — Sale'},
+  {id:'MAIN-2',  building:'MAIN',  level:2, name:'Vlak 2 — ICU / Teater'},
+  {id:'ANNEX-G', building:'ANNEX', level:0, name:'Grondvloer'},
+  {id:'ANNEX-1', building:'ANNEX', level:1, name:'Vlak 1 — Radiologie'},
+];
+
+const nodes = [
+  ['MAIN-G-ENT','MAIN-G','ENTRANCE','Hoof Publieke Ingang',0,0,null],
+  ['MAIN-G-AMB','MAIN-G','ENTRANCE','Ambulans Baai',0,20,null],
+  ['MAIN-G-J01','MAIN-G','JUNCTION','Vestibule Kruising',10,0,null],
+  ['MAIN-G-ELV','MAIN-G','ELEVATOR_LOBBY','Hoof Hysbakke',15,5,null],
+  ['MAIN-G-STA','MAIN-G','STAIRWELL','Hoof Trap',15,10,null],
+  ['MAIN-G-ER','MAIN-G','DEPARTMENT','Nooddienste',5,20,null],
+  ['MAIN-G-TUN','MAIN-G','TUNNEL','Tonnel na Bygebou',10,30,null],
+
+  ['MAIN-1-ELV','MAIN-1','ELEVATOR_LOBBY','Hysbakke Vlak 1',15,5,null],
+  ['MAIN-1-STA','MAIN-1','STAIRWELL','Trap Vlak 1',15,10,null],
+  ['MAIN-1-J01','MAIN-1','JUNCTION','Saal Korridor Kruising',20,5,null],
+  ['MAIN-1-WARDA','MAIN-1','DEPARTMENT','Saal A',25,0,null],
+  ['MAIN-1-WARDB','MAIN-1','DEPARTMENT','Saal B',25,10,null],
+  ['MAIN-1-BRIDGE','MAIN-1','SKYBRIDGE','Lugbrug na Bygebou',30,20,null],
+
+  ['MAIN-2-ELV','MAIN-2','ELEVATOR_LOBBY','Hysbakke Vlak 2',15,5,null],
+  ['MAIN-2-STA','MAIN-2','STAIRWELL','Trap Vlak 2',15,10,null],
+  ['MAIN-2-J01','MAIN-2','JUNCTION','ICU Korridor Kruising',20,5,'ICU_ONLY'],
+  ['MAIN-2-ICU','MAIN-2','DEPARTMENT','ICU',25,0,'ICU_ONLY'],
+  ['MAIN-2-OR','MAIN-2','DEPARTMENT','Operasieteaters',25,10,'STAFF_ONLY'],
+
+  ['ANNEX-G-ENT','ANNEX-G','ENTRANCE','Bygebou Ingang',40,0,null],
+  ['ANNEX-G-J01','ANNEX-G','JUNCTION','Bygebou Vestibule',40,10,null],
+  ['ANNEX-G-ELV','ANNEX-G','ELEVATOR_LOBBY','Bygebou Hysbak',40,15,null],
+  ['ANNEX-G-TUN','ANNEX-G','TUNNEL','Tonnel na Hoofgebou',10,30,null],
+  ['ANNEX-G-OUT','ANNEX-G','DEPARTMENT','Pasiënt Ontvangs',45,10,null],
+
+  ['ANNEX-1-ELV','ANNEX-1','ELEVATOR_LOBBY','Bygebou Hysbak Vlak 1',40,15,null],
+  ['ANNEX-1-BRIDGE','ANNEX-1','SKYBRIDGE','Lugbrug na Hoofgebou',30,20,null],
+  ['ANNEX-1-RAD','ANNEX-1','DEPARTMENT','Radiologie',45,20,null],
+].map(([id,floor,type,label,x,y,restricted])=>({id,floor,type,label,x,y,restricted}));
+
+// [from, to, edgeType, distance_m, base_weight_s, wait_penalty_s, floor_change, bidirectional]
+const edgeRows = [
+  ['MAIN-G-ENT','MAIN-G-J01','CORRIDOR',10,8,0,0,1],
+  ['MAIN-G-J01','MAIN-G-ELV','CORRIDOR',6,5,0,0,1],
+  ['MAIN-G-J01','MAIN-G-STA','CORRIDOR',10,8,0,0,1],
+  ['MAIN-G-J01','MAIN-G-ER','CORRIDOR',22,18,0,0,1],
+  ['MAIN-G-AMB','MAIN-G-ER','CORRIDOR',6,5,0,0,1],
+  ['MAIN-G-J01','MAIN-G-TUN','CORRIDOR',32,27,0,0,1],
+
+  ['MAIN-G-ELV','MAIN-1-ELV','ELEVATOR',0,8,25,1,1],
+  ['MAIN-1-ELV','MAIN-2-ELV','ELEVATOR',0,8,25,1,1],
+  ['MAIN-G-ELV','MAIN-2-ELV','ELEVATOR',0,14,25,2,1],
+  ['MAIN-G-STA','MAIN-1-STA','STAIRS',0,15,0,1,1],
+  ['MAIN-1-STA','MAIN-2-STA','STAIRS',0,15,0,1,1],
+
+  ['MAIN-1-ELV','MAIN-1-J01','CORRIDOR',6,5,0,0,1],
+  ['MAIN-1-STA','MAIN-1-J01','CORRIDOR',6,5,0,0,1],
+  ['MAIN-1-J01','MAIN-1-WARDA','CORRIDOR',6,5,0,0,1],
+  ['MAIN-1-J01','MAIN-1-WARDB','CORRIDOR',6,5,0,0,1],
+  ['MAIN-1-J01','MAIN-1-BRIDGE','CORRIDOR',16,13,0,0,1],
+
+  ['MAIN-2-ELV','MAIN-2-J01','CORRIDOR',6,5,0,0,1],
+  ['MAIN-2-STA','MAIN-2-J01','CORRIDOR',6,5,0,0,1],
+  ['MAIN-2-J01','MAIN-2-ICU','CORRIDOR',6,5,0,0,1],
+  ['MAIN-2-J01','MAIN-2-OR','CORRIDOR',6,5,0,0,1],
+
+  ['ANNEX-G-ENT','ANNEX-G-J01','CORRIDOR',10,8,0,0,1],
+  ['ANNEX-G-J01','ANNEX-G-ELV','CORRIDOR',6,5,0,0,1],
+  ['ANNEX-G-J01','ANNEX-G-OUT','CORRIDOR',6,5,0,0,1],
+  ['ANNEX-G-J01','ANNEX-G-TUN','CORRIDOR',30,25,0,0,1],
+
+  ['ANNEX-G-ELV','ANNEX-1-ELV','ELEVATOR',0,8,25,1,1],
+
+  ['ANNEX-1-ELV','ANNEX-1-BRIDGE','CORRIDOR',10,8,0,0,1],
+  ['ANNEX-1-ELV','ANNEX-1-RAD','CORRIDOR',6,5,0,0,1],
+
+  ['MAIN-1-BRIDGE','ANNEX-1-BRIDGE','SKYBRIDGE',25,21,0,0,1],
+  ['MAIN-G-TUN','ANNEX-G-TUN','TUNNEL',18,15,0,0,1],
+];
+
+const accessPermissions = {
+  PUBLIC: new Set(),
+  STAFF: new Set(['STAFF_ONLY','ICU_ONLY']),
+  PATIENT_TRANSPORT: new Set(['STAFF_ONLY']),
+  EMERGENCY: new Set(['STAFF_ONLY','ICU_ONLY']),
+};
+const userTypeLabels = {
+  PUBLIC:'Publiek / Besoeker',
+  STAFF:'Personeel',
+  PATIENT_TRANSPORT:'Pasiënt Vervoer',
+  EMERGENCY:'Noodgeval',
+};
+
+const NODE_COLORS = {
+  JUNCTION:'#7C8B99', ELEVATOR_LOBBY:'#D97706', STAIRWELL:'#D97706',
+  DOORWAY:'#7C8B99', ENTRANCE:'#2E8B57', SKYBRIDGE:'#6D5DD3',
+  TUNNEL:'#6D5DD3', DEPARTMENT:'#1E6FA8',
+};
+const EDGE_COLORS = {
+  CORRIDOR:'#AFC2CB', ELEVATOR:'#D97706', STAIRS:'#D97706',
+  SKYBRIDGE:'#6D5DD3', TUNNEL:'#6D5DD3',
+};
+
+/* ============================================================
+   NODE/FLOOR LOOKUPS — used purely for drawing the floor plan.
+   Pathfinding itself now comes from the live FastAPI /route
+   endpoint (graph.astar() running server-side), not from JS.
+   ============================================================ */
+const nodeById = Object.fromEntries(nodes.map(n=>[n.id,n]));
+const floorById = Object.fromEntries(floors.map(f=>[f.id,f]));
+
+async function fetchRoute(apiBase, startId, endId, userType){
+  const url = `${apiBase.replace(/\/$/,'')}/route?start=${encodeURIComponent(startId)}&goal=${encodeURIComponent(endId)}&user_type=${encodeURIComponent(userType)}`;
+  let resp;
+  try{
+    resp = await fetch(url);
+  } catch(networkErr){
+    return {error:'network', message:`Kon nie ${apiBase} bereik nie. Loop die API? CORS toegelaat?`};
+  }
+
+  let body;
+  try{ body = await resp.json(); } catch(e){ body = null; }
+
+  if(!resp.ok){
+    const detail = (body && body.detail) ? body.detail : `HTTP ${resp.status}`;
+    return {error: resp.status===403 ? 'blocked' : 'invalid', message: detail};
+  }
+
+  return {
+    path: body.path,
+    cost: body.estimated_time_seconds,
+    nodeCount: body.node_count,
+  };
+}
+
+/* ============================================================
+   UI STATE
+   ============================================================ */
+let currentFloor = floors[0].id;
+let lastResult = null; // {path, cost}
+
+function populateSelects(){
+  const utSel = document.getElementById('userType');
+  Object.keys(userTypeLabels).forEach(k=>{
+    const o=document.createElement('option'); o.value=k; o.textContent=userTypeLabels[k];
+    utSel.appendChild(o);
+  });
+
+  const startSel = document.getElementById('startNode');
+  const endSel = document.getElementById('endNode');
+  floors.forEach(f=>{
+    const g1=document.createElement('optgroup'); g1.label=`${f.building} — ${f.name}`;
+    const g2=document.createElement('optgroup'); g2.label=`${f.building} — ${f.name}`;
+    nodes.filter(n=>n.floor===f.id).forEach(n=>{
+      const o1=document.createElement('option'); o1.value=n.id; o1.textContent=n.label; g1.appendChild(o1);
+      const o2=document.createElement('option'); o2.value=n.id; o2.textContent=n.label; g2.appendChild(o2.cloneNode(true));
+    });
+    startSel.appendChild(g1);
+    endSel.appendChild(g2);
+  });
+  startSel.value='MAIN-G-ENT';
+  endSel.value='ANNEX-1-RAD';
+}
+
+function renderTabs(){
+  const tabsEl = document.getElementById('tabs');
+  tabsEl.innerHTML='';
+  const routeFloors = lastResult && lastResult.path ? new Set(lastResult.path.map(id=>nodeById[id].floor)) : new Set();
+  floors.forEach(f=>{
+    const d=document.createElement('div');
+    d.className='tab'+(f.id===currentFloor?' active':'')+(routeFloors.has(f.id)?' on-route':'');
+    d.textContent=`${f.building} · ${f.name}`;
+    d.onclick=()=>{ currentFloor=f.id; renderAll(); };
+    tabsEl.appendChild(d);
+  });
+}
+
+function renderIndicator(){
+  const el = document.getElementById('indicator');
+  el.innerHTML='';
+  const routeFloors = lastResult && lastResult.path ? new Set(lastResult.path.map(id=>nodeById[id].floor)) : new Set();
+  floors.forEach(f=>{
+    const row=document.createElement('div');
+    row.className='ind-row'+(f.id===currentFloor?' current':'')+(routeFloors.has(f.id)?' onroute':'');
+    row.innerHTML=`<span class="dot"></span><span>${f.building} L${f.level} — ${f.name}</span>`;
+    row.onclick=()=>{ currentFloor=f.id; renderAll(); };
+    el.appendChild(row);
+  });
+}
+
+function renderLegend(){
+  const el = document.getElementById('legend');
+  el.innerHTML='';
+  Object.entries(NODE_COLORS).forEach(([type,color])=>{
+    const s=document.createElement('span');
+    s.innerHTML=`<span class="swatch" style="background:${color}"></span>${type}`;
+    el.appendChild(s);
+  });
+}
+
+// Layout constants: SCALE spaces nodes far enough apart that centered
+// labels don't collide; PAD_Y reserves a clear band at the top for the
+// floor title so it never sits under a node label.
+const SCALE = 15;
+const PAD_X = 55;
+const PAD_Y = 90;
+const px = (n)=>n.x*SCALE+PAD_X;
+const py = (n)=>n.y*SCALE+PAD_Y;
+
+function renderPlan(){
+  const svg = document.getElementById('plan');
+  const NS='http://www.w3.org/2000/svg';
+  svg.innerHTML='';
+
+  const floorNodes = nodes.filter(n=>n.floor===currentFloor);
+  const highlightSet = new Set(lastResult && lastResult.path ? lastResult.path : []);
+  const highlightEdges = new Set();
+  if(lastResult && lastResult.path){
+    const p = lastResult.path;
+    for(let i=0;i<p.length-1;i++){ highlightEdges.add(p[i]+'|'+p[i+1]); highlightEdges.add(p[i+1]+'|'+p[i]); }
+  }
+
+  // draw same-floor edges
+  edgeRows.forEach(([from,to,type])=>{
+    if(nodeById[from].floor===currentFloor && nodeById[to].floor===currentFloor){
+      const a=nodeById[from], b=nodeById[to];
+      const isHl = highlightEdges.has(from+'|'+to);
+      const line=document.createElementNS(NS,'line');
+      line.setAttribute('x1', px(a)); line.setAttribute('y1', py(a));
+      line.setAttribute('x2', px(b)); line.setAttribute('y2', py(b));
+      line.setAttribute('stroke', isHl ? '#FFB100' : (EDGE_COLORS[type]||'#ccc'));
+      line.setAttribute('stroke-width', isHl?5:2.2);
+      if(isHl){ line.setAttribute('stroke-linecap','round'); }
+      svg.appendChild(line);
+    }
+  });
+
+  // draw nodes — labels are centered directly under (or, alternating,
+  // above) each node with a solid halo so they stay legible and don't
+  // run into neighbouring labels or the corridor lines.
+  floorNodes.forEach((n,i)=>{
+    const cx=px(n), cy=py(n);
+    const isHl = highlightSet.has(n.id);
+    const g=document.createElementNS(NS,'g');
+    g.style.cursor='pointer';
+    g.onclick=()=>{
+      const startSel=document.getElementById('startNode'), endSel=document.getElementById('endNode');
+      if(!g.dataset.pickedOnce){ startSel.value=n.id; g.dataset.pickedOnce='1'; }
+      else { endSel.value=n.id; }
+    };
+
+    if(n.restricted){
+      const ring=document.createElementNS(NS,'circle');
+      ring.setAttribute('cx',cx); ring.setAttribute('cy',cy); ring.setAttribute('r', isHl?15:11);
+      ring.setAttribute('fill','none');
+      ring.setAttribute('stroke', n.restricted==='ICU_ONLY' ? '#E14B4B' : '#6D5DD3');
+      ring.setAttribute('stroke-width',1.6);
+      ring.setAttribute('stroke-dasharray','3,3');
+      svg.appendChild(ring);
+    }
+
+    const circle=document.createElementNS(NS,'circle');
+    circle.setAttribute('cx',cx); circle.setAttribute('cy',cy);
+    circle.setAttribute('r', isHl?9:6.5);
+    circle.setAttribute('fill', NODE_COLORS[n.type]||'#333');
+    circle.setAttribute('stroke', isHl ? '#FFB100' : '#fff');
+    circle.setAttribute('stroke-width', isHl?2.4:1.2);
+    g.appendChild(circle);
+
+    // alternate above/below per node so two closely-spaced nodes on the
+    // same row don't stack their labels on top of one another
+    const below = i % 2 === 0;
+    const ty = below ? cy + 18 : cy - 12;
+
+    const text=document.createElementNS(NS,'text');
+    text.setAttribute('x', cx); text.setAttribute('y', ty);
+    text.setAttribute('text-anchor','middle');
+    text.setAttribute('font-size','9');
+    text.setAttribute('font-family','Inter, sans-serif');
+    text.setAttribute('fill','#12222E');
+    text.setAttribute('paint-order','stroke');
+    text.setAttribute('stroke','#E7EEF2');
+    text.setAttribute('stroke-width','3');
+    text.textContent = n.label + (n.restricted?` [${n.restricted}]`:'');
+    g.appendChild(text);
+
+    svg.appendChild(g);
+  });
+
+  const title=document.createElementNS(NS,'text');
+  const f = floorById[currentFloor];
+  title.setAttribute('x',20); title.setAttribute('y',28);
+  title.setAttribute('font-size','15'); title.setAttribute('font-weight','700');
+  title.setAttribute('font-family','Space Grotesk, sans-serif');
+  title.setAttribute('fill','#12222E');
+  title.textContent = `${f.building} — ${f.name}`;
+  svg.appendChild(title);
+}
+
+function renderRoutePanel(){
+  const el = document.getElementById('routePanel');
+  el.innerHTML='';
+  if(!lastResult){
+    el.innerHTML='<div class="empty-note">Kies "Vanaf" en "Na", dan klik Vind Roete.</div>';
+    return;
+  }
+  if(lastResult.error){
+    el.innerHTML=`<div class="empty-note">${lastResult.message}</div>`;
+    return;
+  }
+  if(!lastResult.path){
+    el.innerHTML='<div class="empty-note">Geen roete gevind nie.</div>';
+    return;
+  }
+  const ul=document.createElement('ul');
+  ul.className='route-list';
+  lastResult.path.forEach((id,i)=>{
+    const n=nodeById[id];
+    const li=document.createElement('li');
+    li.innerHTML=`<span>${i+1}. ${n.label}</span><span class="t">${floorById[n.floor].building} L${floorById[n.floor].level}</span>`;
+    li.onclick=()=>{ currentFloor=n.floor; renderAll(); };
+    ul.appendChild(li);
+  });
+  el.appendChild(ul);
+  const total=document.createElement('div');
+  total.className='route-total';
+  total.innerHTML=`<span>Totale tyd</span><span>${Math.round(lastResult.cost)}s</span>`;
+  el.appendChild(total);
+}
+
+function renderStatus(){
+  const el = document.getElementById('status');
+  if(!lastResult){ el.textContent=''; el.className='status'; return; }
+  if(lastResult.error === 'blocked'){
+    el.textContent=`⛔ Toegang geweier (403): ${lastResult.message}`;
+    el.className='status blocked';
+  } else if(lastResult.error === 'invalid'){
+    el.textContent=`⚠ Ongeldige versoek: ${lastResult.message}`;
+    el.className='status blocked';
+  } else if(lastResult.error === 'network'){
+    el.textContent=`⚠ ${lastResult.message}`;
+    el.className='status blocked';
+  } else if(!lastResult.path){
+    el.textContent='⛔ Geen roete beskikbaar nie.';
+    el.className='status blocked';
+  } else {
+    el.textContent=`✓ Roete gevind via API: ${lastResult.nodeCount} node(s), ${lastResult.cost}s.`;
+    el.className='status ok';
+  }
+}
+
+function renderAll(){
+  renderTabs();
+  renderIndicator();
+  renderPlan();
+  renderRoutePanel();
+  renderStatus();
+}
+
+document.getElementById('findBtn').onclick = async ()=>{
+  const start = document.getElementById('startNode').value;
+  const end = document.getElementById('endNode').value;
+  const ut = document.getElementById('userType').value;
+  const apiBase = document.getElementById('apiUrl').value.trim();
+
+  const btn = document.getElementById('findBtn');
+  btn.disabled = true; btn.textContent = 'Soek...';
+  document.getElementById('status').textContent = '⏳ Roep API aan...';
+  document.getElementById('status').className = 'status';
+
+  lastResult = await fetchRoute(apiBase, start, end, ut);
+
+  btn.disabled = false; btn.textContent = 'Vind Roete';
+  if(lastResult.path) currentFloor = nodeById[start].floor;
+  renderAll();
+};
+document.getElementById('clearBtn').onclick = ()=>{
+  lastResult=null;
+  renderAll();
+};
+
+populateSelects();
+renderLegend();
+renderAll();
+</script>
+</body>
+</html>
