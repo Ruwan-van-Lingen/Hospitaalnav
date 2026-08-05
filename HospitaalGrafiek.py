@@ -1,15 +1,9 @@
 """
-Hospital Wayfinding - Graph loader and A* pathfinding.
+Hospitaal Padfind - Grafiek loader en A* "pathfinding".
 
-Loads the topological graph (nodes = decision points, edges = weighted
-paths) from the SQLite database and runs A* between two nodes, honouring
-per-user-type access restrictions (e.g. PUBLIC can't route through
-ICU_ONLY or STAFF_ONLY nodes).
+Laai die topologiese grafiek (nodes = keuse punte, randte = weighted paaie) van die SQLite databasis en hardloop A* tussen twee nodes, en vereer die gebruiker tipe toegang beperkings (bv. die publiek kan nie n roete deur die ICU of die teater saal volg nie).
 
-Heuristic: straight-line (Euclidean) distance between nodes' local
-floor-plan coordinates, plus a fixed penalty per floor crossed. This
-stays admissible as long as FLOOR_CHANGE_PENALTY_S is <= the cheapest
-real elevator/stair time between adjacent floors.
+Heuristic: reguit-lyn (Eucildies) afstand tussen die nodes se lokale vloer plan koordinate, en n vaste penalty per vloer oorkruis. Dit word nie ingereken solank die penalty <= as die goedkoopste ware huisbak/trappe tyd is tussen aangrensende vloere.
 """
 
 import sqlite3
@@ -18,172 +12,171 @@ import heapq
 from dataclasses import dataclass, field
 from typing import Optional
 
-FLOOR_CHANGE_PENALTY_S = 20.0  # conservative lower bound used in the heuristic
+VLOER_VERANDER_PENALTY_S = 20.0  # konserwetiewe laer vlak penalty wat in die heuristic gebruik word 
 
 
 @dataclass
-class Edge:
-    to_node: str
-    weight_s: float          # base_weight_s + wait_penalty_s
-    edge_type: str           # teen aan muur kant 
-    floor_change: int
+class Rand:
+    na_node: str
+    gewig_s: float          # basis_gewig_s + wag_penalty_s
+    rand_tipe: str
+    vloer_verander: int
 
 
-class HospitalGraph:
-    def __init__(self, db_path: str):
-        self.db_path = db_path
-        self.nodes: dict[str, dict] = {}      # node_id -> {floor_id, pos, level, restricted_group}
-        self.adjacency: dict[str, list[Edge]] = {}
+class HospitaalGrafiek:
+    def __init__(self, db_pad: str):
+        self.db_pad = db_pad
+        self.nodes: dict[str, dict] = {}      # node_id -> {vloer_id, pos, beperkte_groep}
+        self.adjacency: dict[str, list[Rand]] = {}
         self._load()
 
     def _load(self):
-        conn = sqlite3.connect(self.db_path)
+        conn = sqlite3.connect(self.db_pad)
         conn.row_factory = sqlite3.Row
         cur = conn.cursor()
 
         cur.execute("""
-            SELECT n.node_id, n.floor_id, n.pos_x, n.pos_y,
-                   n.restricted_group, f.level_number, f.building_id
-            FROM nodes n JOIN floors f ON n.floor_id = f.floor_id
+            SELECT n.node_id, n.vloer_id, n.pos_x, n.pos_y,
+                   n.beperkte_groep, f.level_nommer, f.gebou_id
+            FROM nodes n JOIN vloere f ON n.vloer_id = f.vloer_id
         """)
         for row in cur.fetchall():
             self.nodes[row["node_id"]] = {
-                "floor_id": row["floor_id"],
+                "vloer_id": row["vloer_id"],
                 "pos": (row["pos_x"], row["pos_y"]),
-                "level": row["level_number"],
-                "building_id": row["building_id"],
-                "restricted_group": row["restricted_group"],
+                "level": row["level_nommer"],
+                "gebou_id": row["gebou_id"],
+                "beperkte_groep": row["beperkte_groep"],
             }
             self.adjacency[row["node_id"]] = []
 
         cur.execute("""
-            SELECT from_node, to_node, edge_type, distance_m,
-                   base_weight_s, wait_penalty_s, floor_change, bidirectional
-            FROM edges
+            SELECT van_node, na_node, rand_tipe, afstand_m,
+                   basis_gewig_s, wag_penalty_s, vloer_verander, bidirectional
+            FROM rande
         """)
         for row in cur.fetchall():
-            weight = row["base_weight_s"] + row["wait_penalty_s"]
-            e = Edge(row["to_node"], weight, row["edge_type"], row["floor_change"])
-            self.adjacency[row["from_node"]].append(e)
+            gewig = row["basis_gewig_s"] + row["wag_penalty_s"]
+            e = Rand(row["na_node"], gewig, row["rand_tipe"], row["vloer_verander"])
+            self.adjacency[row["van_node"]].append(e)
             if row["bidirectional"]:
-                e_rev = Edge(row["from_node"], weight, row["edge_type"], row["floor_change"])
-                self.adjacency[row["to_node"]].append(e_rev)
+                e_rev = Rand(row["van_node"], gewig, row["rand_tipe"], row["vloer_verander"])
+                self.adjacency[row["na_node"]].append(e_rev)
 
         conn.close()
 
-    def allowed_groups(self, user_type: str) -> set[str]:
-        """Returns the set of restricted_group values a user_type may enter."""
-        conn = sqlite3.connect(self.db_path)
+    def toegelate_groepe(self, gebruiker_tipe: str) -> set[str]:
+        """Resultaat die stel van beperkte_groep waardes n gebruiker_tipe mag binnekom."""
+        conn = sqlite3.connect(self.db_pad)
         cur = conn.cursor()
         cur.execute(
-            "SELECT restricted_group FROM access_permissions WHERE user_type = ?",
-            (user_type,),
+            "SELECT beperkte_groep FROM toegang_toestemmings WHERE gebruiker_tipe = ?",
+            (gebruiker_tipe,),
         )
-        groups = {r[0] for r in cur.fetchall()}
+        groepe = {r[0] for r in cur.fetchall()}
         conn.close()
-        return groups
+        return groepe
 
     def _heuristic(self, a: str, b: str) -> float:
         ax, ay = self.nodes[a]["pos"]
         bx, by = self.nodes[b]["pos"]
-        # NOTE: this only compares in-floor coordinates; cross-floor
-        # euclidean distance is not meaningful, so we rely on the
-        # floor-change penalty term to keep the estimate admissible.
+        # NOTE: die vergelyk slegs in-vloer koordinate, kruis-vloer eukludiese afstande is nie betekenisvol nie, so ons rely op die vloer_verander_penalty tyd om die skatting relevant te hou. 
+
         planar = math.hypot(ax - bx, ay - by)
-        floor_delta = abs(self.nodes[a]["level"] - self.nodes[b]["level"])
-        return planar + floor_delta * FLOOR_CHANGE_PENALTY_S
+        vloer_delta = abs(self.nodes[a]["level"] - self.nodes[b]["level"])
+        return planar + vloer_delta * VLOER_VERANDER_PENALTY_S
 
     def astar(
         self,
-        start: str,
-        goal: str,
-        user_type: str = "PUBLIC",
+        begin: str,
+        doel: str,
+        gebruiker_tipe: str = "PUBLIEK",
     ) -> Optional[tuple[list[str], float]]:
         """
-        Returns (path_as_list_of_node_ids, total_cost_seconds) or None
-        if no path exists (e.g. blocked entirely by restrictions).
+        Returns (pad_as_lys_of_node_ids, totale_koste_sekondes) or None
+        as geen pad bestaan nie (vb. heeltemal gestop deur beperkings).
         """
-        if start not in self.nodes or goal not in self.nodes:
-            raise ValueError("start/goal node not found in graph")
+        if begin not in self.nodes or doel not in self.nodes:
+            raise ValueError("begin/doel node nie gevind in grafiek nie.")
 
-        allowed = self.allowed_groups(user_type)
+        toegelaat = self.toegelate_groepe(gebruiker_tipe)
 
-        def is_usable(node_id: str) -> bool:
-            group = self.nodes[node_id]["restricted_group"]
-            return group is None or group in allowed
+        def is_bruikbaar(node_id: str) -> bool:
+            groep = self.nodes[node_id]["beperkte_groep"]
+            return groep is None or groep in toegelaat
 
-        if not is_usable(start) or not is_usable(goal):
+        if not is_bruikbaar(begin) or not is_bruikbaar(doel):
             return None
 
-        open_set = [(self._heuristic(start, goal), 0.0, start)]
-        came_from: dict[str, str] = {}
-        g_score = {start: 0.0}
-        visited = set()
+        open_set = [(self._heuristic(begin, doel), 0.0, begin)]  # (f_score, g_score, node_id)  
+        kom_van: dict[str, str] = {}
+        g_score = {begin: 0.0}
+        besoek = set()
 
         while open_set:
-            _, cost_so_far, current = heapq.heappop(open_set)
+            _, koste_so_ver, huidig = heapq.heappop(open_set)
 
-            if current == goal:
-                return self._reconstruct(came_from, current), cost_so_far
+            if huidig == doel:
+                return self._reconstruct(kom_van, huidig), koste_so_ver
 
-            if current in visited:
+            if huidig in besoek:
                 continue
-            visited.add(current)
+            besoek.add(huidig)
 
-            for edge in self.adjacency[current]:
-                if not is_usable(edge.to_node):
-                    continue  # dynamically excluded for this user type
-                tentative_g = cost_so_far + edge.weight_s
-                if tentative_g < g_score.get(edge.to_node, math.inf):
-                    g_score[edge.to_node] = tentative_g
-                    came_from[edge.to_node] = current
-                    f_score = tentative_g + self._heuristic(edge.to_node, goal)
-                    heapq.heappush(open_set, (f_score, tentative_g, edge.to_node))
+            for rand in self.adjacency[huidig]:
+                if not is_bruikbaar(rand.na_node):
+                    continue  # dianmies uitgesluit vir die gebruiker tipe 
+                tentatiewe_g = koste_so_ver + rand.gewig_s
+                if tentatiewe_g < g_score.get(rand.na_node, math.inf):
+                    g_score[rand.na_node] = tentatiewe_g
+                    kom_van[rand.na_node] = huidig
+                    f_score = tentatiewe_g + self._heuristic(rand.na_node, doel)
+                    heapq.heappush(open_set, (f_score, tentatiewe_g, rand.na_node))
 
         return None  # no path found
 
     @staticmethod
-    def _reconstruct(came_from: dict[str, str], current: str) -> list[str]:
-        path = [current]
-        while current in came_from:
-            current = came_from[current]
-            path.append(current)
-        path.reverse()
-        return path
+    def _reconstruct(kom_van: dict[str, str], huidig: str) -> list[str]:
+        pad = [huidig]
+        while huidig in kom_van:
+            huidig = kom_van[huidig]
+            pad.append(huidig)
+        pad.reverse()
+        return pad
 
 
-def build_demo_db(db_path: str, schema_path: str, seed_path: str):
-    """Helper: (re)creates the SQLite DB from schema.sql + seed_data.sql."""
+def bou_demo_db(db_pad: str, skema_pad: str, seed_pad: str):
+    """Helper: (re)creates the SQLite DB from Skema.sql + SeedData.sql."""
     import os
-    if os.path.exists(db_path):
-        os.remove(db_path)
-    conn = sqlite3.connect(db_path)
-    with open(schema_path) as f:
+    if os.path.exists(db_pad):
+        os.remove(db_pad)
+    conn = sqlite3.connect(db_pad)
+    with open(skema_pad) as f:
         conn.executescript(f.read())
-    with open(seed_path) as f:
+    with open(seed_pad) as f:
         conn.executescript(f.read())
     conn.commit()
     conn.close()
 
 
 if __name__ == "__main__":
-    build_demo_db("hospital.db", "schema.sql", "seed_data.sql")
-    g = HospitalGraph("hospital.db")
+    bou_demo_db("hospitaal.db", "Skema.sql", "SeedData.sql")
+    g = HospitaalGrafiek("hospitaal.db")
 
-    print("=== PUBLIC visitor: Main Entrance -> Radiology (Annex) ===")
-    result = g.astar("MAIN-G-ENT", "ANNEX-1-RAD", user_type="PUBLIC")
-    if result:
-        path, cost = result
-        print(f"Path ({cost:.0f}s): " + " -> ".join(path))
+    print("=== PUBLIEK besoeker: Main Ingang -> Radiologie (Annex) ===")
+    resultaat = g.astar("MAIN-G-ENT", "ANNEX-1-RAD", gebruiker_tipe="PUBLIEK")
+    if resultaat:
+        pad, koste = resultaat
+        print(f"Path ({koste:.0f}s): " + " -> ".join(pad))
     else:
-        print("No route found.")
+        print("Geen roete gevind nie.")
 
-    print("\n=== PUBLIC visitor tries to reach ICU (should be blocked) ===")
-    result = g.astar("MAIN-G-ENT", "MAIN-2-ICU", user_type="PUBLIC")
-    print("Blocked as expected." if result is None else f"Unexpected route: {result}")
+    print("\n=== PUBLIEK besoeker proebeer om by ICU uit te kom (moet geblokkeer word) ===")
+    resultaat = g.astar("MAIN-G-ENT", "MAIN-2-ICU", gebruiker_tipe="PUBLIEK")
+    print("Geblokeer soos verwag." if resultaat is None else f"Onverwagte roete: {resultaat}")
 
-    print("\n=== STAFF: Main Entrance -> ICU ===")
-    result = g.astar("MAIN-G-ENT", "MAIN-2-ICU", user_type="STAFF")
-    if result:
-        path, cost = result
-        print(f"Path ({cost:.0f}s): " + " -> ".join(path))
+    print("\n=== STAFF: Hoof Ingang -> ICU ===")
+    resultaat = g.astar("MAIN-G-ENT", "MAIN-2-ICU", gebruiker_tipe="STAFF")
+    if resultaat:
+        pad, koste = resultaat
+        print(f"Pad ({koste:.0f}s): " + " -> ".join(pad))
