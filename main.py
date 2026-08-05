@@ -29,7 +29,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="Hospitaal Padvinder API",
+    title="Hospitaal Navigasie API",
     description="API vir die berekening van die kortste en toeganklikste roetes in die hospitaal.",
     lifespan=lifespan,
 )
