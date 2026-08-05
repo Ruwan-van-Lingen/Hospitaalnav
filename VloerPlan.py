@@ -1,11 +1,12 @@
 """
-Lewer die topologiese grafiek as n vloer plan style diagram - een paneel
-per vloer, nodes plotted by hulle lokaale (pos_x, pos_y) koördinate, met
-rande getrek tussen hulle. Vertikale-sirkulasie rande (huisbak/trappe) en 
-gebou verbindings (lugbrug/tonnel) is geannoteer aangesien hulle nie n 
-selfde-vloer rand het om te teken nie.
+Lewer die topologiese grafiek as 'n vloerplandiagram met een paneel per
+vloer. Nodes word volgens hulle plaaslike (pos_x, pos_y)-koördinate geplaas
+en rande word tussen hulle geteken. Vertikale verbindings (hysbakke en
+trappe) en gebouverbindings (lugbrûe en tonnels) word geannoteer omdat hulle
+nie as gewone rande op dieselfde vloer geteken kan word nie.
 
-Optioneel verlig n pad (lys van node_ids) teruggestuur deur HospitaalGrafiek.astar() of ander roete algoritme. Hierdie pad word om n spesefieke pad te illustreer.
+'n Pad wat deur HospitaalGrafiek.astar() of 'n ander roete-algoritme
+teruggestuur is, kan opsioneel uitgelig word.
 """
 
 import sqlite3
@@ -62,7 +63,7 @@ def teken_vloer_plan(db_pad: str, uit_pad: str, verlig_pad: list[str] | None = N
         vloer_id = vloer["vloer_id"]
         vloer_nodes = {nid: n for nid, n in nodes.items() if n["vloer_id"] == vloer_id}
 
-        # slegs selfde-vloer rande  
+        # Teken slegs rande op dieselfde vloer.
         for e in rande:
             if e["van_node"] in vloer_nodes and e["na_node"] in vloer_nodes:
                 a, b = nodes[e["van_node"]], nodes[e["na_node"]]
@@ -96,7 +97,7 @@ def teken_vloer_plan(db_pad: str, uit_pad: str, verlig_pad: list[str] | None = N
 
         ax.set_title(f"{vloer['gebou_id']} — {vloer['naam']}", fontsize=12, fontweight="bold")
         ax.set_aspect("equal")
-        ax.invert_yaxis()  # so 'op' op die skerm stem ooreen met die tipiese vloer-plan Noord 
+        ax.invert_yaxis()  # Laat skerm-op met die tipiese noordrigting ooreenstem.
         ax.axis("off")
 
     legend_elements = [
@@ -121,10 +122,10 @@ if __name__ == "__main__":
     bou_demo_db("hospitaal.db", "Skema.sql", "SeedData.sql")
     g = HospitaalGrafiek("hospitaal.db")
 
-    # basis diagram, geen verligte roete 
+    # Basiese diagram sonder 'n uitgeligte roete.
     teken_vloer_plan("hospitaal.db", "vloer_plan.png")
 
-    # diagram met n PUBLIEK roete verlig
+    # Diagram met 'n PUBLIEK-roete uitgelig.
     result = g.astar("MAIN-G-ENT", "ANNEX-1-RAD", gebruiker_tipe="PUBLIEK")
     if result:
         pad, _ = result

@@ -14,8 +14,8 @@ app = FastAPI(
     description="API vir die berekening van die kortste en toeganklikste roetes in die hospitaal."
 )
 
-# Laat toe dat die frontend (op 'n ander poort/origin) hierdie API kan bereik.
-# Vir produksie: vervang allow_origins=["*"] met die spesifieke frontend-URL.
+# Laat die webkoppelvlak op 'n ander poort of oorsprong toe om hierdie API te bereik.
+# Vir produksie: vervang allow_origins=["*"] met die spesifieke webkoppelvlak-URL.
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -32,7 +32,7 @@ AUTO_HERBOU_DB = os.getenv("AUTO_HERBOU_DB", "true").lower() == "true"
 
 @app.on_event("startup")
 def startup_event():
-    # Dev: herbou elke start. Prod: stel AUTO_HERBOU_DB=false
+    # Ontwikkeling: herbou by elke begin. Produksie: stel AUTO_HERBOU_DB=false.
     if AUTO_HERBOU_DB:
         bou_demo_db(str(DB_PAD), str(SKEMA_PAD), str(SEED_PAD))
 
