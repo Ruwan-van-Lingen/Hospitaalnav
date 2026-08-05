@@ -359,13 +359,13 @@
           </div>
           <div class="field">
             <label>Vanaf</label>
-            <input class="bestemming-soek" id="beginNode" list="beginBestemmings" placeholder="Soek 'n beginpunt..." autocomplete="off" />
-            <datalist id="beginBestemmings"></datalist>
+            <input class="bestemming-soek" id="beginSoek" placeholder="Soek beginpunte..." autocomplete="off" />
+            <select id="beginNode" aria-label="Kies beginpunt"></select>
           </div>
           <div class="field">
             <label>Na</label>
-            <input class="bestemming-soek" id="endNode" list="eindBestemmings" placeholder="Soek 'n bestemming..." autocomplete="off" />
-            <datalist id="eindBestemmings"></datalist>
+            <input class="bestemming-soek" id="eindSoek" placeholder="Soek bestemmings..." autocomplete="off" />
+            <select id="endNode" aria-label="Kies bestemming"></select>
           </div>
           <button class="primary" id="findBtn">Vind Roete</button>
           <button class="ghost" id="clearBtn">Herstel</button>
@@ -691,49 +691,45 @@
    ============================================================ */
       let huidigeVloer = vloere[0].id;
       let laasteResultaat = null; // {path, cost}
-      const bestemmingIds = new Map();
 
       function bestemmingEtiket(item) {
         return `${item.etiket} — ${item.gebou_naam}, ${item.vloer_naam} (${item.node_id})`;
       }
 
-      async function laaiBestemmings(soekterm, datalistId) {
+      async function laaiBestemmings(soekterm, selectId, gekoseId = null) {
         const apiBase = document.getElementById("apiUrl").value.trim();
-        const url = `${apiBase.replace(/\/$/, "")}/destinations?q=${encodeURIComponent(soekterm)}&limiet=30`;
+        const url = `${apiBase.replace(/\/$/, "")}/destinations?q=${encodeURIComponent(soekterm)}&limiet=100`;
         try {
           const response = await fetch(url);
           if (!response.ok) return;
           const data = await response.json();
-          const lys = document.getElementById(datalistId);
+          const lys = document.getElementById(selectId);
           lys.innerHTML = "";
           data.bestemmings.forEach((item) => {
-            const etiket = bestemmingEtiket(item);
-            bestemmingIds.set(etiket, item.node_id);
             const opsie = document.createElement("option");
-            opsie.value = etiket;
+            opsie.value = item.node_id;
+            opsie.textContent = bestemmingEtiket(item);
             lys.appendChild(opsie);
           });
+          if (gekoseId && [...lys.options].some((opsie) => opsie.value === gekoseId)) {
+            lys.value = gekoseId;
+          }
         } catch (_) {
           // Die roete-foutboodskap hanteer 'n API wat nie bereikbaar is nie.
         }
       }
 
-      function koppelBestemmingSoektog(inputId, datalistId) {
+      function koppelBestemmingSoektog(inputId, selectId) {
         const invoer = document.getElementById(inputId);
         let timer;
         invoer.addEventListener("input", () => {
           clearTimeout(timer);
-          timer = setTimeout(() => laaiBestemmings(invoer.value, datalistId), 200);
+          timer = setTimeout(() => laaiBestemmings(invoer.value, selectId), 200);
         });
-        invoer.addEventListener("focus", () => laaiBestemmings(invoer.value, datalistId));
       }
 
       function bestemmingId(inputId) {
-        const waarde = document.getElementById(inputId).value.trim();
-        if (bestemmingIds.has(waarde)) return bestemmingIds.get(waarde);
-        if (nodeById[waarde]) return waarde;
-        const idPas = waarde.match(/\(([^()]+)\)$/);
-        return idPas && nodeById[idPas[1]] ? idPas[1] : null;
+        return document.getElementById(inputId).value || null;
       }
 
       function populateSelects() {
@@ -745,12 +741,10 @@
           utSel.appendChild(o);
         });
 
-        document.getElementById("beginNode").value = "MAIN-G-ENT";
-        document.getElementById("endNode").value = "ANNEX-1-RAD";
-        koppelBestemmingSoektog("beginNode", "beginBestemmings");
-        koppelBestemmingSoektog("endNode", "eindBestemmings");
-        laaiBestemmings("", "beginBestemmings");
-        laaiBestemmings("", "eindBestemmings");
+        koppelBestemmingSoektog("beginSoek", "beginNode");
+        koppelBestemmingSoektog("eindSoek", "endNode");
+        laaiBestemmings("", "beginNode", "MAIN-G-ENT");
+        laaiBestemmings("", "endNode", "ANNEX-1-RAD");
       }
 
       function renderTabs() {

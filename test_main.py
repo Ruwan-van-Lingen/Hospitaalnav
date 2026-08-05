@@ -20,6 +20,14 @@ def test_soek_bestemming_is_kas_onsensitief():
     assert response.json()["bestemmings"][0]["node_id"] == "MAIN-2-ICU"
 
 
+def test_nooddienste_is_beskikbaar_as_beginpunt():
+    with TestClient(app) as client:
+        response = client.get("/destinations", params={"q": "Nooddienste"})
+
+    assert response.status_code == 200
+    assert response.json()["bestemmings"][0]["node_id"] == "MAIN-G-ER"
+
+
 def test_gevonde_node_werk_in_roete():
     with TestClient(app) as client:
         soek = client.get("/destinations", params={"q": "Radiologie"}).json()

@@ -24,7 +24,7 @@ INSERT INTO nodes (node_id, vloer_id, tipe_kode, etiket, pos_x, pos_y, is_beperk
     ('MAIN-G-J01',   'MAIN-G', 'AANSLUITING',    'Lobby Aansluiting',        10,  0, 0, NULL),
     ('MAIN-G-ELV',   'MAIN-G', 'HUISBAK_GROEP',  'Hoof Huisbak Groep',    15,  5, 0, NULL),
     ('MAIN-G-STA',   'MAIN-G', 'TRAPHUIS',         'Hoof Traphuis',        15, 10, 0, NULL),
-    ('MAIN-G-ER',    'MAIN-G', 'DEPARTEMENT',    'Noodgeval Kamer',         5, 20, 0, NULL),
+    ('MAIN-G-ER',    'MAIN-G', 'DEPARTEMENT',    'Nooddienste',             5, 20, 0, NULL),
     ('MAIN-G-TUN',   'MAIN-G', 'TONNEL',         'Tonnel na Annex',       10, 30, 0, NULL),
 
     -- MAIN Level 1
