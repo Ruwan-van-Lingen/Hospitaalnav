@@ -16,7 +16,7 @@ Die ondersteunde gebruikerstipes is:
 | Gebruikerstipe | Toegang |
 |---|---|
 | `PUBLIEK` | Openbare areas |
-| `STAFF` | Openbare, personeel- en ICU-areas |
+| `PERSONEEL` | Openbare, personeel- en ICU-areas |
 | `PASIENT_VERVOER` | Openbare en personeelareas |
 | `NOODGEVAL` | Alle gedefinieerde areas |
 

@@ -205,8 +205,8 @@ if __name__ == "__main__":
     resultaat = g.astar("MAIN-G-ENT", "MAIN-2-ICU", gebruiker_tipe="PUBLIEK")
     print("Geblokeer soos verwag." if resultaat is None else f"Onverwagte roete: {resultaat}")
 
-    print("\n=== STAFF: Hoof Ingang -> ICU ===")
-    resultaat = g.astar("MAIN-G-ENT", "MAIN-2-ICU", gebruiker_tipe="STAFF")
+    print("\n=== PERSONEEL: Hoof Ingang -> ICU ===")
+    resultaat = g.astar("MAIN-G-ENT", "MAIN-2-ICU", gebruiker_tipe="PERSONEEL")
     if resultaat:
         pad, koste = resultaat
         print(f"Pad ({koste:.0f}s): " + " -> ".join(pad))

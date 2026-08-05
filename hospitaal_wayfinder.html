@@ -502,7 +502,7 @@
           "Operasieteaters",
           25,
           10,
-          "STAFF_ONLY",
+          "SLEGS_PERSONEEL",
         ],
 
         ["ANNEX-G-ENT", "ANNEX-G", "INGANG", "Annex Ingang", 40, 0, null],
@@ -614,13 +614,13 @@
 
       const toegangToestemmings = {
         PUBLIEK: new Set(),
-        STAFF: new Set(["STAFF_ONLY", "ICU_ONLY"]),
-        PASIENT_VERVOER: new Set(["STAFF_ONLY"]),
-        NOODGEVAL: new Set(["STAFF_ONLY", "ICU_ONLY"]),
+        PERSONEEL: new Set(["SLEGS_PERSONEEL", "ICU_ONLY"]),
+        PASIENT_VERVOER: new Set(["SLEGS_PERSONEEL"]),
+        NOODGEVAL: new Set(["SLEGS_PERSONEEL", "ICU_ONLY"]),
       };
       const gebruikerTipeEtikette = {
         PUBLIEK: "Publiek / Besoeker",
-        STAFF: "Personeel",
+        PERSONEEL: "Personeel",
         PASIENT_VERVOER: "Pasiënt Vervoer",
         NOODGEVAL: "Noodgeval",
       };

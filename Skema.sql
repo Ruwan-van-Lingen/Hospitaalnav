@@ -42,7 +42,7 @@ INSERT INTO node_tipes (tipe_kode, beskrywing) VALUES
     ('HUISBAK_GROEP',       'Huisbak op n gegewe vloer'),
     ('TRAPHUIS',            'Trappe toegang punt'),
     ('DEUR',                'Deur tussen die gang en die kamer/saal'),
-    ('INGANG',              'Gebou ingang (publiek/ambulans/staff)'),
+    ('INGANG',              'Gebou ingang (publiek/ambulans/personeel)'),
     ('LUGBRUG',             'Lug brug konneksie punt tussen geboue'),
     ('TONNEL',              'Ondergrondse tonnel konneksie punt'),
     ('DEPARTEMENT',         'Departement / kamer bestemming node');
@@ -58,7 +58,7 @@ CREATE TABLE nodes (
     pos_x           REAL NOT NULL,         -- lokaale koordinaate op vloer plan (meters)
     pos_y           REAL NOT NULL,
     is_beperk       INTEGER NOT NULL DEFAULT 0,  -- 1 = in n verbode wing (soos OR ens.)
-    beperkte_groep  TEXT                  -- vb. 'STAFF_ONLY','ICU_ONLY', NULL if open
+    beperkte_groep  TEXT                  -- vb. 'SLEGS_PERSONEEL','ICU_ONLY', NULL if open
 );
 
 CREATE INDEX idx_nodes_vloer ON nodes(vloer_id);
@@ -87,16 +87,16 @@ CREATE INDEX idx_rande_na ON rande(na_node);
 
 -- ----------------------------------------------------------
 -- Gebruiker tipes - dinamiese exclusion van beperkte nodes 
--- (publiek, staff, pasient-transport, noodgeval, ens.)
+-- (publiek, personeel, pasient-transport, noodgeval, ens.)
 -- ----------------------------------------------------------
 CREATE TABLE gebruiker_tipes (
-    gebruiker_tipe       TEXT PRIMARY KEY,      -- 'PUBLIEK','STAFF','PASIENT_VERVOER','NOODGEVAL'
+    gebruiker_tipe       TEXT PRIMARY KEY,      -- 'PUBLIEK','PERSONEEL','PASIENT_VERVOER','NOODGEVAL'
     beskrywing           TEXT
 );
 
 INSERT INTO gebruiker_tipes (gebruiker_tipe, beskrywing) VALUES
     ('PUBLIEK',            'Algemene besoekers / pasiente'),
-    ('STAFF',              'Hospitaal staff, all saale'),
+    ('PERSONEEL',              'Hospitaal personeel, all saale'),
     ('PASIENT_VERVOER',    'Porters/vervoer met beperkte-saal toegang'),
     ('NOODGEVAL',          'Noodgeval reaksie, alle toegang');
 
@@ -109,8 +109,8 @@ CREATE TABLE toegang_toestemmings (
 );
 
 INSERT INTO toegang_toestemmings (gebruiker_tipe, beperkte_groep) VALUES
-    ('STAFF', 'STAFF_ONLY'),
-    ('STAFF', 'ICU_ONLY'),
-    ('PASIENT_VERVOER', 'STAFF_ONLY'),
-    ('NOODGEVAL', 'STAFF_ONLY'),
+    ('PERSONEEL', 'SLEGS_PERSONEEL'),
+    ('PERSONEEL', 'ICU_ONLY'),
+    ('PASIENT_VERVOER', 'SLEGS_PERSONEEL'),
+    ('NOODGEVAL', 'SLEGS_PERSONEEL'),
     ('NOODGEVAL', 'ICU_ONLY');

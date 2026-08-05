@@ -45,6 +45,14 @@ def tuisblad():
     return {"boodskap": "Welkom by die Hospitaal Padvinder API. Gaan na /docs vir die dokumentasie."}
 
 
+@app.get("/ui")             #die is sodat die correcte api laai vir die link 
+def ui():
+    html_pad = BASE_GIDS / "hospitaal_wayfinder.html"
+    if not html_pad.exists():
+        raise HTTPException(status_code=404, detail="hospitaal_wayfinder.html nie gevind nie.")
+    return FileResponse(str(html_pad))
+
+
 @app.get("/destinations")
 def soek_bestemmings(
     q: str = Query("", description="Naam, node-ID, tipe, gebou of vloer"),
@@ -61,7 +69,7 @@ def soek_bestemmings(
 def kry_roete(
     begin: str = Query(..., description="Die beginnodusse ID (bv. MAIN-G-ENT)"),
     doel: str = Query(..., description="Die eindnodusse ID (bv. ANNEX-1-RAD)"),
-    gebruiker_tipe: str = Query("PUBLIEK", description="Gebruikerstipe (bv. PUBLIEK, STAFF, NOODGEVAL)")
+    gebruiker_tipe: str = Query("PUBLIEK", description="Gebruikerstipe (bv. PUBLIEK, PERSONEEL, NOODGEVAL)")
 ):
     """
     Bereken die vinnigste roete tussen twee punte gebaseer op die gebruikerstipe.
@@ -94,7 +102,7 @@ def kry_roete_prentjie(
     begin: str = Query(..., description="Die beginnodus se ID (bv. MAIN-G-ENT)"),
     doel: str = Query(..., description="Die eindnodus se ID (bv. ANNEX-1-RAD)"),
     gebruiker_tipe: str = Query(
-        "PUBLIEK", description="Gebruikerstipe (bv. PUBLIEK, STAFF, NOODGEVAL)"
+        "PUBLIEK", description="Gebruikerstipe (bv. PUBLIEK, PERSONEEL, NOODGEVAL)"
     ),
 ):
     """Gee 'n PNG-vloerplan terug waarop die berekende roete uitgelig is."""
