@@ -10,7 +10,7 @@ from starlette.background import BackgroundTask
 from VloerPlan import teken_vloer_plan
 
 app = FastAPI(
-    title="Hospitaal Padvinder API",
+    title="Hospitaal Navigasie API",
     description="API vir die berekening van die kortste en toeganklikste roetes in die hospitaal."
 )
 
@@ -42,7 +42,7 @@ def startup_event():
 
 @app.get("/")
 def tuisblad():
-    return {"boodskap": "Welkom by die Hospitaal Padvinder API. Gaan na /docs vir die dokumentasie."}
+    return {"boodskap": "Welkom by die Hospitaal Navigasie API. Gaan na /docs vir die dokumentasie."}
 
 
 @app.get("/ui")             #die is sodat die correcte api laai vir die link 
