@@ -86,7 +86,7 @@ def soek_bestemmings(
 @app.get("/route")
 def kry_roete(
     begin: str = Query(..., description="Die beginnodusse ID (bv. MAIN-G-ENT)"),
-    doel: str = Query(..., description="Die eindnodusse ID (bv. ANNEX-1-RAD)"),
+    doel: str = Query(..., description="Die eindnodusse ID (bv. SYGEBOU-1-RAD)"),
     gebruiker_tipe: str = Query("PUBLIEK", description="Gebruikerstipe (bv. PUBLIEK, PERSONEEL, NOODGEVAL)")
 ):
     """
@@ -119,7 +119,7 @@ def kry_roete(
 @app.get("/route/image")
 def kry_roete_prentjie(
     begin: str = Query(..., description="Die beginnodus se ID (bv. MAIN-G-ENT)"),
-    doel: str = Query(..., description="Die eindnodus se ID (bv. ANNEX-1-RAD)"),
+    doel: str = Query(..., description="Die eindnodus se ID (bv. SYGEBOU-1-RAD)"),
     gebruiker_tipe: str = Query(
         "PUBLIEK", description="Gebruikerstipe (bv. PUBLIEK, PERSONEEL, NOODGEVAL)"
     ),

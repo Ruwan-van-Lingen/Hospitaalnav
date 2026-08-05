@@ -15,7 +15,7 @@ def test_soek_bestemming_volgens_naam():
 
     assert response.status_code == 200
     bestemmings = response.json()["bestemmings"]
-    assert any(item["node_id"] == "ANNEX-1-RAD" for item in bestemmings)
+    assert any(item["node_id"] == "SYGEBOU-1-RAD" for item in bestemmings)
 
 
 def test_soek_bestemming_is_kas_onsensitief():
@@ -48,7 +48,7 @@ def test_gevonde_node_werk_in_roete():
         )
 
     assert response.status_code == 200
-    assert response.json()["pad"][-1] == "ANNEX-1-RAD"
+    assert response.json()["pad"][-1] == "SYGEBOU-1-RAD"
     assert response.json()["geskatte_tyd"] == "1m 23s"
 
 
@@ -73,7 +73,7 @@ def test_ongeldige_gebruikerstipe_word_verwerp():
             "/route",
             params={
                 "begin": "MAIN-G-ENT",
-                "doel": "ANNEX-1-RAD",
+                "doel": "SYGEBOU-1-RAD",
                 "gebruiker_tipe": "ONBEKEND",
             },
         )
@@ -96,7 +96,7 @@ def test_roeteprent_is_png():
             "/route/image",
             params={
                 "begin": "MAIN-G-ENT",
-                "doel": "ANNEX-1-RAD",
+                "doel": "SYGEBOU-1-RAD",
                 "gebruiker_tipe": "PUBLIEK",
             },
         )

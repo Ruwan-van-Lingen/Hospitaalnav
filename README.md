@@ -153,7 +153,7 @@ Bereken 'n toegelate roete.
 Voorbeeld:
 
 ```text
-GET http://127.0.0.1:8000/route?begin=MAIN-G-ENT&doel=ANNEX-1-RAD&gebruiker_tipe=PUBLIEK
+GET http://127.0.0.1:8000/route?begin=MAIN-G-ENT&doel=SYGEBOU-1-RAD&gebruiker_tipe=PUBLIEK
 ```
 
 Voorbeeldantwoord:
@@ -161,7 +161,7 @@ Voorbeeldantwoord:
 ```json
 {
   "begin_node": "MAIN-G-ENT",
-  "doel_node": "ANNEX-1-RAD",
+  "doel_node": "SYGEBOU-1-RAD",
   "gebruiker_tipe": "PUBLIEK",
   "geskatte_tyd_sekondes": 83.0,
   "geskatte_tyd": "1m 23s",
@@ -173,9 +173,9 @@ Voorbeeldantwoord:
     "MAIN-1-STA",
     "MAIN-1-J01",
     "MAIN-1-BRIDGE",
-    "ANNEX-1-BRIDGE",
-    "ANNEX-1-ELV",
-    "ANNEX-1-RAD"
+    "SYGEBOU-1-BRIDGE",
+    "SYGEBOU-1-ELV",
+    "SYGEBOU-1-RAD"
   ]
 }
 ```
@@ -185,7 +185,7 @@ Voorbeeldantwoord:
 Bereken die roete en lewer 'n PNG-vloerplan waarop dit uitgelig is.
 
 ```text
-GET http://127.0.0.1:8000/route/image?begin=MAIN-G-ENT&doel=ANNEX-1-RAD&gebruiker_tipe=PUBLIEK
+GET http://127.0.0.1:8000/route/image?begin=MAIN-G-ENT&doel=SYGEBOU-1-RAD&gebruiker_tipe=PUBLIEK
 ```
 
 ## Algemene HTTP-antwoorde

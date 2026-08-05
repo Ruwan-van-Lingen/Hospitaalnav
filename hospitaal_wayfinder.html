@@ -406,7 +406,7 @@
 
       const geboue = [
         { id: "MAIN", naam: "Hoofgebou" },
-        { id: "ANNEX", naam: "Annex" },
+        { id: "SYGEBOU", naam: "Sygebou" },
       ];
 
       const vloere = [
@@ -418,10 +418,10 @@
           level: 2,
           naam: "Vlak 2 — ICU / Teater",
         },
-        { id: "ANNEX-G", gebou: "ANNEX", level: 0, naam: "Grondvloer" },
+        { id: "SYGEBOU-G", gebou: "SYGEBOU", level: 0, naam: "Grondvloer" },
         {
-          id: "ANNEX-1",
-          gebou: "ANNEX",
+          id: "SYGEBOU-1",
+          gebou: "SYGEBOU",
           level: 1,
           naam: "Vlak 1 — Radiologie",
         },
@@ -434,7 +434,7 @@
           "MAIN-G-J01",
           "MAIN-G",
           "AANSLUITING",
-          "Vestibule Kruising",
+          "Voorportaal Kruising",
           10,
           0,
           null,
@@ -442,7 +442,7 @@
         ["MAIN-G-ELV", "MAIN-G", "HUISBAK_GROEP", "Hoof Hysbakke", 15, 5, null],
         ["MAIN-G-STA", "MAIN-G", "TRAPHUIS", "Hoof Trap", 15, 10, null],
         ["MAIN-G-ER", "MAIN-G", "DEPARTEMENT", "Nooddienste", 5, 20, null],
-        ["MAIN-G-TUN", "MAIN-G", "TONNEL", "Tonnel na Annex", 10, 30, null],
+        ["MAIN-G-TUN", "MAIN-G", "TONNEL", "Tonnel na Sygebou", 10, 30, null],
 
         [
           "MAIN-1-ELV",
@@ -469,7 +469,7 @@
           "MAIN-1-BRIDGE",
           "MAIN-1",
           "LUGBRUG",
-          "Lugbrug na Annex",
+          "Lugbrug na Sygebou",
           30,
           20,
           null,
@@ -505,28 +505,28 @@
           "SLEGS_PERSONEEL",
         ],
 
-        ["ANNEX-G-ENT", "ANNEX-G", "INGANG", "Annex Ingang", 40, 0, null],
+        ["Sygebou-G-ENT", "Sygebou-G", "INGANG", "Sygebou Ingang", 40, 0, null],
         [
-          "ANNEX-G-J01",
-          "ANNEX-G",
+          "SYGEBOU-G-J01",
+          "SYGEBOU-G",
           "AANSLUITING",
-          "Annex Vestibule",
+          "Sygebou Voorportaal",
           40,
           10,
           null,
         ],
         [
-          "ANNEX-G-ELV",
-          "ANNEX-G",
+          "SYGEBOU-G-ELV",
+          "SYGEBOU-G",
           "HUISBAK_GROEP",
-          "Annex Hysbak",
+          "Sygebou Hysbak",
           40,
           15,
           null,
         ],
         [
-          "ANNEX-G-TUN",
-          "ANNEX-G",
+          "SYGEBOU-G-TUN",
+          "SYGEBOU-G",
           "TONNEL",
           "Tonnel na Hoofgebou",
           10,
@@ -534,8 +534,8 @@
           null,
         ],
         [
-          "ANNEX-G-OUT",
-          "ANNEX-G",
+          "SYGEBOU-G-OUT",
+          "SYGEBOU-G",
           "DEPARTEMENT",
           "Pasiënt Ontvangs",
           45,
@@ -544,24 +544,24 @@
         ],
 
         [
-          "ANNEX-1-ELV",
-          "ANNEX-1",
+          "SYGEBOU-1-ELV",
+          "SYGEBOU-1",
           "HUISBAK_GROEP",
-          "Annex Hysbak Vlak 1",
+          "Sygebou Hysbak Vlak 1",
           40,
           15,
           null,
         ],
         [
-          "ANNEX-1-BRIDGE",
-          "ANNEX-1",
+          "SYGEBOU-1-BRIDGE",
+          "SYGEBOU-1",
           "LUGBRUG",
           "Lugbrug na Hoofgebou",
           30,
           20,
           null,
         ],
-        ["ANNEX-1-RAD", "ANNEX-1", "DEPARTEMENT", "Radiologie", 45, 20, null],
+        ["SYGEBOU-1-RAD", "SYGEBOU-1", "DEPARTEMENT", "Radiologie", 45, 20, null],
       ].map(([id, vloer, tipe, etiket, x, y, beperkte_groep]) => ({
         id,
         vloer,
@@ -598,18 +598,18 @@
         ["MAIN-2-J01", "MAIN-2-ICU", "GANG", 6, 5, 0, 0, 1],
         ["MAIN-2-J01", "MAIN-2-OR", "GANG", 6, 5, 0, 0, 1],
 
-        ["ANNEX-G-ENT", "ANNEX-G-J01", "GANG", 10, 8, 0, 0, 1],
-        ["ANNEX-G-J01", "ANNEX-G-ELV", "GANG", 6, 5, 0, 0, 1],
-        ["ANNEX-G-J01", "ANNEX-G-OUT", "GANG", 6, 5, 0, 0, 1],
-        ["ANNEX-G-J01", "ANNEX-G-TUN", "GANG", 30, 25, 0, 0, 1],
+        ["SYGEBOU-G-ENT", "SYEGBOU-G-J01", "GANG", 10, 8, 0, 0, 1],
+        ["SYGEBOU-G-J01", "SYGEBOU-G-ELV", "GANG", 6, 5, 0, 0, 1],
+        ["SYGEBOU-G-J01", "SYGEBOU-G-OUT", "GANG", 6, 5, 0, 0, 1],
+        ["SYGEBOU-G-J01", "SYGEBOU-G-TUN", "GANG", 30, 25, 0, 0, 1],
 
-        ["ANNEX-G-ELV", "ANNEX-1-ELV", "HUISBAK", 0, 8, 25, 1, 1],
+        ["SYGEBOU-G-ELV", "SYGEBOU-1-ELV", "HUISBAK", 0, 8, 25, 1, 1],
 
-        ["ANNEX-1-ELV", "ANNEX-1-BRIDGE", "GANG", 10, 8, 0, 0, 1],
-        ["ANNEX-1-ELV", "ANNEX-1-RAD", "GANG", 6, 5, 0, 0, 1],
+        ["SYGEBOU-1-ELV", "SYGEBOU-1-BRIDGE", "GANG", 10, 8, 0, 0, 1],
+        ["SYGEBOU-1-ELV", "SYGEBOU-1-RAD", "GANG", 6, 5, 0, 0, 1],
 
-        ["MAIN-1-BRIDGE", "ANNEX-1-BRIDGE", "LUGBRUG", 25, 21, 0, 0, 1],
-        ["MAIN-G-TUN", "ANNEX-G-TUN", "TONNEL", 18, 15, 0, 0, 1],
+        ["MAIN-1-BRIDGE", "SYGEBOU-1-BRIDGE", "LUGBRUG", 25, 21, 0, 0, 1],
+        ["MAIN-G-TUN", "SYGEBOU-G-TUN", "TONNEL", 18, 15, 0, 0, 1],
       ];
 
       const toegangToestemmings = {
@@ -745,7 +745,7 @@
         koppelBestemmingSoektog("beginSoek", "beginNode");
         koppelBestemmingSoektog("eindSoek", "endNode");
         laaiBestemmings("", "beginNode", "MAIN-G-ENT");
-        laaiBestemmings("", "endNode", "ANNEX-1-RAD");
+        laaiBestemmings("", "endNode", "SYGEBOU-1-RAD");
       }
 
       function renderTabs() {

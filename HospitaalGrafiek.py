@@ -201,8 +201,8 @@ if __name__ == "__main__":
     bou_demo_db("hospitaal.db", "Skema.sql", "SeedData.sql")
     g = HospitaalGrafiek("hospitaal.db")
 
-    print("=== PUBLIEK besoeker: Main Ingang -> Radiologie (Annex) ===")
-    resultaat = g.astar("MAIN-G-ENT", "ANNEX-1-RAD", gebruiker_tipe="PUBLIEK")
+    print("=== PUBLIEK besoeker: Main Ingang -> Radiologie (Sygebou) ===")
+    resultaat = g.astar("MAIN-G-ENT", "SYGEBOU-1-RAD", gebruiker_tipe="PUBLIEK")
     if resultaat:
         pad, koste = resultaat
         print(f"Path ({koste:.0f}s): " + " -> ".join(pad))

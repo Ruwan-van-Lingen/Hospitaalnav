@@ -10,7 +10,7 @@ PRAGMA foreign_keys = ON;
 -- lug brue / tonnels)
 -- ----------------------------------------------------------
 CREATE TABLE geboue (
-    gebou_id        TEXT PRIMARY KEY,      -- vb. 'MAIN', 'ANNEX'
+    gebou_id        TEXT PRIMARY KEY,      -- vb. 'MAIN', 'SYGEBOU'
     naam            TEXT NOT NULL,
     beskrywing      TEXT
 );
@@ -19,7 +19,7 @@ CREATE TABLE geboue (
 -- Vloere (behoort aan n gebou)
 -- ----------------------------------------------------------
 CREATE TABLE vloere (
-    vloer_id         TEXT PRIMARY KEY,      -- vb. 'MAIN-1', 'ANNEX-G'
+    vloer_id         TEXT PRIMARY KEY,      -- vb. 'MAIN-1', 'SYGEBOU-G'
     gebou_id         TEXT NOT NULL REFERENCES geboue(gebou_id),
     level_nommer     INTEGER NOT NULL,      -- 0 = grond, negatief = basement
     naam             TEXT NOT NULL          -- vb. 'Grond Vloer', 'Level 3'

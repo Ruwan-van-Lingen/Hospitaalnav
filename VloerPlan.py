@@ -129,7 +129,7 @@ if __name__ == "__main__":
     teken_vloer_plan("hospitaal.db", "vloer_plan.png")
 
     # diagram met n PUBLIEK roete verlig
-    result = g.astar("MAIN-G-ENT", "ANNEX-1-RAD", gebruiker_tipe="PUBLIEK")
+    result = g.astar("MAIN-G-ENT", "SYGEBOU-1-RAD", gebruiker_tipe="PUBLIEK")
     if result:
         pad, _ = result
         teken_vloer_plan("hospitaal.db", "vloer_plan_met_roete.png", verlig_pad=pad)

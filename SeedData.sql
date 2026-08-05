@@ -1,19 +1,19 @@
 -- ============================================================
 -- Sample data: n klein twee gebou hospitaal
--- MAIN gebou (3 vloere) + ANNEX geboue (2 vloere),
+-- MAIN gebou (3 vloere) + SYGEBOU geboue (2 vloere),
 -- geheg deur n lug brug op level 1 en n tonnel op die grond vloer
 -- ============================================================
 
 INSERT INTO geboue (gebou_id, naam, beskrywing) VALUES
     ('MAIN',  'Main Hospitaal Gebou', 'Noodgeval, Saale, or'),
-    ('ANNEX', 'Annex Gebou', 'Uitpasiente, Radiologie, Admin');
+    ('SYGEBOU', 'Sygebou Gebou', 'Uitpasiente, Radiologie, Admin');
 
 INSERT INTO vloere (vloer_id, gebou_id, level_nommer, naam) VALUES
     ('MAIN-G',  'MAIN',  0, 'Grond Vloer'),
     ('MAIN-1',  'MAIN',  1, 'Level 1 - Saale'),
     ('MAIN-2',  'MAIN',  2, 'Level 2 - ICU / OR'),
-    ('ANNEX-G', 'ANNEX', 0, 'Grond Vloer'),
-    ('ANNEX-1', 'ANNEX', 1, 'Level 1 - Radiology');
+    ('SYGEBOU-G', 'SYGEBOU', 0, 'Grond Vloer'),
+    ('SYGEBOU-1', 'SYGEBOU', 1, 'Level 1 - Radiology');
 
 -- ---------------- Nodes ----------------
 
@@ -25,7 +25,7 @@ INSERT INTO nodes (node_id, vloer_id, tipe_kode, etiket, pos_x, pos_y, is_beperk
     ('MAIN-G-ELV',   'MAIN-G', 'HUISBAK_GROEP',  'Hoof Huisbak Groep',    15,  5, 0, NULL),
     ('MAIN-G-STA',   'MAIN-G', 'TRAPHUIS',       'Hoof Traphuis',         15, 10, 0, NULL),
     ('MAIN-G-ER',    'MAIN-G', 'DEPARTEMENT',    'Nooddienste',           5, 20, 0, NULL),
-    ('MAIN-G-TUN',   'MAIN-G', 'TONNEL',         'Tonnel na Annex',       10, 30, 0, NULL),
+    ('MAIN-G-TUN',   'MAIN-G', 'TONNEL',         'Tonnel na Sygebou',       10, 30, 0, NULL),
 
     -- MAIN Level 1
     ('MAIN-1-ELV',   'MAIN-1', 'HUISBAK_GROEP',  'Huisbak Groep L1',     15,  5, 0, NULL),
@@ -33,7 +33,7 @@ INSERT INTO nodes (node_id, vloer_id, tipe_kode, etiket, pos_x, pos_y, is_beperk
     ('MAIN-1-J01',   'MAIN-1', 'DEPARTEMENT',    'Saal Gang Jct',        20,  5, 0, NULL),
     ('MAIN-1-WARDA', 'MAIN-1', 'DEPARTEMENT',    'Saal A',               25,  0, 0, NULL),
     ('MAIN-1-WARDB', 'MAIN-1', 'DEPARTEMENT',    'Saal B',               25, 10, 0, NULL),
-    ('MAIN-1-BRIDGE','MAIN-1', 'LUGBRUG',        'Lug Brug na Annex',    30, 20, 0, NULL),
+    ('MAIN-1-BRIDGE','MAIN-1', 'LUGBRUG',        'Lug Brug na Sygebou',    30, 20, 0, NULL),
 
     -- MAIN Level 2 (beperkte - ICU/Surergie)
     ('MAIN-2-ELV',   'MAIN-2', 'HUISBAK_GROEP', 'Huisbak Groep L2',      15,  5, 0, NULL),
@@ -42,17 +42,17 @@ INSERT INTO nodes (node_id, vloer_id, tipe_kode, etiket, pos_x, pos_y, is_beperk
     ('MAIN-2-ICU',   'MAIN-2', 'DEPARTEMENT',   'ICU',                   25,  0, 1, 'ICU_ONLY'),
     ('MAIN-2-OR',    'MAIN-2', 'DEPARTEMENT',   'OR',                    25, 10, 1, 'SLEGS_PERSONEEL'),
 
-    -- ANNEX Grond vloer
-    ('ANNEX-G-ENT',  'ANNEX-G','INGANG',         'Annex Ingang',              40,  0, 0, NULL),
-    ('ANNEX-G-J01',  'ANNEX-G','AANSLUITING',    'Annex Lobby Jct',           40, 10, 0, NULL),
-    ('ANNEX-G-ELV',  'ANNEX-G','HUISBAK_GROEP',  'Annex Huisbak',             40, 15, 0, NULL),
-    ('ANNEX-G-TUN',  'ANNEX-G','TONNEL',         'Tonnel na Main',            10, 30, 0, NULL),
-    ('ANNEX-G-OUT',  'ANNEX-G','DEPARTEMENT',    'Uitpasient Ontvangs',       45, 10, 0, NULL),
+    -- SYGEBOU Grond vloer
+    ('SYGEBOU-G-ENT',  'SYGEBOU-G','INGANG',         'Sygebou Ingang',              40,  0, 0, NULL),
+    ('SYGEBOU-G-J01',  'SYGEBOU-G','AANSLUITING',    'Sygebou Lobby Jct',           40, 10, 0, NULL),
+    ('SYGEBOU-G-ELV',  'SYGEBOU-G','HUISBAK_GROEP',  'Sygebou Huisbak',             40, 15, 0, NULL),
+    ('SYGEBOU-G-TUN',  'SYGEBOU-G','TONNEL',         'Tonnel na Main',            10, 30, 0, NULL),
+    ('SYGEBOU-G-OUT',  'SYGEBOU-G','DEPARTEMENT',    'Uitpasient Ontvangs',       45, 10, 0, NULL),
 
-    -- ANNEX Level 1
-    ('ANNEX-1-ELV',  'ANNEX-1','HUISBAK_GROEP', 'Annex Huisbak L1',           40, 15, 0, NULL),
-    ('ANNEX-1-BRIDGE','ANNEX-1','LUGBRUG',      'Lug Brug na Main',           30, 20, 0, NULL),
-    ('ANNEX-1-RAD',   'ANNEX-1','DEPARTEMENT',  'Radiologie',                 45, 20, 0, NULL);
+    -- SYGEBOU Level 1
+    ('SYGEBOU-1-ELV',  'SYGEBOU-1','HUISBAK_GROEP', 'Sygebou Huisbak L1',           40, 15, 0, NULL),
+    ('SYGEBOU-1-BRIDGE','SYGEBOU-1','LUGBRUG',      'Lug Brug na Main',           30, 20, 0, NULL),
+    ('SYGEBOU-1-RAD',   'SYGEBOU-1','DEPARTEMENT',  'Radiologie',                 45, 20, 0, NULL);
 
 -- ---------------- Rande ----------------
 -- Gang rande: basis_gewig_s ~ afstand / avg loop spoed (1.2 m/s)
@@ -88,19 +88,19 @@ INSERT INTO rande (van_node, na_node, rand_tipe, afstand_m, basis_gewig_s, wag_p
     ('MAIN-2-J01', 'MAIN-2-ICU', 'GANG', 6, 5, 0, 0, 1),
     ('MAIN-2-J01', 'MAIN-2-OR',  'GANG', 6, 5, 0, 0, 1),
 
-    -- ANNEX Grond vloer gange
-    ('ANNEX-G-ENT', 'ANNEX-G-J01', 'GANG', 10, 8, 0, 0, 1),
-    ('ANNEX-G-J01', 'ANNEX-G-ELV', 'GANG', 6,  5, 0, 0, 1),
-    ('ANNEX-G-J01', 'ANNEX-G-OUT', 'GANG', 6,  5, 0, 0, 1),
-    ('ANNEX-G-J01', 'ANNEX-G-TUN', 'GANG', 30, 25, 0, 0, 1),
+    -- SYGEBOU Grond vloer gange
+    ('SYGEBOU-G-ENT', 'SYGEBOU-G-J01', 'GANG', 10, 8, 0, 0, 1),
+    ('SYGEBOU-G-J01', 'SYGEBOU-G-ELV', 'GANG', 6,  5, 0, 0, 1),
+    ('SYGEBOU-G-J01', 'SYGEBOU-G-OUT', 'GANG', 6,  5, 0, 0, 1),
+    ('SYGEBOU-G-J01', 'SYGEBOU-G-TUN', 'GANG', 30, 25, 0, 0, 1),
 
-    -- ANNEX vertikale circulation
-    ('ANNEX-G-ELV', 'ANNEX-1-ELV', 'HUISBAK', 0, 8, 25, 1, 1),
+    -- SYGEBOU vertikale circulation
+    ('SYGEBOU-G-ELV', 'SYGEBOU-1-ELV', 'HUISBAK', 0, 8, 25, 1, 1),
 
-    -- ANNEX Level 1
-    ('ANNEX-1-ELV', 'ANNEX-1-BRIDGE', 'GANG', 10, 8, 0, 0, 1),
-    ('ANNEX-1-ELV', 'ANNEX-1-RAD',    'GANG', 6,  5, 0, 0, 1),
+    -- SYGEBOU Level 1
+    ('SYGEBOU-1-ELV', 'SYGEBOU-1-BRIDGE', 'GANG', 10, 8, 0, 0, 1),
+    ('SYGEBOU-1-ELV', 'SYGEBOU-1-RAD',    'GANG', 6,  5, 0, 0, 1),
 
     -- Gebou-tot-gebou conneksies
-    ('MAIN-1-BRIDGE', 'ANNEX-1-BRIDGE', 'LUGBRUG',    25, 21, 0, 0, 1),
-    ('MAIN-G-TUN',     'ANNEX-G-TUN',    'TONNEL',    18, 15, 0, 0, 1);
+    ('MAIN-1-BRIDGE', 'SYGEBOU-1-BRIDGE', 'LUGBRUG',    25, 21, 0, 0, 1),
+    ('MAIN-G-TUN',     'SYGEBOU-G-TUN',    'TONNEL',    18, 15, 0, 0, 1);
