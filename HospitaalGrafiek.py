@@ -77,6 +77,36 @@ class HospitaalGrafiek:
         conn.close()
         return groepe
 
+    def soek_bestemmings(self, soekterm: str = "", limiet: int = 20) -> list[dict]:
+        """Soek nodes volgens naam, ID, tipe, gebou of vloer."""
+        term = f"%{soekterm.strip()}%"
+        conn = sqlite3.connect(self.db_pad)
+        conn.row_factory = sqlite3.Row
+        cur = conn.cursor()
+        cur.execute(
+            """
+            SELECT n.node_id, n.etiket, n.tipe_kode, n.beperkte_groep,
+                   f.vloer_id, f.naam AS vloer_naam,
+                   g.gebou_id, g.naam AS gebou_naam
+            FROM nodes n
+            JOIN vloere f ON n.vloer_id = f.vloer_id
+            JOIN geboue g ON f.gebou_id = g.gebou_id
+            WHERE n.etiket LIKE ? COLLATE NOCASE
+               OR n.node_id LIKE ? COLLATE NOCASE
+               OR n.tipe_kode LIKE ? COLLATE NOCASE
+               OR f.naam LIKE ? COLLATE NOCASE
+               OR g.naam LIKE ? COLLATE NOCASE
+            ORDER BY
+                CASE WHEN n.etiket LIKE ? COLLATE NOCASE THEN 0 ELSE 1 END,
+                n.etiket
+            LIMIT ?
+            """,
+            (term, term, term, term, term, term, limiet),
+        )
+        bestemmings = [dict(ry) for ry in cur.fetchall()]
+        conn.close()
+        return bestemmings
+
     def _heuristic(self, a: str, b: str) -> float:
         ax, ay = self.nodes[a]["pos"]
         bx, by = self.nodes[b]["pos"]

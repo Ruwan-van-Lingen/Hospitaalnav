@@ -45,6 +45,18 @@ def tuisblad():
     return {"boodskap": "Welkom by die Hospitaal Padvinder API. Gaan na /docs vir die dokumentasie."}
 
 
+@app.get("/destinations")
+def soek_bestemmings(
+    q: str = Query("", description="Naam, node-ID, tipe, gebou of vloer"),
+    limiet: int = Query(20, ge=1, le=100),
+):
+    """Vind mensleesbare bestemmings sonder dat die gebruiker node-ID's hoef te ken."""
+    return {
+        "soekterm": q,
+        "bestemmings": app.state.grafiek.soek_bestemmings(q, limiet),
+    }
+
+
 @app.get("/route")
 def kry_roete(
     begin: str = Query(..., description="Die beginnodusse ID (bv. MAIN-G-ENT)"),

@@ -86,6 +86,7 @@
         font-family: "IBM Plex Mono", monospace;
       }
       select,
+      input,
       button {
         font-family: "Inter", sans-serif;
         font-size: 13.5px;
@@ -97,6 +98,9 @@
       }
       select {
         min-width: 190px;
+      }
+      .bestemming-soek {
+        min-width: 220px;
       }
       button.primary {
         background: var(--amber);
@@ -355,11 +359,13 @@
           </div>
           <div class="field">
             <label>Vanaf</label>
-            <select id="beginNode"></select>
+            <input class="bestemming-soek" id="beginNode" list="beginBestemmings" placeholder="Soek 'n beginpunt..." autocomplete="off" />
+            <datalist id="beginBestemmings"></datalist>
           </div>
           <div class="field">
             <label>Na</label>
-            <select id="endNode"></select>
+            <input class="bestemming-soek" id="endNode" list="eindBestemmings" placeholder="Soek 'n bestemming..." autocomplete="off" />
+            <datalist id="eindBestemmings"></datalist>
           </div>
           <button class="primary" id="findBtn">Vind Roete</button>
           <button class="ghost" id="clearBtn">Herstel</button>
@@ -685,6 +691,50 @@
    ============================================================ */
       let huidigeVloer = vloere[0].id;
       let laasteResultaat = null; // {path, cost}
+      const bestemmingIds = new Map();
+
+      function bestemmingEtiket(item) {
+        return `${item.etiket} — ${item.gebou_naam}, ${item.vloer_naam} (${item.node_id})`;
+      }
+
+      async function laaiBestemmings(soekterm, datalistId) {
+        const apiBase = document.getElementById("apiUrl").value.trim();
+        const url = `${apiBase.replace(/\/$/, "")}/destinations?q=${encodeURIComponent(soekterm)}&limiet=30`;
+        try {
+          const response = await fetch(url);
+          if (!response.ok) return;
+          const data = await response.json();
+          const lys = document.getElementById(datalistId);
+          lys.innerHTML = "";
+          data.bestemmings.forEach((item) => {
+            const etiket = bestemmingEtiket(item);
+            bestemmingIds.set(etiket, item.node_id);
+            const opsie = document.createElement("option");
+            opsie.value = etiket;
+            lys.appendChild(opsie);
+          });
+        } catch (_) {
+          // Die roete-foutboodskap hanteer 'n API wat nie bereikbaar is nie.
+        }
+      }
+
+      function koppelBestemmingSoektog(inputId, datalistId) {
+        const invoer = document.getElementById(inputId);
+        let timer;
+        invoer.addEventListener("input", () => {
+          clearTimeout(timer);
+          timer = setTimeout(() => laaiBestemmings(invoer.value, datalistId), 200);
+        });
+        invoer.addEventListener("focus", () => laaiBestemmings(invoer.value, datalistId));
+      }
+
+      function bestemmingId(inputId) {
+        const waarde = document.getElementById(inputId).value.trim();
+        if (bestemmingIds.has(waarde)) return bestemmingIds.get(waarde);
+        if (nodeById[waarde]) return waarde;
+        const idPas = waarde.match(/\(([^()]+)\)$/);
+        return idPas && nodeById[idPas[1]] ? idPas[1] : null;
+      }
 
       function populateSelects() {
         const utSel = document.getElementById("gebruikerTipe");
@@ -695,30 +745,12 @@
           utSel.appendChild(o);
         });
 
-        const beginSel = document.getElementById("beginNode");
-        const endSel = document.getElementById("endNode");
-        vloere.forEach((f) => {
-          const g1 = document.createElement("optgroup");
-          g1.label = `${f.gebou} — ${f.naam}`;
-          const g2 = document.createElement("optgroup");
-          g2.label = `${f.gebou} — ${f.naam}`;
-          nodes
-            .filter((n) => n.vloer === f.id)
-            .forEach((n) => {
-              const o1 = document.createElement("option");
-              o1.value = n.id;
-              o1.textContent = n.etiket;
-              g1.appendChild(o1);
-              const o2 = document.createElement("option");
-              o2.value = n.id;
-              o2.textContent = n.etiket;
-              g2.appendChild(o2.cloneNode(true));
-            });
-          beginSel.appendChild(g1);
-          endSel.appendChild(g2);
-        });
-        beginSel.value = "MAIN-G-ENT";
-        endSel.value = "ANNEX-1-RAD";
+        document.getElementById("beginNode").value = "MAIN-G-ENT";
+        document.getElementById("endNode").value = "ANNEX-1-RAD";
+        koppelBestemmingSoektog("beginNode", "beginBestemmings");
+        koppelBestemmingSoektog("endNode", "eindBestemmings");
+        laaiBestemmings("", "beginBestemmings");
+        laaiBestemmings("", "eindBestemmings");
       }
 
       function renderTabs() {
@@ -970,10 +1002,19 @@
       }
 
       document.getElementById("findBtn").onclick = async () => {
-        const begin = document.getElementById("beginNode").value;
-        const end = document.getElementById("endNode").value;
+        const begin = bestemmingId("beginNode");
+        const end = bestemmingId("endNode");
         const ut = document.getElementById("gebruikerTipe").value;
         const apiBase = document.getElementById("apiUrl").value.trim();
+
+        if (!begin || !end) {
+          laasteResultaat = {
+            error: "invalid",
+            message: "Kies asseblief 'n geldige beginpunt en bestemming uit die soeklys.",
+          };
+          renderAll();
+          return;
+        }
 
         const btn = document.getElementById("findBtn");
         btn.disabled = true;
