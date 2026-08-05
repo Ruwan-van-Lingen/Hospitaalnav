@@ -1,13 +1,7 @@
 -- ============================================================
-<<<<<<< HEAD
--- Sample data: n klein twee gebou hospitaal
--- MAIN gebou (3 vloere) + SYGEBOU geboue (2 vloere),
--- geheg deur n lug brug op level 1 en n tonnel op die grond vloer
-=======
 -- Voorbeelddata vir 'n klein hospitaal met twee geboue.
 -- Die hoofgebou het drie vloere en die bygebou het twee vloere. 'n Lugbrug
 -- op vlak 1 en 'n tonnel op die grondvloer verbind die geboue.
->>>>>>> 2f5af2b (Verbeter kommentaar in 4 leêrs.)
 -- ============================================================
 
 INSERT INTO geboue (gebou_id, naam, beskrywing) VALUES
@@ -48,7 +42,6 @@ INSERT INTO nodes (node_id, vloer_id, tipe_kode, etiket, pos_x, pos_y, is_beperk
     ('MAIN-2-ICU',   'MAIN-2', 'DEPARTEMENT',   'ICU',                   25,  0, 1, 'ICU_ONLY'),
     ('MAIN-2-OR',    'MAIN-2', 'DEPARTEMENT',   'OR',                    25, 10, 1, 'SLEGS_PERSONEEL'),
 
-<<<<<<< HEAD
     -- SYGEBOU Grond vloer
     ('SYGEBOU-G-ENT',  'SYGEBOU-G','INGANG',         'Sygebou Ingang',              40,  0, 0, NULL),
     ('SYGEBOU-G-J01',  'SYGEBOU-G','AANSLUITING',    'Sygebou Lobby Jct',           40, 10, 0, NULL),
@@ -60,19 +53,6 @@ INSERT INTO nodes (node_id, vloer_id, tipe_kode, etiket, pos_x, pos_y, is_beperk
     ('SYGEBOU-1-ELV',  'SYGEBOU-1','HUISBAK_GROEP', 'Sygebou Huisbak L1',           40, 15, 0, NULL),
     ('SYGEBOU-1-BRIDGE','SYGEBOU-1','LUGBRUG',      'Lug Brug na Main',           30, 20, 0, NULL),
     ('SYGEBOU-1-RAD',   'SYGEBOU-1','DEPARTEMENT',  'Radiologie',                 45, 20, 0, NULL);
-=======
-    -- Bygebou: grondvloer
-    ('ANNEX-G-ENT',  'ANNEX-G','INGANG',         'Annex Ingang',              40,  0, 0, NULL),
-    ('ANNEX-G-J01',  'ANNEX-G','AANSLUITING',    'Annex Lobby Jct',           40, 10, 0, NULL),
-    ('ANNEX-G-ELV',  'ANNEX-G','HUISBAK_GROEP',  'Annex Huisbak',             40, 15, 0, NULL),
-    ('ANNEX-G-TUN',  'ANNEX-G','TONNEL',         'Tonnel na Main',            10, 30, 0, NULL),
-    ('ANNEX-G-OUT',  'ANNEX-G','DEPARTEMENT',    'Uitpasient Ontvangs',       45, 10, 0, NULL),
-
-    -- Bygebou: vlak 1
-    ('ANNEX-1-ELV',  'ANNEX-1','HUISBAK_GROEP', 'Annex Huisbak L1',           40, 15, 0, NULL),
-    ('ANNEX-1-BRIDGE','ANNEX-1','LUGBRUG',      'Lug Brug na Main',           30, 20, 0, NULL),
-    ('ANNEX-1-RAD',   'ANNEX-1','DEPARTEMENT',  'Radiologie',                 45, 20, 0, NULL);
->>>>>>> 2f5af2b (Verbeter kommentaar in 4 leêrs.)
 
 -- ---------------- Rande ----------------
 -- Gangrande: basis_gewig_s is ongeveer afstand gedeel deur 'n gemiddelde
@@ -110,7 +90,6 @@ INSERT INTO rande (van_node, na_node, rand_tipe, afstand_m, basis_gewig_s, wag_p
     ('MAIN-2-J01', 'MAIN-2-ICU', 'GANG', 6, 5, 0, 0, 1),
     ('MAIN-2-J01', 'MAIN-2-OR',  'GANG', 6, 5, 0, 0, 1),
 
-<<<<<<< HEAD
     -- SYGEBOU Grond vloer gange
     ('SYGEBOU-G-ENT', 'SYGEBOU-G-J01', 'GANG', 10, 8, 0, 0, 1),
     ('SYGEBOU-G-J01', 'SYGEBOU-G-ELV', 'GANG', 6,  5, 0, 0, 1),
@@ -127,21 +106,3 @@ INSERT INTO rande (van_node, na_node, rand_tipe, afstand_m, basis_gewig_s, wag_p
     -- Gebou-tot-gebou conneksies
     ('MAIN-1-BRIDGE', 'SYGEBOU-1-BRIDGE', 'LUGBRUG',    25, 21, 0, 0, 1),
     ('MAIN-G-TUN',     'SYGEBOU-G-TUN',    'TONNEL',    18, 15, 0, 0, 1);
-=======
-    -- Bygebou: grondvloergange
-    ('ANNEX-G-ENT', 'ANNEX-G-J01', 'GANG', 10, 8, 0, 0, 1),
-    ('ANNEX-G-J01', 'ANNEX-G-ELV', 'GANG', 6,  5, 0, 0, 1),
-    ('ANNEX-G-J01', 'ANNEX-G-OUT', 'GANG', 6,  5, 0, 0, 1),
-    ('ANNEX-G-J01', 'ANNEX-G-TUN', 'GANG', 30, 25, 0, 0, 1),
-
-    -- Bygebou: vertikale beweging
-    ('ANNEX-G-ELV', 'ANNEX-1-ELV', 'HUISBAK', 0, 8, 25, 1, 1),
-
-    -- Bygebou: vlak 1
-    ('ANNEX-1-ELV', 'ANNEX-1-BRIDGE', 'GANG', 10, 8, 0, 0, 1),
-    ('ANNEX-1-ELV', 'ANNEX-1-RAD',    'GANG', 6,  5, 0, 0, 1),
-
-    -- Verbindings tussen die hoofgebou en bygebou
-    ('MAIN-1-BRIDGE', 'ANNEX-1-BRIDGE', 'LUGBRUG',    25, 21, 0, 0, 1),
-    ('MAIN-G-TUN',     'ANNEX-G-TUN',    'TONNEL',    18, 15, 0, 0, 1);
->>>>>>> 2f5af2b (Verbeter kommentaar in 4 leêrs.)
