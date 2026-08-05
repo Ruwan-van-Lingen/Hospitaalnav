@@ -1,7 +1,7 @@
 # main.py
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
-from HospitaalGrafiek import HospitalGraph, build_demo_db
+from HospitaalGrafiek import HospitaalGrafiek, bou_demo_db
 
 app = FastAPI(
     title="Hospitaal Padvinder API",
@@ -18,10 +18,10 @@ app.add_middleware(
 )
 
 # Bou/hernu die databasis by opstart as dit nog nie bestaan nie
-build_demo_db("hospital.db", "Schema.sql", "SeedData.sql")
+bou_demo_db("hospitaal.db", "Skema.sql", "SeedData.sql")
 
 # Laai die grafiek eenmaal in geheue op
-graph = HospitalGraph("hospital.db")
+grafiek = HospitaalGrafiek("hospitaal.db")
 
 
 @app.get("/")
@@ -31,30 +31,30 @@ def tuisblad():
 
 @app.get("/route")
 def kry_roete(
-    start: str = Query(..., description="Die beginnodusse ID (bv. MAIN-G-ENT)"),
-    goal: str = Query(..., description="Die eindnodusse ID (bv. ANNEX-1-RAD)"),
-    user_type: str = Query("PUBLIC", description="Gebruikerstipe (bv. PUBLIC, STAFF, EMERGENCY)")
+    begin: str = Query(..., description="Die beginnodusse ID (bv. MAIN-G-ENT)"),
+    doel: str = Query(..., description="Die eindnodusse ID (bv. ANNEX-1-RAD)"),
+    gebruiker_tipe: str = Query("PUBLIEK", description="Gebruikerstipe (bv. PUBLIEK, STAFF, NOODGEVAL)")
 ):
     """
     Bereken die vinnigste roete tussen twee punte gebaseer op die gebruikerstipe.
     """
     try:
-        result = graph.astar(start, goal, user_type=user_type)
+        resultaat = grafiek.astar(begin, doel, gebruiker_tipe=gebruiker_tipe)
         
-        if result is None:
+        if resultaat is None:
             raise HTTPException(
                 status_code=403, 
                 detail="Geen roete gevind nie. Die pad bestaan nie of jy het nie toegang tot sekere nodusse nie."
             )
         
-        path, time_seconds = result
+        pad, tyd_sekondes = resultaat
         return {
-            "start_node": start,
-            "goal_node": goal,
-            "user_type": user_type,
-            "estimated_time_seconds": round(time_seconds, 1),
-            "node_count": len(path),
-            "path": path
+            "begin_node": begin,
+            "doel_node": doel,
+            "gebruiker_tipe": gebruiker_tipe,
+            "geskatte_tyd_sekondes": round(tyd_sekondes, 1),
+            "node_telling": len(pad),
+            "pad": pad
         }
 
     except ValueError as e:

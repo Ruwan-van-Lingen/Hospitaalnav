@@ -1,83 +1,82 @@
 """
-Renders the topological graph as a floor-plan-style diagram - one panel
-per floor, nodes plotted at their local (pos_x, pos_y) coordinates,
-edges drawn between them. Vertical-circulation edges (elevator/stairs)
-and building links (sky bridge/tunnel) are annotated since they don't
-have a same-floor edge to draw.
+Lewer die topologiese grafiek as n vloer plan style diagram - een paneel
+per vloer, nodes plotted by hulle lokaale (pos_x, pos_y) koördinate, met
+rande getrek tussen hulle. Vertikale-sirkulasie rande (huisbak/trappe) en 
+gebou verbindings (lugbrug/tonnel) is geannoteer aangesien hulle nie n 
+selfde-vloer rand het om te teken nie.
 
-Optionally highlights a path (list of node_ids) returned by
-HospitalGraph.astar(), e.g. to illustrate a specific route.
+Optioneel verlig n pad (lys van node_ids) teruggestuur deur HospitaalGrafiek.astar() of ander roete algoritme. Hierdie pad word om n spesefieke pad te illustreer.
 """
 
 import sqlite3
 import matplotlib.pyplot as plt
 from matplotlib.lines import Line2D
 
-NODE_COLORS = {
-    "JUNCTION": "#8899a6",
-    "ELEVATOR_LOBBY": "#e67e22",
-    "STAIRWELL": "#e67e22",
-    "DOORWAY": "#8899a6",
-    "ENTRANCE": "#27ae60",
-    "SKYBRIDGE": "#8e44ad",
-    "TUNNEL": "#8e44ad",
-    "DEPARTMENT": "#2980b9",
+NODE_KLEURE = {
+    "AANSLUITING": "#8899a6",
+    "HUISBAK_GROEP": "#e67e22",
+    "TRAPHUIS": "#e67e22",
+    "DEUR": "#8899a6",
+    "INGANG": "#27ae60",
+    "LUGBRUG": "#8e44ad",
+    "TONNEL": "#8e44ad",
+    "DEPARTEMENT": "#2980b9",
 }
 
-EDGE_COLORS = {
-    "CORRIDOR": "#b0b8bf",
-    "ELEVATOR": "#e67e22",
-    "STAIRS": "#e67e22",
-    "SKYBRIDGE": "#8e44ad",
-    "TUNNEL": "#8e44ad",
+RAND_KLEURE = {
+    "GANG": "#b0b8bf",
+    "HUISBAK": "#e67e22",
+    "TRAPPE": "#e67e22",
+    "LUGBRUG": "#8e44ad",
+    "TONNEL": "#8e44ad",
 }
 
 
-def draw_floor_plan(db_path: str, out_path: str, highlight_path: list[str] | None = None):
-    conn = sqlite3.connect(db_path)
+def teken_vloer_plan(db_pad: str, uit_pad: str, verlig_pad: list[str] | None = None):
+    conn = sqlite3.connect(db_pad)
     conn.row_factory = sqlite3.Row
     cur = conn.cursor()
 
-    cur.execute("SELECT floor_id, building_id, level_number, name FROM floors ORDER BY building_id, level_number")
-    floors = cur.fetchall()
+    cur.execute("SELECT vloer_id, gebou_id, level_nommer, naam FROM vloere ORDER BY gebou_id, level_nommer")
+    vloere = cur.fetchall()
 
-    cur.execute("SELECT node_id, floor_id, type_code, label, pos_x, pos_y, restricted_group FROM nodes")
+    cur.execute("SELECT node_id, vloer_id, tipe_kode, etiket, pos_x, pos_y, beperkte_groep FROM nodes")
     nodes = {r["node_id"]: dict(r) for r in cur.fetchall()}
 
-    cur.execute("SELECT from_node, to_node, edge_type FROM edges")
-    edges = cur.fetchall()
+    cur.execute("SELECT van_node, na_node, rand_tipe FROM rande")
+    rande = cur.fetchall()
     conn.close()
 
-    highlight_edges = set()
-    if highlight_path:
-        for a, b in zip(highlight_path, highlight_path[1:]):
-            highlight_edges.add((a, b))
-            highlight_edges.add((b, a))
+    verlig_rande = set()
+    if verlig_pad:
+        for a, b in zip(verlig_pad, verlig_pad[1:]):
+            verlig_rande.add((a, b))
+            verlig_rande.add((b, a))
 
-    n_floors = len(floors)
-    fig, axes = plt.subplots(1, n_floors, figsize=(6 * n_floors, 6))
-    if n_floors == 1:
+    n_vloere = len(vloere)
+    fig, axes = plt.subplots(1, n_vloere, figsize=(6 * n_vloere, 6))
+    if n_vloere == 1:
         axes = [axes]
 
-    for ax, floor in zip(axes, floors):
-        floor_id = floor["floor_id"]
-        floor_nodes = {nid: n for nid, n in nodes.items() if n["floor_id"] == floor_id}
+    for ax, vloer in zip(axes, vloere):
+        vloer_id = vloer["vloer_id"]
+        vloer_nodes = {nid: n for nid, n in nodes.items() if n["vloer_id"] == vloer_id}
 
-        # same-floor edges only
-        for e in edges:
-            if e["from_node"] in floor_nodes and e["to_node"] in floor_nodes:
-                a, b = nodes[e["from_node"]], nodes[e["to_node"]]
-                is_hl = (e["from_node"], e["to_node"]) in highlight_edges
+        # slegs selfde-vloer rande  
+        for e in rande:
+            if e["van_node"] in vloer_nodes and e["na_node"] in vloer_nodes:
+                a, b = nodes[e["van_node"]], nodes[e["na_node"]]
+                is_hl = (e["van_node"], e["na_node"]) in verlig_rande
                 ax.plot(
                     [a["pos_x"], b["pos_x"]], [a["pos_y"], b["pos_y"]],
-                    color="#e74c3c" if is_hl else EDGE_COLORS.get(e["edge_type"], "#ccc"),
+                    color="#e74c3c" if is_hl else RAND_KLEURE.get(e["rand_tipe"], "#ccc"),
                     linewidth=3.5 if is_hl else 1.5,
                     zorder=2 if is_hl else 1,
                 )
 
-        for nid, n in floor_nodes.items():
-            color = NODE_COLORS.get(n["type_code"], "#333")
-            is_hl = highlight_path is not None and nid in highlight_path
+        for nid, n in vloer_nodes.items():
+            color = NODE_KLEURE.get(n["tipe_kode"], "#333")
+            is_hl = verlig_pad is not None and nid in verlig_pad
             ax.scatter(
                 n["pos_x"], n["pos_y"],
                 s=180 if is_hl else 90,
@@ -86,47 +85,47 @@ def draw_floor_plan(db_path: str, out_path: str, highlight_path: list[str] | Non
                 linewidths=2 if is_hl else 1,
                 zorder=3,
             )
-            label = n["label"]
-            if n["restricted_group"]:
-                label += f"\n[{n['restricted_group']}]"
+            etiket = n["etiket"]
+            if n["beperkte_groep"]:
+                etiket += f"\n[{n['beperkte_groep']}]"
             ax.annotate(
-                label, (n["pos_x"], n["pos_y"]),
+                etiket, (n["pos_x"], n["pos_y"]),
                 textcoords="offset points", xytext=(6, 6),
                 fontsize=7.5, color="#333",
             )
 
-        ax.set_title(f"{floor['building_id']} — {floor['name']}", fontsize=12, fontweight="bold")
+        ax.set_title(f"{vloer['gebou_id']} — {vloer['naam']}", fontsize=12, fontweight="bold")
         ax.set_aspect("equal")
-        ax.invert_yaxis()  # so 'up' on screen matches typical floor-plan north
+        ax.invert_yaxis()  # so 'op' op die skerm stem ooreen met die tipiese vloer-plan Noord 
         ax.axis("off")
 
     legend_elements = [
         Line2D([0], [0], marker='o', color='w', label=t,
                markerfacecolor=c, markersize=9)
-        for t, c in NODE_COLORS.items()
+        for t, c in NODE_KLEURE.items()
     ]
     fig.legend(handles=legend_elements, loc="lower center", ncol=len(legend_elements), fontsize=8, frameon=False)
 
-    fig.suptitle("Hospital Wayfinding — Topological Floor Plan Graph", fontsize=14, fontweight="bold")
+    fig.suptitle("Hospitaal Wayfinding — Topologiese Vloer Plan Grafiek", fontsize=14, fontweight="bold")
     plt.tight_layout(rect=[0, 0.05, 1, 0.95])
-    plt.savefig(out_path, dpi=150, bbox_inches="tight")
+    plt.savefig(uit_pad, dpi=150, bbox_inches="tight")
     plt.close()
-    print(f"Saved diagram to {out_path}")
+    print(f"Saved diagram to {uit_pad}")
 
 
 if __name__ == "__main__":
     import sys
     sys.path.insert(0, ".")
-    from hospital_graph import HospitalGraph, build_demo_db
+    from HospitaalGrafiek import HospitaalGrafiek, bou_demo_db
 
-    build_demo_db("hospital.db", "schema.sql", "seed_data.sql")
-    g = HospitalGraph("hospital.db")
+    bou_demo_db("hospitaal.db", "Skema.sql", "SeedData.sql")
+    g = HospitaalGrafiek("hospitaal.db")
 
-    # base diagram, no highlighted route
-    draw_floor_plan("hospital.db", "floor_plan.png")
+    # basis diagram, geen verligte roete 
+    teken_vloer_plan("hospitaal.db", "vloer_plan.png")
 
-    # diagram with a PUBLIC route highlighted
-    result = g.astar("MAIN-G-ENT", "ANNEX-1-RAD", user_type="PUBLIC")
+    # diagram met n PUBLIEK roete verlig
+    result = g.astar("MAIN-G-ENT", "ANNEX-1-RAD", gebruiker_tipe="PUBLIEK")
     if result:
-        path, _ = result
-        draw_floor_plan("hospital.db", "floor_plan_with_route.png", highlight_path=path)
+        pad, _ = result
+        teken_vloer_plan("hospitaal.db", "vloer_plan_met_roete.png", verlig_pad=pad)
