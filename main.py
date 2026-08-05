@@ -44,6 +44,20 @@ app.add_middleware(
 )
 
 
+def formateer_tyd(sekondes: float) -> str:
+    """Formateer sekondes as byvoorbeeld 45s, 1m 17s of 2h 3m 4s."""
+    totaal = max(0, round(sekondes))
+    ure, oor = divmod(totaal, 3600)
+    minute, sekondes_oor = divmod(oor, 60)
+    dele = []
+    if ure:
+        dele.append(f"{ure}h")
+    if minute or ure:
+        dele.append(f"{minute}m")
+    dele.append(f"{sekondes_oor}s")
+    return " ".join(dele)
+
+
 @app.get("/")
 def tuisblad():
     return {"boodskap": "Welkom by die Hospitaal Padvinder API. Gaan na /docs vir die dokumentasie."}
@@ -93,6 +107,7 @@ def kry_roete(
             "doel_node": doel,
             "gebruiker_tipe": gebruiker_tipe,
             "geskatte_tyd_sekondes": round(tyd_sekondes, 1),
+            "geskatte_tyd": formateer_tyd(tyd_sekondes),
             "node_telling": len(pad),
             "pad": pad
         }

@@ -1,6 +1,12 @@
 from fastapi.testclient import TestClient
 
-from main import app
+from main import app, formateer_tyd
+
+
+def test_tydformaat():
+    assert formateer_tyd(45) == "45s"
+    assert formateer_tyd(77) == "1m 17s"
+    assert formateer_tyd(7384) == "2h 3m 4s"
 
 
 def test_soek_bestemming_volgens_naam():
@@ -43,6 +49,7 @@ def test_gevonde_node_werk_in_roete():
 
     assert response.status_code == 200
     assert response.json()["pad"][-1] == "ANNEX-1-RAD"
+    assert response.json()["geskatte_tyd"] == "1m 23s"
 
 
 def test_personeel_kan_icu_bereik():

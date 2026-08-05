@@ -164,6 +164,7 @@ Voorbeeldantwoord:
   "doel_node": "ANNEX-1-RAD",
   "gebruiker_tipe": "PUBLIEK",
   "geskatte_tyd_sekondes": 83.0,
+  "geskatte_tyd": "1m 23s",
   "node_telling": 9,
   "pad": [
     "MAIN-G-ENT",

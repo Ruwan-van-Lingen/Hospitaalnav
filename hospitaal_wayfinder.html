@@ -682,6 +682,7 @@
         return {
           path: body.pad,
           cost: body.geskatte_tyd_sekondes,
+          formattedCost: body.geskatte_tyd,
           nodeCount: body.node_telling,
         };
       }
@@ -958,7 +959,7 @@
         el.appendChild(ul);
         const total = document.createElement("div");
         total.className = "route-total";
-        total.innerHTML = `<span>Totale tyd</span><span>${Math.round(laasteResultaat.cost)}s</span>`;
+        total.innerHTML = `<span>Totale tyd</span><span>${laasteResultaat.formattedCost}</span>`;
         el.appendChild(total);
       }
 
@@ -982,7 +983,7 @@
           el.textContent = "⛔ Geen roete beskikbaar nie.";
           el.className = "status blocked";
         } else {
-          el.textContent = `✓ Roete gevind via API: ${laasteResultaat.nodeCount} node(s), ${laasteResultaat.cost}s.`;
+          el.textContent = `✓ Roete gevind via API: ${laasteResultaat.nodeCount} node(s), ${laasteResultaat.formattedCost}.`;
           el.className = "status ok";
         }
       }
