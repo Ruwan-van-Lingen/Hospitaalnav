@@ -19,11 +19,13 @@ AUTO_HERBOU_DB = os.getenv("AUTO_HERBOU_DB", "true").lower() == "true"
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Dev: herbou elke start. Prod: stel AUTO_HERBOU_DB=false
+    """Berei die databasis en grafiek voor voordat die API versoeke ontvang."""
+    # Herbou die databasis by elke begin tydens ontwikkeling.
+    # AUTO_HERBOU_DB=false om bestaande data in 'n produksie-omgewing te behou.
     if AUTO_HERBOU_DB:
         bou_demo_db(str(DB_PAD), str(SKEMA_PAD), str(SEED_PAD))
 
-    # Laai die grafiek eenmaal in geheue op
+    # Laai die grafiek een keer in die toepassingsgeheue vir hergebruik.
     app.state.grafiek = HospitaalGrafiek(str(DB_PAD))
     yield
 
@@ -34,8 +36,8 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# Laat toe dat die frontend (op 'n ander poort/origin) hierdie API kan bereik.
-# Vir produksie: vervang allow_origins=["*"] met die spesifieke frontend-URL.
+# Laat die webkoppelvlak toe om die API vanaf 'n ander oorsprong te bereik.
+# Beperk allow_origins tot bekende adresse voordat die API ontplooi word.
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -63,8 +65,9 @@ def tuisblad():
     return {"boodskap": "Welkom by die Hospitaal Navigasie API. Gaan na /docs vir die dokumentasie."}
 
 
-@app.get("/ui")             #die is sodat die correcte api laai vir die link 
+@app.get("/ui")
 def ui():
+    """Bedien die webkoppelvlak direk vanaf dieselfde API-adres."""
     html_pad = BASE_GIDS / "hospitaal_wayfinder.html"
     if not html_pad.exists():
         raise HTTPException(status_code=404, detail="hospitaal_wayfinder.html nie gevind nie.")
@@ -89,9 +92,7 @@ def kry_roete(
     doel: str = Query(..., description="Die eindnodusse ID (bv. SYGEBOU-1-RAD)"),
     gebruiker_tipe: str = Query("PUBLIEK", description="Gebruikerstipe (bv. PUBLIEK, PERSONEEL, NOODGEVAL)")
 ):
-    """
-    Bereken die vinnigste roete tussen twee punte gebaseer op die gebruikerstipe.
-    """
+    """Bereken die vinnigste toegelate roete vir die gebruikerstipe."""
     try:
         resultaat = app.state.grafiek.astar(begin, doel, gebruiker_tipe=gebruiker_tipe)
 
@@ -139,6 +140,7 @@ def kry_roete_prentjie(
         uit_pad = Path(tydelike_leer.name)
         tydelike_leer.close()
 
+        # Die tydelike lêer word ná die HTTP-antwoord deur BackgroundTask verwyder.
         teken_vloer_plan(str(DB_PAD), str(uit_pad), verlig_pad=pad)
         return FileResponse(
             uit_pad,
