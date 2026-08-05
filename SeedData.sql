@@ -1,7 +1,7 @@
 -- ============================================================
--- Sample data: n klein twee gebou hospitaal
--- MAIN gebou (3 vloere) + SYGEBOU geboue (2 vloere),
--- geheg deur n lug brug op level 1 en n tonnel op die grond vloer
+-- Voorbeelddata vir 'n klein hospitaal met twee geboue.
+-- Die hoofgebou het drie vloere en die bygebou het twee vloere. 'n Lugbrug
+-- op vlak 1 en 'n tonnel op die grondvloer verbind die geboue.
 -- ============================================================
 
 INSERT INTO geboue (gebou_id, naam, beskrywing) VALUES
@@ -15,10 +15,10 @@ INSERT INTO vloere (vloer_id, gebou_id, level_nommer, naam) VALUES
     ('SYGEBOU-G', 'SYGEBOU', 0, 'Grond Vloer'),
     ('SYGEBOU-1', 'SYGEBOU', 1, 'Level 1 - Radiology');
 
--- ---------------- Nodes ----------------
+-- ---------------- Nodusse ----------------
 
 INSERT INTO nodes (node_id, vloer_id, tipe_kode, etiket, pos_x, pos_y, is_beperk, beperkte_groep) VALUES
-    -- MAIN Grond vloer
+    -- Hoofgebou: grondvloer
     ('MAIN-G-ENT',   'MAIN-G', 'INGANG',         'Hoof Publiek Ingang',   0,  0, 0, NULL),
     ('MAIN-G-AMB',   'MAIN-G', 'INGANG',         'Ambulaans Baai',        0, 20, 0, NULL),
     ('MAIN-G-J01',   'MAIN-G', 'AANSLUITING',    'Lobby Aansluiting',     10,  0, 0, NULL),
@@ -27,7 +27,7 @@ INSERT INTO nodes (node_id, vloer_id, tipe_kode, etiket, pos_x, pos_y, is_beperk
     ('MAIN-G-ER',    'MAIN-G', 'DEPARTEMENT',    'Nooddienste',           5, 20, 0, NULL),
     ('MAIN-G-TUN',   'MAIN-G', 'TONNEL',         'Tonnel na Sygebou',       10, 30, 0, NULL),
 
-    -- MAIN Level 1
+    -- Hoofgebou: vlak 1
     ('MAIN-1-ELV',   'MAIN-1', 'HUISBAK_GROEP',  'Huisbak Groep L1',     15,  5, 0, NULL),
     ('MAIN-1-STA',   'MAIN-1', 'TRAPHUIS',       'Traphuis L1',          15, 10, 0, NULL),
     ('MAIN-1-J01',   'MAIN-1', 'DEPARTEMENT',    'Saal Gang Jct',        20,  5, 0, NULL),
@@ -35,7 +35,7 @@ INSERT INTO nodes (node_id, vloer_id, tipe_kode, etiket, pos_x, pos_y, is_beperk
     ('MAIN-1-WARDB', 'MAIN-1', 'DEPARTEMENT',    'Saal B',               25, 10, 0, NULL),
     ('MAIN-1-BRIDGE','MAIN-1', 'LUGBRUG',        'Lug Brug na Sygebou',    30, 20, 0, NULL),
 
-    -- MAIN Level 2 (beperkte - ICU/Surergie)
+    -- Hoofgebou: vlak 2 (beperkte ICU- en operasieteatergebied)
     ('MAIN-2-ELV',   'MAIN-2', 'HUISBAK_GROEP', 'Huisbak Groep L2',      15,  5, 0, NULL),
     ('MAIN-2-STA',   'MAIN-2', 'TRAPHUIS',      'Traphuis L2',           15, 10, 0, NULL),
     ('MAIN-2-J01',   'MAIN-2', 'AANSLUITING',   'ICU Gang Jct',          20,  5, 1, 'ICU_ONLY'),
@@ -55,12 +55,14 @@ INSERT INTO nodes (node_id, vloer_id, tipe_kode, etiket, pos_x, pos_y, is_beperk
     ('SYGEBOU-1-RAD',   'SYGEBOU-1','DEPARTEMENT',  'Radiologie',                 45, 20, 0, NULL);
 
 -- ---------------- Rande ----------------
--- Gang rande: basis_gewig_s ~ afstand / avg loop spoed (1.2 m/s)
--- Huisbak rande: afstand_m = 0, wag_penalty_s = avg wag, vloer_verander = |delta|
--- Lug Brug / tonnel rande: standaard weighted gang rande tussen geboue
+-- Gangrande: basis_gewig_s is ongeveer afstand gedeel deur 'n gemiddelde
+-- loopsnelheid van 1,2 meter per sekonde.
+-- Hysbakrande: afstand_m is 0, wag_penalty_s is die gemiddelde wagtyd en
+-- vloer_verander is die absolute verskil tussen die vloervlakke.
+-- Lugbrug- en tonnelrande is gewone geweegde verbindings tussen geboue.
 
 INSERT INTO rande (van_node, na_node, rand_tipe, afstand_m, basis_gewig_s, wag_penalty_s, vloer_verander, bidirectional) VALUES
-    -- MAIN Grond vloer gange 
+    -- Hoofgebou: grondvloergange
     ('MAIN-G-ENT', 'MAIN-G-J01', 'GANG', 10, 8, 0, 0, 1),
     ('MAIN-G-J01', 'MAIN-G-ELV', 'GANG', 6,  5, 0, 0, 1),
     ('MAIN-G-J01', 'MAIN-G-STA', 'GANG', 10, 8, 0, 0, 1),
@@ -68,21 +70,21 @@ INSERT INTO rande (van_node, na_node, rand_tipe, afstand_m, basis_gewig_s, wag_p
     ('MAIN-G-AMB', 'MAIN-G-ER',  'GANG', 6,  5, 0, 0, 1),
     ('MAIN-G-J01', 'MAIN-G-TUN', 'GANG', 32, 27, 0, 0, 1),
 
-    -- MAIN vertical circulation (Grond <-> L1 <-> L2)
+    -- Hoofgebou: vertikale beweging tussen die grondvloer, vlak 1 en vlak 2
     ('MAIN-G-ELV', 'MAIN-1-ELV', 'HUISBAK', 0, 8,  25, 1, 1),
     ('MAIN-1-ELV', 'MAIN-2-ELV', 'HUISBAK', 0, 8,  25, 1, 1),
     ('MAIN-G-ELV', 'MAIN-2-ELV', 'HUISBAK', 0, 14, 25, 2, 1),
     ('MAIN-G-STA', 'MAIN-1-STA', 'TRAPPE',  0, 15, 0,  1, 1),
     ('MAIN-1-STA', 'MAIN-2-STA', 'TRAPPE',  0, 15, 0,  1, 1),
 
-    -- MAIN Level 1 gange
+    -- Hoofgebou: gange op vlak 1
     ('MAIN-1-ELV', 'MAIN-1-J01',    'GANG',    6,  5,  0, 0, 1),
     ('MAIN-1-STA', 'MAIN-1-J01',    'GANG',    6,  5,  0, 0, 1),
     ('MAIN-1-J01', 'MAIN-1-WARDA',  'GANG',  6, 5, 0, 0, 1),
     ('MAIN-1-J01', 'MAIN-1-WARDB',  'GANG',  6, 5, 0, 0, 1),
     ('MAIN-1-J01', 'MAIN-1-BRIDGE', 'GANG', 16, 13, 0, 0, 1),
 
-    -- MAIN Level 2 gange (beperk)
+    -- Hoofgebou: beperkte gange op vlak 2
     ('MAIN-2-ELV', 'MAIN-2-J01', 'GANG', 6, 5, 0, 0, 1),
     ('MAIN-2-STA', 'MAIN-2-J01', 'GANG', 6, 5, 0, 0, 1),
     ('MAIN-2-J01', 'MAIN-2-ICU', 'GANG', 6, 5, 0, 0, 1),

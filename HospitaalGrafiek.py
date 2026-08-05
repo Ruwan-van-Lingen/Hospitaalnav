@@ -1,9 +1,13 @@
 """
-Hospitaal Padfind - Grafiek loader en A* "pathfinding".
+Hospitaalpadvinder: grafieklaaier en A*-roetebepaling.
 
-Laai die topologiese grafiek (nodes = keuse punte, randte = weighted paaie) van die SQLite databasis en hardloop A* tussen twee nodes, en vereer die gebruiker tipe toegang beperkings (bv. die publiek kan nie n roete deur die ICU of die teater saal volg nie).
+Laai die topologiese grafiek uit die SQLite-databasis en gebruik die
+A*-algoritme om 'n roete tussen twee nodusse te bepaal. Die algoritme
+eerbiedig toegangsbeperkings volgens gebruikerstipe; 'n lid van die publiek
+kan byvoorbeeld nie deur die ICU of operasieteater beweeg nie.
 
-Heuristic: reguit-lyn (Eucildies) afstand tussen die nodes se lokale vloer plan koordinate, en n vaste penalty per vloer oorkruis. Dit word nie ingereken solank die penalty <= as die goedkoopste ware huisbak/trappe tyd is tussen aangrensende vloere.
+Die heuristiek gebruik die reguitlynafstand tussen nodusse se plaaslike
+vloerplankoördinate en 'n vaste strafwaarde vir elke vloerverandering.
 """
 
 import sqlite3
@@ -12,13 +16,13 @@ import heapq
 from dataclasses import dataclass, field
 from typing import Optional
 
-VLOER_VERANDER_PENALTY_S = 20.0  # konserwetiewe laer vlak penalty wat in die heuristic gebruik word 
+VLOER_VERANDER_PENALTY_S = 20.0  # Konserwatiewe strafwaarde vir 'n vloerverandering.
 
 
 @dataclass
 class Rand:
     na_node: str
-    gewig_s: float          # basis_gewig_s + wag_penalty_s
+    gewig_s: float          # Som van die basiese reistyd en wagtyd.
     rand_tipe: str
     vloer_verander: int
 
@@ -26,11 +30,13 @@ class Rand:
 class HospitaalGrafiek:
     def __init__(self, db_pad: str):
         self.db_pad = db_pad
-        self.nodes: dict[str, dict] = {}      # node_id -> {vloer_id, pos, beperkte_groep}
+        # Koppel elke node-ID aan sy vloer, posisie en toegangsbeperking.
+        self.nodes: dict[str, dict] = {}
         self.adjacency: dict[str, list[Rand]] = {}
         self._load()
 
     def _load(self):
+        """Laai die nodusse en rande uit SQLite in 'n aangrensendheidslys."""
         conn = sqlite3.connect(self.db_pad)
         conn.row_factory = sqlite3.Row
         cur = conn.cursor()
@@ -66,7 +72,7 @@ class HospitaalGrafiek:
         conn.close()
 
     def toegelate_groepe(self, gebruiker_tipe: str) -> set[str]:
-        """Resultaat die stel van beperkte_groep waardes n gebruiker_tipe mag binnekom."""
+        """Gee die beperkte groepe terug wat die gebruikerstipe mag betree."""
         conn = sqlite3.connect(self.db_pad)
         cur = conn.cursor()
         cur.execute(
@@ -86,7 +92,7 @@ class HospitaalGrafiek:
         return groepe
 
     def soek_bestemmings(self, soekterm: str = "", limiet: int = 20) -> list[dict]:
-        """Soek nodes volgens naam, ID, tipe, gebou of vloer."""
+        """Soek nodusse volgens naam, ID, tipe, gebou of vloer."""
         term = f"%{soekterm.strip()}%"
         conn = sqlite3.connect(self.db_pad)
         conn.row_factory = sqlite3.Row
@@ -116,9 +122,11 @@ class HospitaalGrafiek:
         return bestemmings
 
     def _heuristic(self, a: str, b: str) -> float:
+        """Skat die oorblywende koste tussen twee nodusse vir A*."""
         ax, ay = self.nodes[a]["pos"]
         bx, by = self.nodes[b]["pos"]
-        # NOTE: die vergelyk slegs in-vloer koordinate, kruis-vloer eukludiese afstande is nie betekenisvol nie, so ons rely op die vloer_verander_penalty tyd om die skatting relevant te hou. 
+        # Koördinate is slegs binne dieselfde vloer direk vergelykbaar.
+        # Die vloerveranderingstraf hou die skatting oor verskeie vloere bruikbaar.
 
         planar = math.hypot(ax - bx, ay - by)
         vloer_delta = abs(self.nodes[a]["level"] - self.nodes[b]["level"])
@@ -131,8 +139,8 @@ class HospitaalGrafiek:
         gebruiker_tipe: str = "PUBLIEK",
     ) -> Optional[tuple[list[str], float]]:
         """
-        Returns (pad_as_lys_of_node_ids, totale_koste_sekondes) or None
-        as geen pad bestaan nie (vb. heeltemal gestop deur beperkings).
+        Gee 'n tuple met die node-ID's en totale koste in sekondes terug.
+        Gee None terug wanneer geen toegelate pad bestaan nie.
         """
         if begin not in self.nodes or doel not in self.nodes:
             raise ValueError("begin/doel node nie gevind in grafiek nie.")
@@ -146,7 +154,8 @@ class HospitaalGrafiek:
         if not is_bruikbaar(begin) or not is_bruikbaar(doel):
             return None
 
-        open_set = [(self._heuristic(begin, doel), 0.0, begin)]  # (f_score, g_score, node_id)  
+        # Elke inskrywing bevat die beraamde totaalkoste, werklike koste en node-ID.
+        open_set = [(self._heuristic(begin, doel), 0.0, begin)]
         kom_van: dict[str, str] = {}
         g_score = {begin: 0.0}
         besoek = set()
@@ -163,7 +172,7 @@ class HospitaalGrafiek:
 
             for rand in self.adjacency[huidig]:
                 if not is_bruikbaar(rand.na_node):
-                    continue  # dianmies uitgesluit vir die gebruiker tipe 
+                    continue  # Slaan nodusse oor waarvoor die gebruiker nie toegang het nie.
                 tentatiewe_g = koste_so_ver + rand.gewig_s
                 if tentatiewe_g < g_score.get(rand.na_node, math.inf):
                     g_score[rand.na_node] = tentatiewe_g
@@ -171,7 +180,7 @@ class HospitaalGrafiek:
                     f_score = tentatiewe_g + self._heuristic(rand.na_node, doel)
                     heapq.heappush(open_set, (f_score, tentatiewe_g, rand.na_node))
 
-        return None  # no path found
+        return None  # Geen toegelate pad kon gevind word nie.
 
     @staticmethod
     def _reconstruct(kom_van: dict[str, str], huidig: str) -> list[str]:
@@ -184,7 +193,7 @@ class HospitaalGrafiek:
 
 
 def bou_demo_db(db_pad: str, skema_pad: str, seed_pad: str):
-    """Helper: (re)creates the SQLite DB from Skema.sql + SeedData.sql."""
+    """Herskep die SQLite-databasis uit die skema- en voorbeelddata."""
     import os
     if os.path.exists(db_pad):
         os.remove(db_pad)

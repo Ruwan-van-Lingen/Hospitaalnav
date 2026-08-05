@@ -1,13 +1,13 @@
 -- ============================================================
--- Hospitaal Wayfinding Sisteem - Databasis Skema
--- Topologiese grafiek model: nodes besluit punte, rante = weighted paths
+-- Hospitaalnavigasiestelsel – databasisskema
+-- Topologiese grafiekmodel: nodusse is keusepunte en rande is geweegde paaie.
 -- ============================================================
 
 PRAGMA foreign_keys = ON;
 
 -- ----------------------------------------------------------
--- Geboue (n hospitaal kampus mag baie bevat wat gelink word deur
--- lug brue / tonnels)
+-- Geboue ('n hospitaalkampus kan verskeie geboue bevat wat deur
+-- lugbrûe of tonnels verbind word)
 -- ----------------------------------------------------------
 CREATE TABLE geboue (
     gebou_id        TEXT PRIMARY KEY,      -- vb. 'MAIN', 'SYGEBOU'
@@ -16,19 +16,19 @@ CREATE TABLE geboue (
 );
 
 -- ----------------------------------------------------------
--- Vloere (behoort aan n gebou)
+-- Vloere (elke vloer behoort aan 'n gebou)
 -- ----------------------------------------------------------
 CREATE TABLE vloere (
     vloer_id         TEXT PRIMARY KEY,      -- vb. 'MAIN-1', 'SYGEBOU-G'
     gebou_id         TEXT NOT NULL REFERENCES geboue(gebou_id),
-    level_nommer     INTEGER NOT NULL,      -- 0 = grond, negatief = basement
-    naam             TEXT NOT NULL          -- vb. 'Grond Vloer', 'Level 3'
+    level_nommer     INTEGER NOT NULL,      -- 0 is die grondvloer; negatiewe waardes is keldervloere.
+    naam             TEXT NOT NULL          -- Byvoorbeeld 'Grondvloer' of 'Vlak 3'.
 );
 
 -- ----------------------------------------------------------
--- Node tipes - beheer hoe n node gedra in padfind 
--- (hysbak/trappe nodes dra n vloer verander penalty,
---  lug brue/tonnels nodes link geboue, ens.)
+-- Nodustipes bepaal hoe 'n nodus tydens roetebepaling optree.
+-- Hysbak- en trapnodusse verbind vloere; lugbrug- en tonnelnodusse
+-- verbind afsonderlike geboue.
 -- ----------------------------------------------------------
 CREATE TABLE node_tipes (
     tipe_kode       TEXT PRIMARY KEY,      -- 'AANSLUITING','HUISBAK_GROEP','TRAPHUIS',
@@ -48,25 +48,24 @@ INSERT INTO node_tipes (tipe_kode, beskrywing) VALUES
     ('DEPARTEMENT',         'Departement / kamer bestemming node');
 
 -- ----------------------------------------------------------
--- Nodes - besluit punte in die topologiese grafiek 
+-- Nodusse is keusepunte en bestemmings in die topologiese grafiek.
 -- ----------------------------------------------------------
 CREATE TABLE nodes (
-    node_id         TEXT PRIMARY KEY,      -- vb. 'MAIN-1-J07'
+    node_id         TEXT PRIMARY KEY,      -- Byvoorbeeld 'MAIN-1-J07'.
     vloer_id        TEXT NOT NULL REFERENCES vloere(vloer_id),
     tipe_kode       TEXT NOT NULL REFERENCES node_tipes(tipe_kode),
-    etiket          TEXT NOT NULL,         -- Naam ('Radiologie Ontvangs')
-    pos_x           REAL NOT NULL,         -- lokaale koordinaate op vloer plan (meters)
+    etiket          TEXT NOT NULL,         -- Mensleesbare naam, byvoorbeeld 'Radiologie-ontvangs'.
+    pos_x           REAL NOT NULL,         -- Plaaslike x-koördinaat op die vloerplan, in meter.
     pos_y           REAL NOT NULL,
-    is_beperk       INTEGER NOT NULL DEFAULT 0,  -- 1 = in n verbode wing (soos OR ens.)
-    beperkte_groep  TEXT                  -- vb. 'SLEGS_PERSONEEL','ICU_ONLY', NULL if open
+    is_beperk       INTEGER NOT NULL DEFAULT 0,  -- 1 dui 'n beperkte gebied aan.
+    beperkte_groep  TEXT                  -- Toegangsgroep, of NULL wanneer die nodus oop is.
 );
 
 CREATE INDEX idx_nodes_vloer ON nodes(vloer_id);
 
 -- ----------------------------------------------------------
--- Randte - weighted konneksies tussen nodes 
--- Gestoor as directe pare so asimetriese gewigte is moontelik
--- (vb. hysbak wag tyd is net van toepassing op opklim nie alighting)
+-- Rande is geweegde verbindings tussen nodusse.
+-- Gerigte pare maak verskillende kostes in teenoorgestelde rigtings moontlik.
 -- ----------------------------------------------------------
 CREATE TABLE rande (
     rand_id         INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -74,10 +73,10 @@ CREATE TABLE rande (
     na_node         TEXT NOT NULL REFERENCES nodes(node_id),
     rand_tipe       TEXT NOT NULL DEFAULT 'GANG',  -- 'GANG','HUISBAK','TRAPPE',
                                                    -- 'LUGBRUG','TONNEL'
-    afstand_m      REAL NOT NULL,          -- fiesiese afstand (0 vir hysbak hop)
-    basis_gewig_s   REAL NOT NULL,          -- travel time in sekondes vir normale walking pace
-    wag_penalty_s   REAL NOT NULL DEFAULT 0, -- vb. gemiddelde hysbak wag tyd
-    vloer_verander  INTEGER NOT NULL DEFAULT 0, -- hoeveelheid vloere oorgesteek (vir heuristic)
+    afstand_m      REAL NOT NULL,          -- Fisiese afstand; 0 vir 'n hysbakbeweging.
+    basis_gewig_s   REAL NOT NULL,          -- Basiese reistyd in sekondes teen 'n normale looptempo.
+    wag_penalty_s   REAL NOT NULL DEFAULT 0, -- Bykomende wagtyd, byvoorbeeld vir 'n hysbak.
+    vloer_verander  INTEGER NOT NULL DEFAULT 0, -- Aantal vloere wat oorgesteek word.
     bidirectional   INTEGER NOT NULL DEFAULT 1,
     UNIQUE(van_node, na_node)
 );
@@ -86,8 +85,8 @@ CREATE INDEX idx_rande_van ON rande(van_node);
 CREATE INDEX idx_rande_na ON rande(na_node);
 
 -- ----------------------------------------------------------
--- Gebruiker tipes - dinamiese exclusion van beperkte nodes 
--- (publiek, personeel, pasient-transport, noodgeval, ens.)
+-- Gebruikerstipes bepaal dinamies watter beperkte nodusse uitgesluit word,
+-- byvoorbeeld vir die publiek, personeel, pasiëntvervoer en noodgevalle.
 -- ----------------------------------------------------------
 CREATE TABLE gebruiker_tipes (
     gebruiker_tipe       TEXT PRIMARY KEY,      -- 'PUBLIEK','PERSONEEL','PASIENT_VERVOER','NOODGEVAL'
@@ -100,8 +99,9 @@ INSERT INTO gebruiker_tipes (gebruiker_tipe, beskrywing) VALUES
     ('PASIENT_VERVOER',    'Porters/vervoer met beperkte-saal toegang'),
     ('NOODGEVAL',          'Noodgeval reaksie, alle toegang');
 
--- Watter beperkte_groep waardes elke gebruiker tipe in mag gaan.
--- As n node se 'beperkte_groep' geen ooreenstemmende ry het vir n bepaaled gebruiker_tipe nie, is daai node uitgesluit van die grafiek vir hulle
+-- Koppel elke gebruikerstipe aan die beperkte groepe wat hulle mag betree.
+-- 'n Nodus word vir die gebruiker uitgesluit wanneer geen ooreenstemmende
+-- toestemming vir die nodus se beperkte_groep bestaan nie.
 CREATE TABLE toegang_toestemmings (
     gebruiker_tipe        TEXT NOT NULL REFERENCES gebruiker_tipes(gebruiker_tipe),
     beperkte_groep        TEXT NOT NULL,
