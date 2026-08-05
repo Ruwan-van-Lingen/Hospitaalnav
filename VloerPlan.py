@@ -10,6 +10,10 @@ HospitalGraph.astar(), e.g. to illustrate a specific route.
 """
 
 import sqlite3
+import matplotlib
+
+# Die API teken prente in FastAPI-werkerdrade; 'Agg' benodig geen GUI nie.
+matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from matplotlib.lines import Line2D
 

@@ -1,20 +1,27 @@
-import os
-from fastapi import FastAPI, HTTPException, Query, BackgroundTasks
+import tempfile
+from fastapi import FastAPI, HTTPException, Query
 from fastapi.responses import FileResponse
 from HospitaalGrafiek import HospitalGraph, build_demo_db
 from VloerPlan import draw_floor_plan
 from pathlib import Path
+from starlette.background import BackgroundTask
+
+BASE_DIR = Path(__file__).resolve().parent
+DB_PATH = BASE_DIR / "hospital.db"
+SCHEMA_PATH = BASE_DIR / "Schema.sql"
+SEED_PATH = BASE_DIR / "SeedData.sql"
 
 app = FastAPI(
     title="Hospitaal Padvinder API",
     description="API vir die berekening van die kortste en toeganklikste roetes in die hospitaal.",
 )
 
-# Bou/hernu die databasis by opstart as dit nog nie bestaan nie
-build_demo_db("hospital.db", "Schema.sql", "seedData.sql")
+# Bou die databasis by opstart as dit nog nie bestaan nie.
+if not DB_PATH.exists():
+    build_demo_db(str(DB_PATH), str(SCHEMA_PATH), str(SEED_PATH))
 
 # Laai die grafiek eenmaal in geheue op
-graph = HospitalGraph("hospital.db")
+graph = HospitalGraph(str(DB_PATH))
 
 
 @app.get("/")
@@ -61,7 +68,6 @@ def kry_roete(
 
 @app.get("/route/image")
 def kry_roete_prentjie(
-    background_tasks: BackgroundTasks,
     start: str = Query(..., description="Start node ID (bv. MAIN-G-ENT)"),
     goal: str = Query(..., description="Goal node ID (bv. ANNEX-1-RAD)"),
     user_type: str = Query("PUBLIC", description="Gebruikerstipe (bv. PUBLIC, STAFF)"),
@@ -76,22 +82,21 @@ def kry_roete_prentjie(
             raise HTTPException(status_code=403, detail="Geen pad gevind nie.")
 
         path, _ = result
-        output_filename = "temp_roete.png"
+        temp_file = tempfile.NamedTemporaryFile(
+            prefix="hospitaal_roete_", suffix=".png", delete=False
+        )
+        output_path = Path(temp_file.name)
+        temp_file.close()
 
         # Genereer die afbeelding
-        draw_floor_plan("hospital.db", output_filename, highlight_path=path)
-
-        # Skeduleer om die tydelike prentjie uit te vee ná die versoek voltooi is
-        if os.path.exists(output_filename):
-            background_tasks.add_task(os.remove, output_filename)
+        draw_floor_plan(str(DB_PATH), str(output_path), highlight_path=path)
 
         # Stuur die afbeelding terug na gebruiker se webblaaier
         return FileResponse(
-            output_filename,
+            output_path,
             media_type="image/png",
-            background=BackgroundTasks(
-                lambda: Path(output_filename).unlink(missing_ok=True)
-            ),
+            filename="hospitaal_roete.png",
+            background=BackgroundTask(output_path.unlink, missing_ok=True),
         )
 
     except ValueError as e:
