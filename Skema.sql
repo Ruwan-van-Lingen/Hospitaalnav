@@ -40,7 +40,7 @@ CREATE TABLE node_tipes (
 INSERT INTO node_tipes (tipe_kode, beskrywing) VALUES
     ('AANSLUITING',         'Gang aansluiting / keuse punt'),
     ('HUISBAK_GROEP',       'Huisbak op n gegewe vloer'),
-    ('TRAPHUIS',             'Trappe toegang punt'),
+    ('TRAPHUIS',            'Trappe toegang punt'),
     ('DEUR',                'Deur tussen die gang en die kamer/saal'),
     ('INGANG',              'Gebou ingang (publiek/ambulans/staff)'),
     ('LUGBRUG',             'Lug brug konneksie punt tussen geboue'),
