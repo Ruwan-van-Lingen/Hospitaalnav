@@ -86,8 +86,7 @@ CREATE INDEX idx_rande_van ON rande(van_node);
 CREATE INDEX idx_rande_na ON rande(na_node);
 
 -- ----------------------------------------------------------
--- Gebruiker tipes - dinamiese exclusion van beperkte
- nodes 
+-- Gebruiker tipes - dinamiese exclusion van beperkte nodes 
 -- (publiek, staff, pasient-transport, noodgeval, ens.)
 -- ----------------------------------------------------------
 CREATE TABLE gebruiker_tipes (

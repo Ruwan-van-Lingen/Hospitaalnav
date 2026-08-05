@@ -1,4 +1,5 @@
 # main.py
+import os
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from HospitaalGrafiek import HospitaalGrafiek, bou_demo_db
@@ -17,11 +18,18 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Bou/hernu die databasis by opstart as dit nog nie bestaan nie
-bou_demo_db("hospitaal.db", "Skema.sql", "SeedData.sql")
+DB_PAD = "hospitaal.db"
+AUTO_HERBOU_DB = os.getenv("AUTO_HERBOU_DB", "true").lower() == "true"
 
-# Laai die grafiek eenmaal in geheue op
-grafiek = HospitaalGrafiek("hospitaal.db")
+
+@app.on_event("startup")
+def startup_event():
+    # Dev: herbou elke start. Prod: stel AUTO_HERBOU_DB=false
+    if AUTO_HERBOU_DB:
+        bou_demo_db(DB_PAD, "Skema.sql", "SeedData.sql")
+
+    # Laai die grafiek eenmaal in geheue op
+    app.state.grafiek = HospitaalGrafiek(DB_PAD)
 
 
 @app.get("/")
@@ -39,14 +47,14 @@ def kry_roete(
     Bereken die vinnigste roete tussen twee punte gebaseer op die gebruikerstipe.
     """
     try:
-        resultaat = grafiek.astar(begin, doel, gebruiker_tipe=gebruiker_tipe)
-        
+        resultaat = app.state.grafiek.astar(begin, doel, gebruiker_tipe=gebruiker_tipe)
+
         if resultaat is None:
             raise HTTPException(
-                status_code=403, 
+                status_code=403,
                 detail="Geen roete gevind nie. Die pad bestaan nie of jy het nie toegang tot sekere nodusse nie."
             )
-        
+
         pad, tyd_sekondes = resultaat
         return {
             "begin_node": begin,

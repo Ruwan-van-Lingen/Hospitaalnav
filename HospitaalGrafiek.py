@@ -146,7 +146,7 @@ class HospitaalGrafiek:
 
 
 def bou_demo_db(db_pad: str, skema_pad: str, seed_pad: str):
-    """Helper: (re)creates the SQLite DB from Skema.sql + seed_data.sql."""
+    """Helper: (re)creates the SQLite DB from Skema.sql + SeedData.sql."""
     import os
     if os.path.exists(db_pad):
         os.remove(db_pad)
