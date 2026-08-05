@@ -43,3 +43,57 @@ def test_gevonde_node_werk_in_roete():
 
     assert response.status_code == 200
     assert response.json()["pad"][-1] == "ANNEX-1-RAD"
+
+
+def test_personeel_kan_icu_bereik():
+    with TestClient(app) as client:
+        response = client.get(
+            "/route",
+            params={
+                "begin": "MAIN-G-ENT",
+                "doel": "MAIN-2-ICU",
+                "gebruiker_tipe": "PERSONEEL",
+            },
+        )
+
+    assert response.status_code == 200
+    assert response.json()["pad"][-1] == "MAIN-2-ICU"
+
+
+def test_ongeldige_gebruikerstipe_word_verwerp():
+    with TestClient(app) as client:
+        response = client.get(
+            "/route",
+            params={
+                "begin": "MAIN-G-ENT",
+                "doel": "ANNEX-1-RAD",
+                "gebruiker_tipe": "ONBEKEND",
+            },
+        )
+
+    assert response.status_code == 400
+    assert "Ongeldige gebruikerstipe" in response.json()["detail"]
+
+
+def test_ui_word_bedien():
+    with TestClient(app) as client:
+        response = client.get("/ui")
+
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith("text/html")
+
+
+def test_roeteprent_is_png():
+    with TestClient(app) as client:
+        response = client.get(
+            "/route/image",
+            params={
+                "begin": "MAIN-G-ENT",
+                "doel": "ANNEX-1-RAD",
+                "gebruiker_tipe": "PUBLIEK",
+            },
+        )
+
+    assert response.status_code == 200
+    assert response.headers["content-type"] == "image/png"
+    assert response.content.startswith(b"\x89PNG\r\n\x1a\n")

@@ -1,6 +1,7 @@
 # main.py
 import os
 import tempfile
+from contextlib import asynccontextmanager
 from pathlib import Path
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
@@ -9,9 +10,28 @@ from HospitaalGrafiek import HospitaalGrafiek, bou_demo_db
 from starlette.background import BackgroundTask
 from VloerPlan import teken_vloer_plan
 
+BASE_GIDS = Path(__file__).resolve().parent
+DB_PAD = BASE_GIDS / "hospitaal.db"
+SKEMA_PAD = BASE_GIDS / "Skema.sql"
+SEED_PAD = BASE_GIDS / "SeedData.sql"
+AUTO_HERBOU_DB = os.getenv("AUTO_HERBOU_DB", "true").lower() == "true"
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Dev: herbou elke start. Prod: stel AUTO_HERBOU_DB=false
+    if AUTO_HERBOU_DB:
+        bou_demo_db(str(DB_PAD), str(SKEMA_PAD), str(SEED_PAD))
+
+    # Laai die grafiek eenmaal in geheue op
+    app.state.grafiek = HospitaalGrafiek(str(DB_PAD))
+    yield
+
+
 app = FastAPI(
     title="Hospitaal Padvinder API",
-    description="API vir die berekening van die kortste en toeganklikste roetes in die hospitaal."
+    description="API vir die berekening van die kortste en toeganklikste roetes in die hospitaal.",
+    lifespan=lifespan,
 )
 
 # Laat toe dat die frontend (op 'n ander poort/origin) hierdie API kan bereik.
@@ -22,22 +42,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-BASE_GIDS = Path(__file__).resolve().parent
-DB_PAD = BASE_GIDS / "hospitaal.db"
-SKEMA_PAD = BASE_GIDS / "Skema.sql"
-SEED_PAD = BASE_GIDS / "SeedData.sql"
-AUTO_HERBOU_DB = os.getenv("AUTO_HERBOU_DB", "true").lower() == "true"
-
-
-@app.on_event("startup")
-def startup_event():
-    # Dev: herbou elke start. Prod: stel AUTO_HERBOU_DB=false
-    if AUTO_HERBOU_DB:
-        bou_demo_db(str(DB_PAD), str(SKEMA_PAD), str(SEED_PAD))
-
-    # Laai die grafiek eenmaal in geheue op
-    app.state.grafiek = HospitaalGrafiek(str(DB_PAD))
 
 
 @app.get("/")

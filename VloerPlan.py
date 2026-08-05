@@ -9,6 +9,10 @@ Optioneel verlig n pad (lys van node_ids) teruggestuur deur HospitaalGrafiek.ast
 """
 
 import sqlite3
+import matplotlib
+
+# Gebruik 'n bedienerveilige agterkant wat nie 'n GUI of Tk-hoofdraad benodig nie.
+matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from matplotlib.lines import Line2D
 
