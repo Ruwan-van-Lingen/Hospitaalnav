@@ -10,6 +10,8 @@ Hierdie projek is 'n binnenshuise navigasiestelsel vir 'n hospitaal. Dit gebruik
 - Wys die roete, node-telling en beraamde reistyd as JSON.
 - Genereer 'n PNG-vloerplan waarop die roete uitgelig is.
 - Wys 'n interaktiewe webkoppelvlak met vloer-oortjies en roetestappe.
+- Bedien die webkoppelvlak direk vanaf die API by `/ui`.
+- Verwerp onbekende gebruikerstipes met 'n duidelike foutboodskap.
 
 Die ondersteunde gebruikerstipes is:
 
@@ -28,6 +30,8 @@ Die ondersteunde gebruikerstipes is:
 - Matplotlib
 - HTML, CSS, JavaScript en SVG
 - Pytest
+
+Matplotlib gebruik die nie-interaktiewe `Agg`-agterkant, sodat roeteprente veilig binne FastAPI en bedieneromgewings gegenereer kan word.
 
 ## Projekstruktuur
 
@@ -76,6 +80,7 @@ python -m uvicorn main:app --reload
 Die volgende adresse is dan beskikbaar:
 
 - API: `http://127.0.0.1:8000`
+- Webkoppelvlak: `http://127.0.0.1:8000/ui`
 - Swagger-dokumentasie: `http://127.0.0.1:8000/docs`
 - OpenAPI-skema: `http://127.0.0.1:8000/openapi.json`
 
@@ -87,6 +92,14 @@ python -m uvicorn main:app --reload
 ```
 
 ## Begin die webkoppelvlak
+
+Die eenvoudigste metode is om die webkoppelvlak direk vanaf FastAPI oop te maak:
+
+```text
+http://127.0.0.1:8000/ui
+```
+
+Alternatiewelik kan dit met 'n aparte plaaslike webbediener bedien word. Hou die API aan die gang en open 'n tweede PowerShell-venster in die projekgids:
 
 Hou die API aan die gang en open 'n tweede PowerShell-venster in die projekgids:
 
@@ -107,6 +120,10 @@ Die API-basis-URL in die webkoppelvlak moet `http://localhost:8000` wees. Gebrui
 ### `GET /`
 
 Gee 'n verwelkomingsboodskap terug.
+
+### `GET /ui`
+
+Bedien `hospitaal_wayfinder.html` as die interaktiewe webkoppelvlak. Dit gee `404` terug indien die HTML-lêer nie beskikbaar is nie.
 
 ### `GET /destinations`
 
@@ -175,7 +192,7 @@ GET http://127.0.0.1:8000/route/image?begin=MAIN-G-ENT&doel=ANNEX-1-RAD&gebruike
 | Status | Betekenis |
 |---:|---|
 | `200` | Versoek was suksesvol |
-| `400` | Begin- of eindnode bestaan nie |
+| `400` | Begin- of eindnode bestaan nie, of die gebruikerstipe is ongeldig |
 | `403` | Geen toegelate roete bestaan vir die gebruikerstipe nie |
 | `422` | Vereiste parameters ontbreek of is ongeldig |
 
@@ -193,6 +210,12 @@ Die huidige toetse bevestig dat:
 - Soektogte nie hooflettersensitief is nie.
 - Nooddienste as `MAIN-G-ER` beskikbaar is.
 - 'n gevonde bestemming in 'n roeteversoek gebruik kan word.
+- `PERSONEEL` die ICU kan bereik.
+- 'n onbekende gebruikerstipe met status `400` verwerp word.
+- `/ui` 'n HTML-webkoppelvlak bedien.
+- `/route/image` 'n geldige PNG-lêer lewer.
+
+Die huidige toetsstel bevat agt toetse.
 
 ## Databasismodel
 
@@ -207,3 +230,7 @@ Die hospitaal word as 'n grafiek gestoor:
 - `toegang_toestemmings`: beperkte groepe wat elke rol mag betree.
 
 'n Rand se roetekoste is die basisreistyd plus enige wagtyd. Die A*-heuristiek gebruik die afstand tussen koördinate en 'n vaste strafwaarde vir vloerveranderings.
+
+## Toepassingslewensiklus
+
+FastAPI gebruik 'n lifespan-hanteerder om die databasis by ontwikkelingstart te herbou en die hospitaalgrafiek een keer in geheue te laai. Dit vervang die verouderde `startup`-gebeurtenis en verseker dat die grafiek gereed is voordat versoeke verwerk word.

@@ -70,6 +70,14 @@ class HospitaalGrafiek:
         conn = sqlite3.connect(self.db_pad)
         cur = conn.cursor()
         cur.execute(
+            "SELECT 1 FROM gebruiker_tipes WHERE gebruiker_tipe = ?",
+            (gebruiker_tipe,),
+        )
+        if cur.fetchone() is None:
+            conn.close()
+            raise ValueError(f"Ongeldige gebruikerstipe: {gebruiker_tipe}")
+
+        cur.execute(
             "SELECT beperkte_groep FROM toegang_toestemmings WHERE gebruiker_tipe = ?",
             (gebruiker_tipe,),
         )
