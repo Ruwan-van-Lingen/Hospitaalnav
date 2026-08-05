@@ -1,0 +1,34 @@
+# Python cache en saamgestelde bytekode
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Toets- en dekkinguitsette
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Virtuele omgewings
+.venv/
+venv/
+env/
+
+# Plaaslike SQLite-databasisse wat uit die SQL-lêers herbou word
+*.db
+*.db-shm
+*.db-wal
+
+# Gegenereerde vloerplan- en roeteprente
+temp*.png
+vloer_plan*.png
+VloerPlan*.png
+hospitaal_roete*.png
+
+# Plaaslike IDE- en bedryfstelsellêers
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Loglêers
+*.log
