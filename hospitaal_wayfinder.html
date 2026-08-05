@@ -224,7 +224,7 @@
         letter-spacing: 0.03em;
       }
 
-      /* Hysbakstyl-vloeraanwyser – kenmerkende visuele element */
+      /* Huisbakstyle vloer indikator strip — signature element */
       .indicator {
         display: flex;
         flex-direction: column-reverse;
@@ -400,7 +400,7 @@
 
     <script>
       /* ============================================================
-   DATA – direk uit Skema.sql en SeedData.sql oorgeneem
+   DATA — transcribed directly from Skema.sql + SeedData.sql
    ============================================================ */
       const VLOER_VERANDER_PENALTY_S = 20.0;
 
@@ -572,7 +572,7 @@
         beperkte: beperkte_groep,
       }));
 
-      // [van, na, randtipe, afstand_m, basis_gewig_s, wag_penalty_s, vloer_verander, tweerigting]
+      // [from, to, RandTipe, afstand_m, Basis_gewig_s, wag_penalty_s, vloer_verander, bidirectional]
       const randRye = [
         ["MAIN-G-ENT", "MAIN-G-J01", "GANG", 10, 8, 0, 0, 1],
         ["MAIN-G-J01", "MAIN-G-ELV", "GANG", 6, 5, 0, 0, 1],
@@ -644,9 +644,9 @@
       };
 
       /* ============================================================
-   NODUS- EN VLOEROPSOEKTABELLE – slegs vir die tekening van die vloerplan.
-   Roetebepaling kom vanaf FastAPI se /route-eindpunt en word deur
-   graph.astar() aan die bedienerkant uitgevoer, nie deur JavaScript nie.
+   NODE/VLOER LOOKUPS — gebruik slegs vir tekening van vloer plan 
+   Pathfinding kom vanaf die FastAPI / roete eindpunt (graph.astar() 
+   wat bediener-kant hardloop), nie van JS nie.
    ============================================================ */
       const nodeById = Object.fromEntries(nodes.map((n) => [n.id, n]));
       const vloerById = Object.fromEntries(vloere.map((f) => [f.id, f]));
@@ -687,10 +687,10 @@
       }
 
       /* ============================================================
-   GEBRUIKERSKOPPELVLAKTOESTAND
+   UI STATE
    ============================================================ */
       let huidigeVloer = vloere[0].id;
-      let laasteResultaat = null; // {pad, koste}
+      let laasteResultaat = null; // {path, cost}
 
       function bestemmingEtiket(item) {
         return `${item.etiket} — ${item.gebou_naam}, ${item.vloer_naam} (${item.node_id})`;
@@ -801,8 +801,7 @@
         });
       }
 
-      // Uitlegkonstantes: SCALE spasieer nodusse om oorvleueling te voorkom.
-      // PAD_Y hou 'n oop band bo vir die vloertitel sodat dit nie met node-etikette bots nie.
+      // Uitleg konstantes: SCALE spasieer nodes ver genoeg weg van mekaar dat hulle nooit bots nie; PAD_Y reserveer n duidelike band aan die bokant vir die vloer titel so dat dit nooit onder n node etiktt sit nie
       const SCALE = 15;
       const PAD_X = 55;
       const PAD_Y = 90;
@@ -827,7 +826,7 @@
           }
         }
 
-        // Teken rande waarvan albei nodusse op dieselfde vloer is.
+        // teken selfde-vloer rande 
         randRye.forEach(([van, na, tipe]) => {
           if (
             nodeById[van].vloer === huidigeVloer &&
@@ -853,8 +852,7 @@
           }
         });
 
-        // Teken nodusse met etikette afwisselend bo en onder. 'n Soliede rand
-        // hou die etikette leesbaar teen aangrensende etikette en ganglyne.
+        // teken nodes - etikette is gesentreer direk onder (of alternating above ), elke node met n soliede halo sodat hulle leesbaar bly en nie bots in aaneengrensende etikette of gang lyne in nie.
         vloerNodes.forEach((n, i) => {
           const cx = px(n),
             cy = py(n);
@@ -896,7 +894,7 @@
           circle.setAttribute("stroke-width", isHl ? 2.4 : 1.2);
           g.appendChild(circle);
 
-          // Wissel etikette bo en onder af sodat nabygeleë etikette nie oorvleuel nie.
+          // alternate bo/onder per node sodat die twee naby-gespasieerde nodes op dies ry nie hulle etikette bo op mekaar stack nie 
           const below = i % 2 === 0;
           const ty = below ? cy + 18 : cy - 12;
 
