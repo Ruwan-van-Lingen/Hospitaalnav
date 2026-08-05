@@ -25,7 +25,7 @@ FLOOR_CHANGE_PENALTY_S = 20.0  # conservative lower bound used in the heuristic
 class Edge:
     to_node: str
     weight_s: float          # base_weight_s + wait_penalty_s
-    edge_type: str
+    edge_type: str           # teen aan muur kant 
     floor_change: int
 
 
