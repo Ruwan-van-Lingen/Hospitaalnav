@@ -458,7 +458,7 @@
           "MAIN-1-J01",
           "MAIN-1",
           "AANSLUITING",
-          "Saal Korridor Kruising",
+          "Saal Gang Kruising",
           20,
           5,
           null,
@@ -489,7 +489,7 @@
           "MAIN-2-J01",
           "MAIN-2",
           "AANSLUITING",
-          "ICU Korridor Kruising",
+          "ICU Gang Kruising",
           20,
           5,
           "ICU_ONLY",
@@ -691,7 +691,7 @@
    UI STATE
    ============================================================ */
       let huidigeVloer = vloere[0].id;
-      let laasteResultaat = null; // {path, cost}
+      let laasteResultaat = null; // {pad, koste}
 
       function bestemmingEtiket(item) {
         return `${item.etiket} — ${item.gebou_naam}, ${item.vloer_naam} (${item.node_id})`;

@@ -110,7 +110,7 @@ def teken_vloer_plan(db_pad: str, uit_pad: str, verlig_pad: list[str] | None = N
     ]
     fig.legend(handles=legend_elements, loc="lower center", ncol=len(legend_elements), fontsize=8, frameon=False)
 
-    fig.suptitle("Hospitaal Wayfinding — Topologiese Vloer Plan Grafiek", fontsize=14, fontweight="bold")
+    fig.suptitle("Hospitaal Navigasie — Topologiese Vloer Plan Grafiek", fontsize=14, fontweight="bold")
     plt.tight_layout(rect=[0, 0.05, 1, 0.95])
     plt.savefig(uit_pad, dpi=150, bbox_inches="tight")
     plt.close()
