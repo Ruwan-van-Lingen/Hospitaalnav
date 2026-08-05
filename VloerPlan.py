@@ -117,7 +117,7 @@ def draw_floor_plan(db_path: str, out_path: str, highlight_path: list[str] | Non
 if __name__ == "__main__":
     import sys
     sys.path.insert(0, ".")
-    from hospital_graph import HospitalGraph, build_demo_db
+    from HospitaalGrafiek import HospitalGraph, build_demo_db
 
     build_demo_db("hospital.db", "schema.sql", "seed_data.sql")
     g = HospitalGraph("hospital.db")
