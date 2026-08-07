@@ -1,0 +1,12 @@
+services:
+  hospitaalnav:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: hospitaalnav:latest
+    container_name: hospitaalnav
+    ports:
+      - "8000:8000"
+    environment:
+      AUTO_HERBOU_DB: "true"
+    restart: unless-stopped

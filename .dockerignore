@@ -1,0 +1,17 @@
+.git
+.gitignore
+.pytest_cache
+__pycache__
+*.py[cod]
+.venv
+venv
+env
+*.db
+*.db-shm
+*.db-wal
+*.log
+*.pptx
+temp*.png
+vloer_plan*.png
+VloerPlan*.png
+hospitaal_roete*.png

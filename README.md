@@ -48,6 +48,37 @@ Matplotlib gebruik die nie-interaktiewe `Agg`-agterkant, sodat roeteprente veili
 
 ## Installasie
 
+### Docker Desktop (vereiste metode)
+
+Maak Docker Desktop oop en wag totdat die Linux-container-enjin gereed is. Bou en begin daarna die volledige toepassing vanuit die projekgids:
+
+```powershell
+docker compose up --build -d
+```
+
+Kontroleer die container se status en logs:
+
+```powershell
+docker compose ps
+docker compose logs -f hospitaalnav
+```
+
+Die toepassing is beskikbaar by:
+
+- Webkoppelvlak: `http://localhost:8000/ui`
+- Swagger-dokumentasie: `http://localhost:8000/docs`
+- API: `http://localhost:8000`
+
+Stop en verwyder die container met:
+
+```powershell
+docker compose down
+```
+
+Die SQLite-demodatabasis word by elke container-start uit `Skema.sql` en `SeedData.sql` herbou. Die bronkode en plaaslike gegenereerde databasisse word nie in die Docker-image ingesluit nie.
+
+### Plaaslike Python-ontwikkeling
+
 Clone die repository en beweeg na die projekgids:
 
 ```powershell
