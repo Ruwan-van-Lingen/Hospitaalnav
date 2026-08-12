@@ -10,3 +10,10 @@ services:
     environment:
       AUTO_HERBOU_DB: "true"
     restart: unless-stopped
+
+  # docker compose up --build -d (indien 1ste keer of requirments.txt het verander)
+  # docker compose up --build (vir normale gebruik)
+  # docker compose down (om af te sit)
+
+  # http://localhost:8000/ui (ons pretty version)
+  # http://localhost:8000/docs (default API version)

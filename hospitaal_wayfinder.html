@@ -643,6 +643,18 @@
         TONNEL: "#6D5DD3",
       };
 
+      // Elke vloer kry 'n eie kleur sodat, wanneer alle vloere laag-vir-laag
+      // bo-op mekaar getoon word (die oorsigaansig), oorvleuelende lae —
+      // bv. hysbakke wat op dieselfde plaaslike koördinate op elke vloer sit —
+      // steeds van mekaar onderskei kan word.
+      const VLOER_KLEURE = {
+        "MAIN-G": "#2E8B57",
+        "MAIN-1": "#1E6FA8",
+        "MAIN-2": "#E14B4B",
+        "SYGEBOU-G": "#6D5DD3",
+        "SYGEBOU-1": "#FFB100",
+      };
+
       /* ============================================================
    NODE/VLOER LOOKUPS — gebruik slegs vir tekening van vloer plan 
    Pathfinding kom vanaf die FastAPI / roete eindpunt (graph.astar() 
@@ -690,7 +702,7 @@
       /* ============================================================
                               UI TOESTANDE
       ============================================================ */
-      let huidigeVloer = vloere[0].id;
+      let huidigeVloer = null; // null = oorsig-modus: alle vloere laag-vir-laag saamgevoeg
       let laasteResultaat = null; // {pad, koste}
 
       function bestemmingEtiket(item) {
@@ -755,6 +767,16 @@
           laasteResultaat && laasteResultaat.path
             ? new Set(laasteResultaat.path.map((id) => nodeById[id].vloer))
             : new Set();
+
+        const oorsigTab = document.createElement("div");
+        oorsigTab.className = "tab" + (huidigeVloer === null ? " active" : "");
+        oorsigTab.textContent = "Oorsig · Alle Vloere";
+        oorsigTab.onclick = () => {
+          huidigeVloer = null;
+          renderAll();
+        };
+        tabsEl.appendChild(oorsigTab);
+
         vloere.forEach((f) => {
           const d = document.createElement("div");
           d.className =
@@ -777,6 +799,16 @@
           laasteResultaat && laasteResultaat.path
             ? new Set(laasteResultaat.path.map((id) => nodeById[id].vloer))
             : new Set();
+
+        const oorsigRow = document.createElement("div");
+        oorsigRow.className = "ind-row" + (huidigeVloer === null ? " current" : "");
+        oorsigRow.innerHTML = `<span class="dot"></span><span>Oorsig — Alle Vloere</span>`;
+        oorsigRow.onclick = () => {
+          huidigeVloer = null;
+          renderAll();
+        };
+        el.appendChild(oorsigRow);
+
         vloere.forEach((f) => {
           const row = document.createElement("div");
           row.className =
@@ -809,7 +841,112 @@
       const px = (n) => n.x * SCALE + PAD_X;
       const py = (n) => n.y * SCALE + PAD_Y;
 
+      // Oorsigaansig: elke vloer se gange en nodusse word laag-vir-laag,
+      // deurskynend en in sy eie vloerkleur, bo-op mekaar op dieselfde
+      // plaaslike koördinate geteken — sodat albei geboue en alle vloere
+      // as een saamgevoegde plan sigbaar is voordat 'n roete gekies is.
+      function renderOorsigPlan() {
+        const svg = document.getElementById("plan");
+        const NS = "http://www.w3.org/2000/svg";
+        svg.innerHTML = "";
+
+        randRye.forEach(([van, na, tipe]) => {
+          // Vertikale skakels (hysbak/trappe) verbind presies dieselfde
+          // plaaslike koördinaat op opeenvolgende vloere — as 'n lyn help
+          // dit nie in die oorsig nie, die oorvleuelende nodes toon dit reeds.
+          if (tipe === "HUISBAK" || tipe === "TRAPPE") return;
+          const a = nodeById[van],
+            b = nodeById[na];
+          const kleur = VLOER_KLEURE[a.vloer] || VLOER_KLEURE[b.vloer] || "#7C8B99";
+          const line = document.createElementNS(NS, "line");
+          line.setAttribute("x1", px(a));
+          line.setAttribute("y1", py(a));
+          line.setAttribute("x2", px(b));
+          line.setAttribute("y2", py(b));
+          line.setAttribute("stroke", kleur);
+          line.setAttribute("stroke-width", 2);
+          line.setAttribute("opacity", "0.5");
+          svg.appendChild(line);
+        });
+
+        nodes.forEach((n) => {
+          const cx = px(n),
+            cy = py(n);
+          const kleur = VLOER_KLEURE[n.vloer] || "#7C8B99";
+          const g = document.createElementNS(NS, "g");
+
+          const circle = document.createElementNS(NS, "circle");
+          circle.setAttribute("cx", cx);
+          circle.setAttribute("cy", cy);
+          circle.setAttribute("r", 6);
+          circle.setAttribute("fill", kleur);
+          circle.setAttribute("fill-opacity", "0.75");
+          circle.setAttribute("stroke", "#fff");
+          circle.setAttribute("stroke-width", "1");
+          g.appendChild(circle);
+
+          const title = document.createElementNS(NS, "title");
+          title.textContent = `${n.etiket} — ${vloerById[n.vloer].gebou} · ${vloerById[n.vloer].naam}`;
+          g.appendChild(title);
+
+          g.style.cursor = "pointer";
+          g.onclick = () => {
+            huidigeVloer = n.vloer;
+            renderAll();
+          };
+
+          svg.appendChild(g);
+        });
+
+        const heading = document.createElementNS(NS, "text");
+        heading.setAttribute("x", 20);
+        heading.setAttribute("y", 28);
+        heading.setAttribute("font-size", "15");
+        heading.setAttribute("font-weight", "700");
+        heading.setAttribute("font-family", "Space Grotesk, sans-serif");
+        heading.setAttribute("fill", "#12222E");
+        heading.textContent = "Volledige Hospitaal — Alle Vloere Saamgevoeg";
+        svg.appendChild(heading);
+
+        const subheading = document.createElementNS(NS, "text");
+        subheading.setAttribute("x", 20);
+        subheading.setAttribute("y", 45);
+        subheading.setAttribute("font-size", "10.5");
+        subheading.setAttribute("font-family", "IBM Plex Mono, monospace");
+        subheading.setAttribute("fill", "#4C6270");
+        subheading.textContent = "Klik 'n oortjie of 'n nodus om 'n vloer te ondersoek";
+        svg.appendChild(subheading);
+
+        // Vloerkleur-legende
+        const legendX = 600,
+          legendYStart = 470;
+        vloere.forEach((f, i) => {
+          const ly = legendYStart + i * 16;
+          const sq = document.createElementNS(NS, "rect");
+          sq.setAttribute("x", legendX);
+          sq.setAttribute("y", ly);
+          sq.setAttribute("width", 10);
+          sq.setAttribute("height", 10);
+          sq.setAttribute("rx", 2);
+          sq.setAttribute("fill", VLOER_KLEURE[f.id] || "#7C8B99");
+          svg.appendChild(sq);
+
+          const txt = document.createElementNS(NS, "text");
+          txt.setAttribute("x", legendX + 16);
+          txt.setAttribute("y", ly + 9);
+          txt.setAttribute("font-size", "9.5");
+          txt.setAttribute("font-family", "IBM Plex Mono, monospace");
+          txt.setAttribute("fill", "#12222E");
+          txt.textContent = `${f.gebou} · ${f.naam}`;
+          svg.appendChild(txt);
+        });
+      }
+
       function renderPlan() {
+        if (huidigeVloer === null) {
+          renderOorsigPlan();
+          return;
+        }
         const svg = document.getElementById("plan");
         const NS = "http://www.w3.org/2000/svg";
         svg.innerHTML = "";
@@ -1026,6 +1163,7 @@
       };
       document.getElementById("clearBtn").onclick = () => {
         laasteResultaat = null;
+        huidigeVloer = null;
         renderAll();
       };
 
