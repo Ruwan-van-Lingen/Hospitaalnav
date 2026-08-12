@@ -400,8 +400,8 @@
 
     <script>
       /* ============================================================
-   DATA — transcribed directly from Skema.sql + SeedData.sql
-   ============================================================ */
+          DATA — verkry direk vanaf Skema.sql + SeedData.sql
+        ============================================================ */
       const VLOER_VERANDER_PENALTY_S = 20.0;
 
       const geboue = [
@@ -572,7 +572,7 @@
         beperkte: beperkte_groep,
       }));
 
-      // [from, to, RandTipe, afstand_m, Basis_gewig_s, wag_penalty_s, vloer_verander, bidirectional]
+      // [van, na, RandTipe, afstand_m, Basis_gewig_s, wag_penalty_s, vloer_verander, bidirectional]
       const randRye = [
         ["MAIN-G-ENT", "MAIN-G-J01", "GANG", 10, 8, 0, 0, 1],
         ["MAIN-G-J01", "MAIN-G-ELV", "GANG", 6, 5, 0, 0, 1],
@@ -688,8 +688,8 @@
       }
 
       /* ============================================================
-   UI STATE
-   ============================================================ */
+                              UI TOESTANDE
+      ============================================================ */
       let huidigeVloer = vloere[0].id;
       let laasteResultaat = null; // {pad, koste}
 

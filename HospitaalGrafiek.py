@@ -172,7 +172,7 @@ class HospitaalGrafiek:
 
             for rand in self.adjacency[huidig]:
                 if not is_bruikbaar(rand.na_node):
-                    continue  # Slaan nodusse oor waarvoor die gebruiker nie toegang het nie.
+                    continue  # Slaan nodes oor waarvoor die gebruiker nie toegang het nie.
                 tentatiewe_g = koste_so_ver + rand.gewig_s
                 if tentatiewe_g < g_score.get(rand.na_node, math.inf):
                     g_score[rand.na_node] = tentatiewe_g
