@@ -60,6 +60,14 @@ def formateer_tyd(sekondes: float) -> str:
     return " ".join(dele)
 
 
+def formateer_afstand(meter: float) -> str:
+    """Formateer meter as byvoorbeeld 45m of 1.2km."""
+    meter = max(0.0, meter)
+    if meter >= 1000:
+        return f"{meter / 1000:.1f}km"
+    return f"{round(meter)}m"
+
+
 @app.get("/")
 def tuisblad():
     return {"boodskap": "Welkom by die Hospitaal Navigasie API. Gaan na /docs vir die dokumentasie."}
@@ -102,13 +110,15 @@ def kry_roete(
                 detail="Geen roete gevind nie. Die pad bestaan nie of jy het nie toegang tot sekere nodusse nie."
             )
 
-        pad, tyd_sekondes = resultaat
+        pad, tyd_sekondes, afstand_m = resultaat
         return {
             "begin_node": begin,
             "doel_node": doel,
             "gebruiker_tipe": gebruiker_tipe,
             "geskatte_tyd_sekondes": round(tyd_sekondes, 1),
             "geskatte_tyd": formateer_tyd(tyd_sekondes),
+            "geskatte_afstand_m": round(afstand_m, 1),
+            "geskatte_afstand": formateer_afstand(afstand_m),
             "node_telling": len(pad),
             "pad": pad
         }
@@ -133,7 +143,7 @@ def kry_roete_prentjie(
         if resultaat is None:
             raise HTTPException(status_code=403, detail="Geen roete gevind nie.")
 
-        pad, _ = resultaat
+        pad, _, _ = resultaat
         tydelike_leer = tempfile.NamedTemporaryFile(
             prefix="hospitaal_roete_", suffix=".png", delete=False
         )

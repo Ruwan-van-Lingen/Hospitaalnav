@@ -25,6 +25,7 @@ class Rand:
     gewig_s: float          # Som van die basiese reistyd en wagtyd.
     rand_tipe: str
     vloer_verander: int
+    afstand_m: float        # Fisiese loopafstand; 0 vir 'n hysbakbeweging.
 
 
 class HospitaalGrafiek:
@@ -63,10 +64,10 @@ class HospitaalGrafiek:
         """)
         for row in cur.fetchall():
             gewig = row["basis_gewig_s"] + row["wag_penalty_s"]
-            e = Rand(row["na_node"], gewig, row["rand_tipe"], row["vloer_verander"])
+            e = Rand(row["na_node"], gewig, row["rand_tipe"], row["vloer_verander"], row["afstand_m"])
             self.adjacency[row["van_node"]].append(e)
             if row["bidirectional"]:
-                e_rev = Rand(row["van_node"], gewig, row["rand_tipe"], row["vloer_verander"])
+                e_rev = Rand(row["van_node"], gewig, row["rand_tipe"], row["vloer_verander"], row["afstand_m"])
                 self.adjacency[row["na_node"]].append(e_rev)
 
         conn.close()
@@ -137,10 +138,14 @@ class HospitaalGrafiek:
         begin: str,
         doel: str,
         gebruiker_tipe: str = "PUBLIEK",
-    ) -> Optional[tuple[list[str], float]]:
+    ) -> Optional[tuple[list[str], float, float]]:
         """
-        Gee 'n tuple met die node-ID's en totale koste in sekondes terug.
-        Gee None terug wanneer geen toegelate pad bestaan nie.
+        Gee 'n tuple met die node-ID's, totale koste in sekondes en totale
+        loopafstand in meter terug. Gee None terug wanneer geen toegelate pad
+        bestaan nie. Die afstand is die som van elke rand se afstand_m langs
+        die gekose (tyd-optimale) pad; hysbakrande dra niks by tot die
+        afstand nie, aangesien hulle geen fisiese loopafstand verteenwoordig
+        nie.
         """
         if begin not in self.nodes or doel not in self.nodes:
             raise ValueError("begin/doel node nie gevind in grafiek nie.")
@@ -158,13 +163,14 @@ class HospitaalGrafiek:
         open_set = [(self._heuristic(begin, doel), 0.0, begin)]
         kom_van: dict[str, str] = {}
         g_score = {begin: 0.0}
+        afstand_score = {begin: 0.0}  # Kumulatiewe loopafstand tot elke nodus, langs die tyd-optimale pad.
         besoek = set()
 
         while open_set:
             _, koste_so_ver, huidig = heapq.heappop(open_set)
 
             if huidig == doel:
-                return self._reconstruct(kom_van, huidig), koste_so_ver
+                return self._reconstruct(kom_van, huidig), koste_so_ver, afstand_score[huidig]
 
             if huidig in besoek:
                 continue
@@ -176,6 +182,7 @@ class HospitaalGrafiek:
                 tentatiewe_g = koste_so_ver + rand.gewig_s
                 if tentatiewe_g < g_score.get(rand.na_node, math.inf):
                     g_score[rand.na_node] = tentatiewe_g
+                    afstand_score[rand.na_node] = afstand_score[huidig] + rand.afstand_m
                     kom_van[rand.na_node] = huidig
                     f_score = tentatiewe_g + self._heuristic(rand.na_node, doel)
                     heapq.heappush(open_set, (f_score, tentatiewe_g, rand.na_node))
@@ -213,8 +220,8 @@ if __name__ == "__main__":
     print("=== PUBLIEK besoeker: Main Ingang -> Radiologie (Sygebou) ===")
     resultaat = g.astar("MAIN-G-ENT", "SYGEBOU-1-RAD", gebruiker_tipe="PUBLIEK")
     if resultaat:
-        pad, koste = resultaat
-        print(f"Path ({koste:.0f}s): " + " -> ".join(pad))
+        pad, koste, afstand = resultaat
+        print(f"Path ({koste:.0f}s, {afstand:.0f}m): " + " -> ".join(pad))
     else:
         print("Geen roete gevind nie.")
 
@@ -225,5 +232,5 @@ if __name__ == "__main__":
     print("\n=== PERSONEEL: Hoof Ingang -> ICU ===")
     resultaat = g.astar("MAIN-G-ENT", "MAIN-2-ICU", gebruiker_tipe="PERSONEEL")
     if resultaat:
-        pad, koste = resultaat
-        print(f"Pad ({koste:.0f}s): " + " -> ".join(pad))
+        pad, koste, afstand = resultaat
+        print(f"Pad ({koste:.0f}s, {afstand:.0f}m): " + " -> ".join(pad))

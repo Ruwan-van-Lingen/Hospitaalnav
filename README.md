@@ -196,6 +196,8 @@ Voorbeeldantwoord:
   "gebruiker_tipe": "PUBLIEK",
   "geskatte_tyd_sekondes": 83.0,
   "geskatte_tyd": "1m 23s",
+  "geskatte_afstand_m": 83.0,
+  "geskatte_afstand": "83m",
   "node_telling": 9,
   "pad": [
     "MAIN-G-ENT",

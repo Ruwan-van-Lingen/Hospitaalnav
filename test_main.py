@@ -48,8 +48,11 @@ def test_gevonde_node_werk_in_roete():
         )
 
     assert response.status_code == 200
-    assert response.json()["pad"][-1] == "SYGEBOU-1-RAD"
-    assert response.json()["geskatte_tyd"] == "1m 23s"
+    data = response.json()
+    assert data["pad"][-1] == "SYGEBOU-1-RAD"
+    assert data["geskatte_tyd"] == "1m 23s"
+    assert data["geskatte_afstand_m"] == 83.0
+    assert data["geskatte_afstand"] == "83m"
 
 
 def test_personeel_kan_icu_bereik():
