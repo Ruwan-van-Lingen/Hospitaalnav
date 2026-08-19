@@ -359,7 +359,13 @@ async function laaiInsident() {
       document.getElementById("incidentTitle").textContent = `Aktiewe sluiting: ${aktieweInsident.name}`;
       document.getElementById("incidentDescription").textContent = ontruimTeks;
     }
-    merkGesloteBestemmings();
+    // Herlaai die seleksielyste nadat die insidentdata ontvang is sodat
+    // geblokkeerde nodusse gewaarborg gedeaktiveer word, ongeag watter
+    // API-aanroep eerste voltooi het.
+    await Promise.all([
+      laaiBestemmings(document.getElementById("beginSoek").value, "beginNode"),
+      laaiBestemmings(document.getElementById("eindSoek").value, "endNode"),
+    ]);
     renderAll();
   } catch (_) { }
 }
@@ -593,6 +599,10 @@ function renderPlan() {
         b = nodeById[na];
       vloerLyne.push({ x1: px(a), y1: py(a), x2: px(b), y2: py(b) });
       const isHl = verligRande.has(van + "|" + na);
+      // 'n Rand word rooi geteken as BEIDE eindpunte geblokkeer is —
+      // dit wys die geslote area as 'n samehangende rooi sone eerder
+      // as net geïsoleerde rooi kolle.
+      const isBlocked = blockedSet.has(van) && blockedSet.has(na);
       const line = document.createElementNS(NS, "line");
       line.setAttribute("x1", px(a));
       line.setAttribute("y1", py(a));
@@ -600,10 +610,10 @@ function renderPlan() {
       line.setAttribute("y2", py(b));
       line.setAttribute(
         "stroke",
-        isHl ? "#FFB100" : RAND_KLEURE[tipe] || "#ccc",
+        isHl ? "#FFB100" : isBlocked ? "#D94B4B" : RAND_KLEURE[tipe] || "#ccc",
       );
-      line.setAttribute("stroke-width", isHl ? 5 : 2.2);
-      if (isHl) {
+      line.setAttribute("stroke-width", isHl ? 5 : isBlocked ? 3.5 : 2.2);
+      if (isHl || isBlocked) {
         line.setAttribute("stroke-linecap", "round");
       }
       if (oorsigModus) line.setAttribute("opacity", "0.75");
@@ -928,7 +938,10 @@ document.getElementById("clearBtn").onclick = () => {
   renderAll();
 };
 
-populateSelects();
+// Laai eers die insidentstatus voordat die seleksielyste gevul word,
+// sodat merkGesloteBestemmings() gewaarborg die korrekte geblokkeerde
+// node-lys het wanneer dit die opsies deaktiveer.
 renderLegend();
 renderAll();
+populateSelects();
 laaiInsident();
