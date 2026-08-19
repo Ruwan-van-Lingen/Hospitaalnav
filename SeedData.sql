@@ -17,42 +17,44 @@ INSERT INTO vloere (vloer_id, gebou_id, level_nommer, naam) VALUES
 
 -- ---------------- Nodusse ----------------
 
-INSERT INTO nodes (node_id, vloer_id, tipe_kode, etiket, pos_x, pos_y, is_beperk, beperkte_groep) VALUES
+-- is_nooduitgang=1 merk 'n nodus as 'n veilige versamelpunt buite die gebou.
+-- Ingange op die grondvloer kwalifiseer; hysbakke en interne aansluitings nie.
+INSERT INTO nodes (node_id, vloer_id, tipe_kode, etiket, pos_x, pos_y, is_beperk, beperkte_groep, is_nooduitgang) VALUES
     -- Hoofgebou: grondvloer
-    ('MAIN-G-ENT',   'MAIN-G', 'INGANG',         'Hoof Publiek Ingang',   0,  0, 0, NULL),
-    ('MAIN-G-AMB',   'MAIN-G', 'INGANG',         'Ambulaans Baai',        0, 20, 0, NULL),
-    ('MAIN-G-J01',   'MAIN-G', 'AANSLUITING',    'Lobby Aansluiting',     10,  0, 0, NULL),
-    ('MAIN-G-ELV',   'MAIN-G', 'HUISBAK_GROEP',  'Hoof Huisbak Groep',    15,  5, 0, NULL),
-    ('MAIN-G-STA',   'MAIN-G', 'TRAPHUIS',       'Hoof Traphuis',         15, 10, 0, NULL),
-    ('MAIN-G-ER',    'MAIN-G', 'DEPARTEMENT',    'Nooddienste',           5, 20, 0, NULL),
-    ('MAIN-G-TUN',   'MAIN-G', 'TONNEL',         'Tonnel na Sygebou',       10, 30, 0, NULL),
+    ('MAIN-G-ENT',   'MAIN-G', 'INGANG',         'Hoof Publiek Ingang',   0,  0, 0, NULL, 1),
+    ('MAIN-G-AMB',   'MAIN-G', 'INGANG',         'Ambulaans Baai',        0, 20, 0, NULL, 1),
+    ('MAIN-G-J01',   'MAIN-G', 'AANSLUITING',    'Lobby Aansluiting',     10,  0, 0, NULL, 0),
+    ('MAIN-G-ELV',   'MAIN-G', 'HUISBAK_GROEP',  'Hoof Huisbak Groep',    15,  5, 0, NULL, 0),
+    ('MAIN-G-STA',   'MAIN-G', 'TRAPHUIS',       'Hoof Traphuis',         15, 10, 0, NULL, 0),
+    ('MAIN-G-ER',    'MAIN-G', 'DEPARTEMENT',    'Nooddienste',           5, 20, 0, NULL, 0),
+    ('MAIN-G-TUN',   'MAIN-G', 'TONNEL',         'Tonnel na Sygebou',     10, 30, 0, NULL, 0),
 
     -- Hoofgebou: vlak 1
-    ('MAIN-1-ELV',   'MAIN-1', 'HUISBAK_GROEP',  'Huisbak Groep L1',     15,  5, 0, NULL),
-    ('MAIN-1-STA',   'MAIN-1', 'TRAPHUIS',       'Traphuis L1',          15, 10, 0, NULL),
-    ('MAIN-1-J01',   'MAIN-1', 'DEPARTEMENT',    'Saal Gang Jct',        20,  5, 0, NULL),
-    ('MAIN-1-WARDA', 'MAIN-1', 'DEPARTEMENT',    'Saal A',               25,  0, 0, NULL),
-    ('MAIN-1-WARDB', 'MAIN-1', 'DEPARTEMENT',    'Saal B',               25, 10, 0, NULL),
-    ('MAIN-1-BRIDGE','MAIN-1', 'LUGBRUG',        'Lug Brug na Sygebou',    30, 20, 0, NULL),
+    ('MAIN-1-ELV',   'MAIN-1', 'HUISBAK_GROEP',  'Huisbak Groep L1',     15,  5, 0, NULL, 0),
+    ('MAIN-1-STA',   'MAIN-1', 'TRAPHUIS',       'Traphuis L1',          15, 10, 0, NULL, 0),
+    ('MAIN-1-J01',   'MAIN-1', 'DEPARTEMENT',    'Saal Gang Jct',        20,  5, 0, NULL, 0),
+    ('MAIN-1-WARDA', 'MAIN-1', 'DEPARTEMENT',    'Saal A',               25,  0, 0, NULL, 0),
+    ('MAIN-1-WARDB', 'MAIN-1', 'DEPARTEMENT',    'Saal B',               25, 10, 0, NULL, 0),
+    ('MAIN-1-BRIDGE','MAIN-1', 'LUGBRUG',        'Lug Brug na Sygebou',  30, 20, 0, NULL, 0),
 
     -- Hoofgebou: vlak 2 (beperkte ICU- en operasieteatergebied)
-    ('MAIN-2-ELV',   'MAIN-2', 'HUISBAK_GROEP', 'Huisbak Groep L2',      15,  5, 0, NULL),
-    ('MAIN-2-STA',   'MAIN-2', 'TRAPHUIS',      'Traphuis L2',           15, 10, 0, NULL),
-    ('MAIN-2-J01',   'MAIN-2', 'AANSLUITING',   'ICU Gang Jct',          20,  5, 1, 'SLEGS_ICU'),
-    ('MAIN-2-ICU',   'MAIN-2', 'DEPARTEMENT',   'ICU',                   25,  0, 1, 'SLEGS_ICU'),
-    ('MAIN-2-OR',    'MAIN-2', 'DEPARTEMENT',   'OR',                    25, 10, 1, 'SLEGS_PERSONEEL'),
+    ('MAIN-2-ELV',   'MAIN-2', 'HUISBAK_GROEP', 'Huisbak Groep L2',      15,  5, 0, NULL, 0),
+    ('MAIN-2-STA',   'MAIN-2', 'TRAPHUIS',      'Traphuis L2',           15, 10, 0, NULL, 0),
+    ('MAIN-2-J01',   'MAIN-2', 'AANSLUITING',   'ICU Gang Jct',          20,  5, 1, 'SLEGS_ICU', 0),
+    ('MAIN-2-ICU',   'MAIN-2', 'DEPARTEMENT',   'ICU',                   25,  0, 1, 'SLEGS_ICU', 0),
+    ('MAIN-2-OR',    'MAIN-2', 'DEPARTEMENT',   'OR',                    25, 10, 1, 'SLEGS_PERSONEEL', 0),
 
     -- SYGEBOU Grond vloer
-    ('SYGEBOU-G-ENT',  'SYGEBOU-G','INGANG',         'Sygebou Ingang',              40,  0, 0, NULL),
-    ('SYGEBOU-G-J01',  'SYGEBOU-G','AANSLUITING',    'Sygebou Lobby Jct',           40, 10, 0, NULL),
-    ('SYGEBOU-G-ELV',  'SYGEBOU-G','HUISBAK_GROEP',  'Sygebou Huisbak',             40, 15, 0, NULL),
-    ('SYGEBOU-G-TUN',  'SYGEBOU-G','TONNEL',         'Tonnel na Main',            10, 30, 0, NULL),
-    ('SYGEBOU-G-OUT',  'SYGEBOU-G','DEPARTEMENT',    'Uitpasient Ontvangs',       45, 10, 0, NULL),
+    ('SYGEBOU-G-ENT',  'SYGEBOU-G','INGANG',         'Sygebou Ingang',        40,  0, 0, NULL, 1),
+    ('SYGEBOU-G-J01',  'SYGEBOU-G','AANSLUITING',    'Sygebou Lobby Jct',     40, 10, 0, NULL, 0),
+    ('SYGEBOU-G-ELV',  'SYGEBOU-G','HUISBAK_GROEP',  'Sygebou Huisbak',       40, 15, 0, NULL, 0),
+    ('SYGEBOU-G-TUN',  'SYGEBOU-G','TONNEL',         'Tonnel na Main',        10, 30, 0, NULL, 0),
+    ('SYGEBOU-G-OUT',  'SYGEBOU-G','DEPARTEMENT',    'Uitpasient Ontvangs',   45, 10, 0, NULL, 0),
 
     -- SYGEBOU Level 1
-    ('SYGEBOU-1-ELV',  'SYGEBOU-1','HUISBAK_GROEP', 'Sygebou Huisbak L1',           40, 15, 0, NULL),
-    ('SYGEBOU-1-BRIDGE','SYGEBOU-1','LUGBRUG',      'Lug Brug na Main',           30, 20, 0, NULL),
-    ('SYGEBOU-1-RAD',   'SYGEBOU-1','DEPARTEMENT',  'Radiologie',                 45, 20, 0, NULL);
+    ('SYGEBOU-1-ELV',  'SYGEBOU-1','HUISBAK_GROEP', 'Sygebou Huisbak L1',    40, 15, 0, NULL, 0),
+    ('SYGEBOU-1-BRIDGE','SYGEBOU-1','LUGBRUG',       'Lug Brug na Main',      30, 20, 0, NULL, 0),
+    ('SYGEBOU-1-RAD',   'SYGEBOU-1','DEPARTEMENT',   'Radiologie',            45, 20, 0, NULL, 0);
 
 -- ---------------- Rande ----------------
 -- Gangrande: basis_gewig_s is ongeveer afstand gedeel deur 'n gemiddelde

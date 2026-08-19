@@ -1,7 +1,36 @@
-/* ============================================================
-    DATA — verkry direk vanaf Skema.sql + SeedData.sql
-    Gebruik sodat ons nie elke keur nuwe sql entries hoef te skep nie
-  ============================================================ */
+/**
+ * hospitaal_wayfinder.js
+ * =======================
+ * Interaktiewe webkoppelvlak vir die Hospitaal Navigasiestelsel (/ui).
+ *
+ * Hierdie lêer bevat:
+ *   • Statiese topologiese grafieksdata (nodusse, rande, vloere, geboue)
+ *     wat direk vanuit Skema.sql + SeedData.sql afgelei is en kliëntkant
+ *     gebruik word vir SVG-tekening.
+ *   • Roeteberekening via die FastAPI-agterkant (/route of /route/ontruim).
+ *     A* loop bediener-kant (HospitaalGrafiek.py) — hierdie lêer stuur
+ *     slegs die versoek en vertoon die resultaat.
+ *   • SVG-vloerplan-rendering: nodusse, rande, paduitligging, etiketplaatsing.
+ *   • Vloer-oortjies en die hysbak-styl vloerindikator (sykolom).
+ *   • Soekveld-integrasie met /destinations vir mensleesbare bestemmings.
+ *   • Ontruimingsmodus-ondersteuning: die banner en /route/ontruim-aanroep.
+ *
+ * Kaart-oorsigmodus (OORSIG_ID)
+ * --------------------------------
+ * Die "Oorsig — Alle Vloere"-oortjie laag alle vloere op een SVG-kaart.
+ * Nodusse wat presies dieselfde (x, y) koördinate deel oor vloere (bv.
+ * hysbakke) word effens uitmekaar geskuif met 'n jitter-algoritme sodat
+ * hulle onderskei kan word. Vertikale hysbak- en trap-rande word in
+ * oorsigmodus oorgeslaan omdat hulle as onsigbare lyne sou teken.
+ *
+ * Etiketplaatsing
+ * -----------------
+ * Die plaatsingsalgoritme probeer 8 kandidaatposisies per etiket en kies
+ * die posisie met die minste botsings teen ander etikette, noduspunte en
+ * gangslyne. Dit verhoed dat etikette oor mekaar of oor punte lê.
+ */
+
+
 const VLOER_VERANDER_PENALTY_S = 20.0;
 
 const geboue = [
@@ -261,7 +290,15 @@ const nodeById = Object.fromEntries(nodes.map((n) => [n.id, n]));
 const vloerById = Object.fromEntries(vloere.map((f) => [f.id, f]));
 
 async function fetchRoute(apiBase, beginId, eindeId, gebruikerTipe) {
-  const url = `${apiBase.replace(/\/$/, "")}/route?begin=${encodeURIComponent(beginId)}&doel=${encodeURIComponent(eindeId)}&gebruiker_tipe=${encodeURIComponent(gebruikerTipe)}`;
+  const basis = apiBase.replace(/\/$/, "");
+
+  // Tydens ontruimingsmodus word die bestemming geïgnoreer en word die
+  // naaste nooduitgang via 'n afsonderlike eindpunt bepaal.
+  const ontruim = aktieweInsident.active && aktieweInsident.ontruimings_modus;
+  const url = ontruim
+    ? `${basis}/route/ontruim?begin=${encodeURIComponent(beginId)}&gebruiker_tipe=${encodeURIComponent(gebruikerTipe)}`
+    : `${basis}/route?begin=${encodeURIComponent(beginId)}&doel=${encodeURIComponent(eindeId)}&gebruiker_tipe=${encodeURIComponent(gebruikerTipe)}`;
+
   let resp;
   try {
     resp = await fetch(url);
@@ -280,8 +317,7 @@ async function fetchRoute(apiBase, beginId, eindeId, gebruikerTipe) {
   }
 
   if (!resp.ok) {
-    const detail =
-      body && body.detail ? body.detail : `HTTP ${resp.status}`;
+    const detail = body && body.detail ? body.detail : `HTTP ${resp.status}`;
     return {
       error: resp.status === 403 || resp.status === 409 ? "blocked" : "invalid",
       message: detail,
@@ -295,6 +331,8 @@ async function fetchRoute(apiBase, beginId, eindeId, gebruikerTipe) {
     distance: body.geskatte_afstand_m,
     formattedDistance: body.geskatte_afstand,
     nodeCount: body.node_telling,
+    // Wys die nooduitgang se naam in die roete-paneel as ons in ontruimingsmodus is.
+    uitgang: ontruim ? body.uitgang_node : null,
   };
 }
 
@@ -314,8 +352,12 @@ async function laaiInsident() {
     const banier = document.getElementById("incidentBanner");
     banier.hidden = !aktieweInsident.active;
     if (aktieweInsident.active) {
+      // Wys 'n spesiale boodskap as ontruimingsmodus aktief is.
+      const ontruimTeks = aktieweInsident.ontruimings_modus
+        ? "🚨 ONTRUIMINGSMODUS — Kies 'n beginpunt en klik Vind Roete vir die naaste nooduitgang."
+        : aktieweInsident.description || "Roetes word rondom die geslote gebied bereken.";
       document.getElementById("incidentTitle").textContent = `Aktiewe sluiting: ${aktieweInsident.name}`;
-      document.getElementById("incidentDescription").textContent = aktieweInsident.description || "Roetes word rondom die geslote gebied bereken.";
+      document.getElementById("incidentDescription").textContent = ontruimTeks;
     }
     merkGesloteBestemmings();
     renderAll();
@@ -788,6 +830,15 @@ function renderRoutePanel() {
     el.innerHTML = '<div class="empty-note">Geen roete gevind nie.</div>';
     return;
   }
+  // As ons in ontruimingsmodus is, wys die nooduitgang se naam prominent.
+  if (laasteResultaat.uitgang) {
+    const uitgang = nodeById[laasteResultaat.uitgang];
+    const uitEl = document.createElement("div");
+    uitEl.style.cssText = "background:#8f2525;color:#fff;border-radius:6px;padding:8px 10px;margin-bottom:10px;font-family:'IBM Plex Mono',monospace;font-size:12px;";
+    uitEl.innerHTML = `🚨 Nooduitgang: <strong>${uitgang ? uitgang.etiket : laasteResultaat.uitgang}</strong>`;
+    el.appendChild(uitEl);
+  }
+
   const ul = document.createElement("ul");
   ul.className = "route-list";
   laasteResultaat.path.forEach((id, i) => {

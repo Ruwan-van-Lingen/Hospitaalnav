@@ -72,7 +72,11 @@ CREATE TABLE
         pos_x REAL NOT NULL, -- Plaaslike x-koördinaat op die vloerplan, in meter.
         pos_y REAL NOT NULL,
         is_beperk INTEGER NOT NULL DEFAULT 0, -- 1 dui 'n beperkte gebied aan.
-        beperkte_groep TEXT -- Toegangsgroep, of NULL wanneer die nodus oop is.
+        beperkte_groep TEXT, -- Toegangsgroep, of NULL wanneer die nodus oop is.
+        -- Nooduitgang-vlag: 1 = hierdie nodus is 'n veilige versamelpunt
+        -- wat gebruik word as teiken tydens ontruimingsmodus.
+        -- Ingange (tipe_kode='INGANG') word tipies as nooduitgange gemerk.
+        is_nooduitgang INTEGER NOT NULL DEFAULT 0
     );
 
 CREATE INDEX idx_nodes_vloer ON nodes (vloer_id);
@@ -121,9 +125,11 @@ VALUES
     ),
     ('NOODGEVAL', 'Noodgeval reaksie, alle toegang');
 
+----------------------------------------------------------------------------
 -- Koppel elke gebruikerstipe aan die beperkte groepe wat hulle mag betree.
 -- 'n Nodus word vir die gebruiker uitgesluit wanneer geen ooreenstemmende
 -- toestemming vir die nodus se beperkte_groep bestaan nie.
+----------------------------------------------------------------------------
 CREATE TABLE
     toegang_toestemmings (
         gebruiker_tipe TEXT NOT NULL REFERENCES gebruiker_tipes (gebruiker_tipe),
@@ -151,7 +157,13 @@ CREATE TABLE
         insident_id INTEGER PRIMARY KEY CHECK (insident_id = 1),
         kode_id TEXT NOT NULL REFERENCES noodkodes (kode_id),
         beskrywing TEXT,
-        geaktiveer_op TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+        geaktiveer_op TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        ---------------------------------------------------------------------------
+        -- Ontruimingsmodus: 1 = ignoreer die gebruiker se gewenste bestemming
+        -- en stuur hom/haar eerder na die naaste veilige nooduitgang.
+        -- Hysbakke word verbied tydens ontruiming (trap/lug brug/tonnel slegs).
+        ---------------------------------------------------------------------------
+        ontruimings_modus INTEGER NOT NULL DEFAULT 0
     );
 
 CREATE TABLE

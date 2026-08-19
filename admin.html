@@ -1,4 +1,18 @@
 <!doctype html>
+<!--
+  admin.html
+  ===========
+  Adminblad vir die Hospitaal Sluitingsadministrasie.
+
+  Hierdie bladsy laat gemagtigde gebruikers toe om:
+    • Aan te meld met 'n gebruikersnaam en wagwoord (sessie-koekie).
+    • 'n Aktiewe sluiting te aktiveer vir geselekteerde nodusse.
+    • Ontruimingsmodus te aktiveer (stuur gebruikers na nooduitgange).
+    • Die aktiewe sluiting te kanselleer.
+
+  Alle API-kommunikasie word hanteer deur admin.js.
+  Die keuseboom-struktuur word dinamies gebou uit /admin/map.
+-->
 <html lang="af">
   <head>
     <meta charset="UTF-8" />
@@ -38,6 +52,8 @@
             <h2 id="aktieweTitel"></h2>
             <p id="aktieweBeskrywing"></p>
             <p id="aktieweNodes" class="muted"></p>
+            <!-- Visuele aanduiding of ontruimingsmodus aktief is -->
+            <p id="aktieweOntruim" class="muted" hidden>🚨 Ontruimingsmodus aktief — gebruikers word na nooduitgange gestuur.</p>
           </div>
           <button class="danger" id="clearIncidentBtn">Kanselleer sluiting</button>
         </div>
@@ -48,6 +64,15 @@
             <h2>Beskryf die sluiting</h2>
             <label>Insidenttipe<select id="kode" required></select></label>
             <label>Beskrywing<textarea id="beskrywing" maxlength="500" rows="4" placeholder="Byvoorbeeld: Waterpyp word in die oostelike gang herstel."></textarea></label>
+            <!-- Ontruimingsmodus: ignoreer bestemming, stuur gebruikers na naaste nooduitgang. -->
+            <!-- Hysbakke word outomaties verbied; slegs trappe/lugbrûe/tonnels. -->
+            <label class="ontruim-toggle">
+              <input type="checkbox" id="ontruimingsModus" />
+              <span>
+                <strong>Ontruimingsmodus</strong><br />
+                <span class="muted">Stuur alle gebruikers na die naaste nooduitgang. Hysbakke word verbied.</span>
+              </span>
+            </label>
           </section>
 
           <section class="card selection">

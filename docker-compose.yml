@@ -1,3 +1,25 @@
+# docker-compose.yml
+# ===================
+# Orkestreert die Hospitaal Navigasiestelsel as 'n enkele Docker-diens.
+#
+# Gebruik
+# -------
+#   docker compose up --build -d    # Bou en begin in die agtergrond (eerste keer)
+#   docker compose up --build       # Bou en begin met logs in die voorgrond
+#   docker compose logs -f          # Volg logs van 'n lopende diens
+#   docker compose down             # Stop en verwyder die diens
+#
+# URL's (nadat die diens begin het)
+# ----------------------------------
+#   http://localhost:8000/ui       — Interaktiewe webkoppelvlak (publiek)
+#   http://localhost:8000/admin    — Sluitingsadministrasie (admin-aanmelding vereist)
+#   http://localhost:8000/docs     — Swagger API-dokumentasie
+#
+# Sekuriteit
+# -----------
+# VERANDER die omgewingsveranderlikes hier onder voordat die diens in
+# produksie ontplooi word. Moenie die verstekwaardes gebruik nie.
+
 services:
   hospitaalnav:
     build:
@@ -8,17 +30,12 @@ services:
     ports:
       - "8000:8000"
     environment:
+      # Stel op "false" om die databasis ná die eerste opstart te behou.
+      # Nuttig in produksie sodat aktiewe insidente nie by herbegin verlore gaan nie.
       AUTO_HERBOU_DB: "false"
+
+      # VERANDER hierdie waardes vir enige nie-ontwikkelingsomgewing!
       ADMIN_GEBRUIKERSNAAM: "admin"
       ADMIN_WAGWOORD: "verander-my"
       SESSIE_GEHEIM: "vervang-met-n-lang-willekeurige-geheim"
     restart: unless-stopped
-
-  # docker compose up --build -d (indien 1ste keer of requirments.txt het verander)
-  # docker compose up --build (vir normale gebruik)
-  # docker compose down (om af te sit)
-
-  # http://localhost:8000/ui (ons pretty version)
-  # http://localhost:8000/docs (default API version)
-  # http://localhost:8000/admin (admin login)
-  # Admin login: User: admin PW: verander-my (kan verander word in .env file)

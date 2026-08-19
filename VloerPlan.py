@@ -1,43 +1,73 @@
-"""============================================================================
-Lewer die topologiese grafiek as 'n vloerplandiagram met een paneel per
-vloer. Nodusse word volgens hulle plaaslike (pos_x, pos_y)-koördinate geplaas
-en rande word tussen hulle geteken. Vertikale verbindings, soos hysbakke en
-trappe, en verbindings tussen geboue word duidelik aangedui.
+"""
+VloerPlan.py
+=============
+Matplotlib-gebaseerde vloerplanvisualiseerder vir die Hospitaal Navigasiestelsel.
 
-'n Pad wat deur HospitaalGrafiek.astar() of 'n ander roete-algoritme
-teruggestuur is, kan opsioneel uitgelig word.
-==========================================================================="""
+Hierdie module lewer 'n topologiese grafiekskets as 'n multi-paneel PNG-prent,
+een paneel per vloer. Dit word gebruik deur die /route/image eindpunt in
+main.py om 'n aflaaibare roetekaart te genereer.
+
+Waarom Matplotlib (en nie SVG of die webkoppelvlak nie)?
+---------------------------------------------------------
+Die webkoppelvlak (hospitaal_wayfinder.js) teken die interaktiewe SVG-kaart
+kliëntkant. Hierdie module dien 'n ander doel: dit genereer 'n statiese
+PNG-lêer bediener-kant, geskik vir druk of aflaai. Matplotlib se Agg-agterkant
+("non-interactive Anti-Grain Geometry") werk sonder 'n vertoonskerm of GUI,
+wat dit veilig maak vir bediener- en Docker-omgewings.
+
+Prent-uitleg
+-------------
+• Elke vloer kry sy eie paneel (subplot).
+• Nodusse word by hul (pos_x, pos_y)-koördinate geplaas.
+• Rande word as lyne tussen nodusse geteken.
+• As 'n roetepad verskaf word, word die betrokke nodusse en rande in rooi uitgelig met 'n dikker lyndikte.
+• Die y-as word omgekeer sodat "skerm-op" met die vloerplan se oriëntasie ooreenstem (pos_y = 0 is bo).
+"""
 
 import sqlite3
 import matplotlib
 
-# Gebruik 'n bedienerveilige agterkant wat nie 'n GUI of Tk-hoofdraad benodig nie.
+# Gebruik die bedienerveilige Agg-agterkant voor enige ander matplotlib-invoer.
+# Dit voorkom Tk/GUI-hoofdraadfout in FastAPI/Docker-omgewings.
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from matplotlib.lines import Line2D
 
+# Kleurpalet vir node-tipes — ooreenstemmend met die webkoppelvlak se CSS-veranderlikes.
 NODE_KLEURE = {
-    "AANSLUITING": "#8899a6",
-    "HUISBAK_GROEP": "#e67e22",
-    "TRAPHUIS": "#e67e22",
-    "DEUR": "#8899a6",
-    "INGANG": "#27ae60",
-    "LUGBRUG": "#8e44ad",
-    "TONNEL": "#8e44ad",
-    "DEPARTEMENT": "#2980b9",
+    "AANSLUITING":   "#8899a6",  # Grys  — gang-aansluitingspunte
+    "HUISBAK_GROEP": "#e67e22",  # Oranje — hysbakke
+    "TRAPHUIS":      "#e67e22",  # Oranje — trappe (selfde as hysbakke)
+    "DEUR":          "#8899a6",  # Grys  — deure
+    "INGANG":        "#27ae60",  # Groen — ingange / nooduitgange
+    "LUGBRUG":       "#8e44ad",  # Pers  — lugbrûe
+    "TONNEL":        "#8e44ad",  # Pers  — tonnels
+    "DEPARTEMENT":   "#2980b9",  # Blou  — departemente en sale
 }
 
+# Kleurpalet vir rand-tipes.
 RAND_KLEURE = {
-    "GANG": "#b0b8bf",
-    "HUISBAK": "#e67e22",
-    "TRAPPE": "#e67e22",
-    "LUGBRUG": "#8e44ad",
-    "TONNEL": "#8e44ad",
+    "GANG":    "#b0b8bf",  # Liggrys — gewone gange
+    "HUISBAK": "#e67e22",  # Oranje  — hysbakverbindings
+    "TRAPPE":  "#e67e22",  # Oranje  — trapverbindings
+    "LUGBRUG": "#8e44ad",  # Pers    — lugbrûe
+    "TONNEL":  "#8e44ad",  # Pers    — tonnels
 }
 
 
 def teken_vloer_plan(db_pad: str, uit_pad: str, verlig_pad: list[str] | None = None):
-    # Teken die hospitaal se vloere en stoor die resultaat as 'n prent.
+    """
+    Genereer 'n PNG-vloerplan vir alle vloere en stoor dit by uit_pad.
+
+    Parameters
+    ----------
+    db_pad      : Pad na die SQLite-databasis (hospitaal.db).
+    uit_pad     : Uitvoerlêerpad vir die gegenereerde PNG-prent.
+    verlig_pad  : Opsionele lys node-ID's (soos teruggegee deur astar()) wat
+                  op die prent uitgelig moet word. Uitgeligte rande word in
+                  rooi geteken en uitgeligte nodusse is groter.
+    """
+    # Laai alle vloere, nodusse en rande uit die databasis.
     conn = sqlite3.connect(db_pad)
     conn.row_factory = sqlite3.Row
     cur = conn.cursor()
@@ -52,23 +82,29 @@ def teken_vloer_plan(db_pad: str, uit_pad: str, verlig_pad: list[str] | None = N
     rande = cur.fetchall()
     conn.close()
 
-    verlig_rande = set()
+    # Bou 'n stel van (van, na) rand-pare wat op die pad lê, vir vinnige naslaan.
+    verlig_rande: set[tuple[str, str]] = set()
     if verlig_pad:
         for a, b in zip(verlig_pad, verlig_pad[1:]):
             verlig_rande.add((a, b))
-            verlig_rande.add((b, a))
+            verlig_rande.add((b, a))  # Teken in beide rigtings, aangesien rande bidirectioneel is.
 
+    # Skep een subplot per vloer, gerangskik horisontaal.
     n_vloere = len(vloere)
     fig, axes = plt.subplots(1, n_vloere, figsize=(6 * n_vloere, 6))
     if n_vloere == 1:
-        axes = [axes]
+        axes = [axes]  # Verseker altyd 'n itereerbare lys, selfs vir 'n enkelvloer-gebou.
 
     for ax, vloer in zip(axes, vloere):
         vloer_id = vloer["vloer_id"]
+        # Filter nodusse en rande tot slegs hierdie vloer.
         vloer_nodes = {nid: n for nid, n in nodes.items() if n["vloer_id"] == vloer_id}
 
-        # Slegs rande waarvan albei nodusse op hierdie vloer is, word geteken.
+        # Teken eers rande (sodat nodusse bo-op verskyn).
         for e in rande:
+            # Teken slegs rande waarvan BEIDE eindpunte op hierdie vloer is.
+            # Vertikale rande (hysbakke, trappe) en gebou-tot-gebou rande
+            # word hier oorgeslaan — dit word in die webkoppelvlak se oorsigmodus gewys.
             if e["van_node"] in vloer_nodes and e["na_node"] in vloer_nodes:
                 a, b = nodes[e["van_node"]], nodes[e["na_node"]]
                 is_hl = (e["van_node"], e["na_node"]) in verlig_rande
@@ -79,6 +115,7 @@ def teken_vloer_plan(db_pad: str, uit_pad: str, verlig_pad: list[str] | None = N
                     zorder=2 if is_hl else 1,
                 )
 
+        # Teken nodusse as gekleurde punte bo-op die rande.
         for nid, n in vloer_nodes.items():
             color = NODE_KLEURE.get(n["tipe_kode"], "#333")
             is_hl = verlig_pad is not None and nid in verlig_pad
@@ -90,6 +127,7 @@ def teken_vloer_plan(db_pad: str, uit_pad: str, verlig_pad: list[str] | None = N
                 linewidths=2 if is_hl else 1,
                 zorder=3,
             )
+            # Voeg die nodus se etiket by, met die beperkte groep in hakies indien van toepassing.
             etiket = n["etiket"]
             if n["beperkte_groep"]:
                 etiket += f"\n[{n['beperkte_groep']}]"
@@ -101,24 +139,29 @@ def teken_vloer_plan(db_pad: str, uit_pad: str, verlig_pad: list[str] | None = N
 
         ax.set_title(f"{vloer['gebou_id']} — {vloer['naam']}", fontsize=12, fontweight="bold")
         ax.set_aspect("equal")
-        # Keer die y-as om sodat skerm-op met die vloerplan se noordrigting ooreenstem.
-        ax.invert_yaxis()
-        ax.axis("off")
+        ax.invert_yaxis()  # Keer y-as om: pos_y=0 is bo, soos op 'n vloerplan.
+        ax.axis("off")     # Verberg asse — die vloerplan het sy eie visuele konteks.
 
+    # Bou 'n legende onderaan die figuur.
     legend_elements = [
         Line2D([0], [0], marker='o', color='w', label=t,
                markerfacecolor=c, markersize=9)
         for t, c in NODE_KLEURE.items()
     ]
-    fig.legend(handles=legend_elements, loc="lower center", ncol=len(legend_elements), fontsize=8, frameon=False)
+    fig.legend(handles=legend_elements, loc="lower center",
+               ncol=len(legend_elements), fontsize=8, frameon=False)
 
-    fig.suptitle("Hospitaal Navigasie — Topologiese Vloer Plan Grafiek", fontsize=14, fontweight="bold")
-    plt.tight_layout(rect=[0, 0.05, 1, 0.95])
+    fig.suptitle("Hospitaal Navigasie — Topologiese Vloerplan Grafiek",
+                 fontsize=14, fontweight="bold")
+    plt.tight_layout(rect=[0, 0.05, 1, 0.95])  # Maak ruimte vir die legende onderaan.
     plt.savefig(uit_pad, dpi=150, bbox_inches="tight")
-    plt.close()
-    print(f"Saved diagram to {uit_pad}")
+    plt.close()  # Sluit die figuur om geheue vry te stel (belangrik in 'n bedieneromgewing).
+    print(f"Vloerplan gestoor: {uit_pad}")
 
 
+# ---------------------------------------------------------------------------
+# Handmatige demonstrasie (voer uit as: python VloerPlan.py)
+# ---------------------------------------------------------------------------
 if __name__ == "__main__":
     import sys
     sys.path.insert(0, ".")
@@ -127,10 +170,10 @@ if __name__ == "__main__":
     bou_demo_db("hospitaal.db", "Skema.sql", "SeedData.sql")
     g = HospitaalGrafiek("hospitaal.db")
 
-    # Genereer eers 'n basiese diagram sonder 'n uitgeligte roete.
+    # Genereer 'n basiese diagram sonder 'n uitgeligte roete.
     teken_vloer_plan("hospitaal.db", "vloer_plan.png")
 
-    # diagram met n PUBLIEK roete verlig
+    # Genereer 'n diagram met die PUBLIEK-roete na Radiologie uitgelig.
     result = g.astar("MAIN-G-ENT", "SYGEBOU-1-RAD", gebruiker_tipe="PUBLIEK")
     if result:
         pad, _, _ = result

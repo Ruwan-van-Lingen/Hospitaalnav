@@ -1,6 +1,29 @@
-/* ============================================================
+/*
+  hospitaal_wayfinder.css
+  ========================
+  Stylblad vir die interaktiewe Hospitaal Navigasiewebkoppelvlak
+  (hospitaal_wayfinder.html).
 
-  ============================================================ */
+  Gebruik CSS-veranderlikes vir die kleurpalet sodat die ontwerp maklik
+  aangepas kan word. Die algehele styl is 'n donker marienerblou ("navy")
+  skema — geskik vir 'n hospitaalomgewing wat beide snags en bedags gebruik
+  word. Die adminblad (admin.css) gebruik 'n ligter papierwit hoofinhoud-
+  area, maar deel dieselfde --navy en --amber ankerkleurtokens.
+
+  Hoofkomponente
+  ---------------
+  • Kopstuk (header)       — Hospitaalnaam, subtitel en adminskakels.
+  • Insidentbanier         — Rooi streep wat vertoon wanneer 'n aktiewe
+                             sluiting of ontruimingsmodus van krag is.
+  • Uitlegrooster (layout) — Tweekolomrooster: hoofskolom (kaart + beheer)
+                             en sykantpaneel (vloerindikator + roeteljst).
+  • Beheerpaneel (controls)— Soekkvelde, gebruikertipe-keuse en knoppe.
+  • Vloeroortjies (tabs)   — Een oortjie per vloer, plus 'n "Oorsig"-oortjie.
+  • Vloerplan (plan-wrap)  — SVG-kaart-omhulsel met skadueffek.
+  • Legende (legend)       — Kleursleutel vir nodustipes en vloere.
+  • Hysbakstyl-aanwyser    — Vloer-vir-vloer-aanduider in die sykantpaneel.
+  • Roeteljst (route-list) — Stap-vir-stap-instruksies in die sykantpaneel.
+*/
 :root {
   --navy: #12222e;
   --navy-2: #1b3446;

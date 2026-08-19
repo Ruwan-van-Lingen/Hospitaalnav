@@ -1,4 +1,26 @@
-:root { --navy:#12222e; --panel:#1b3446; --paper:#eef3f5; --ink:#172934; --muted:#6e818c; --amber:#ffb100; --red:#d94b4b; --line:#d5e0e5; }
+/*
+  admin.css
+  ==========
+  Stylblad vir die Hospitaal Sluitingsadministrasieblad (admin.html).
+
+  Gebruik CSS-veranderlikes vir die kleurpalet sodat die ontwerp maklik
+  aangepas kan word. Die styl stem ooreen met die webkoppelvlak se donker
+  marienerblou kleurskema (hospitaal_wayfinder.css), maar gebruik 'n
+  ligter papierwit agtergrond vir die hoofinhoudsarea — die adminblad
+  is bedoel vir gebruik op 'n rekenaar eerder as 'n mobiele toestel.
+*/
+
+:root { 
+    --navy:#12222e; 
+    --panel:#1b3446; 
+    --paper:#eef3f5; 
+    --ink:#172934; 
+    --muted:#6e818c; 
+    --amber:#ffb100; 
+    --red:#d94b4b; 
+    --line:#d5e0e5; 
+}
+
 * { box-sizing:border-box; }
 body { margin:0; background:#e7eef2; color:var(--ink); font-family:Arial,sans-serif; }
 header { background:var(--navy); color:white; padding:22px max(24px,calc((100vw - 1120px)/2)); display:flex; justify-content:space-between; align-items:center; }
@@ -20,4 +42,8 @@ button { cursor:pointer; border:0; background:var(--amber); color:#261b00; font-
 .selection { min-height:420px; }.section-title { display:flex; justify-content:space-between; align-items:start; gap:16px; }.section-title h2 { margin-top:7px; }.section-title p { margin:0; font-size:13px; }.section-title strong { color:#8a6200; white-space:nowrap; }
 .tree { margin-top:18px; border-top:1px solid var(--line); }.tree-group { border-bottom:1px solid var(--line); padding:12px 0; }.tree-floor { margin:8px 0 4px 24px; }.tree-nodes { margin-left:52px; display:grid; grid-template-columns:repeat(2,minmax(180px,1fr)); }.tree label { flex-direction:row; align-items:center; margin:7px 0; font-weight:600; }.tree input { width:17px; height:17px; accent-color:#b77e00; }.node-type { color:var(--muted); font-size:10px; margin-left:auto; }
 .actions { grid-column:1/-1; display:flex; justify-content:flex-end; align-items:center; gap:18px; }.actions p { color:var(--red); margin-right:auto; }.activate { padding:13px 22px; }
+/* Ontruimingsmodus-wissel: checkbox links, beskrywingsteks regs. */
+.ontruim-toggle { flex-direction:row; align-items:flex-start; gap:10px; margin-top:20px; padding:12px; border:1px solid var(--line); border-radius:8px; background:#fdf8ee; }
+.ontruim-toggle input { width:17px; height:17px; accent-color:var(--red); margin-top:2px; flex:none; }
+.ontruim-toggle strong { color:var(--red); }
 @media(max-width:760px){.workspace{grid-template-columns:1fr}.tree-nodes{grid-template-columns:1fr}.alert{align-items:flex-start;flex-direction:column}header{align-items:flex-start;gap:15px;flex-direction:column}}
