@@ -13,11 +13,19 @@
   </head>
   <body>
     <header>
-      <h1>Hospitaal Navigasie</h1>
-      <p id="apiStatusLine">
-        Roete enjin vir hospitaal besoekers en personeel. Kies 'n beginpunt en bestemming, dan klik "Vind Roete".
-      </p>
+      <div>
+        <h1>Hospitaal Navigasie</h1>
+        <p id="apiStatusLine">
+          Roete enjin vir hospitaal besoekers en personeel. Kies 'n beginpunt en bestemming, dan klik "Vind Roete".
+        </p>
+      </div>
+      <a class="admin-link" href="/admin">Adminaanmelding</a>
     </header>
+
+    <div id="incidentBanner" class="incident-banner" hidden>
+      <strong id="incidentTitle"></strong>
+      <span id="incidentDescription"></span>
+    </div>
 
     <div class="layout">
       <div class="main-col">

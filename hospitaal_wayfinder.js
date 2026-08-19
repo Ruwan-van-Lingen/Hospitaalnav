@@ -273,7 +273,7 @@ async function fetchRoute(apiBase, beginId, eindeId, gebruikerTipe) {
     const detail =
       body && body.detail ? body.detail : `HTTP ${resp.status}`;
     return {
-      error: resp.status === 403 ? "blocked" : "invalid",
+      error: resp.status === 403 || resp.status === 409 ? "blocked" : "invalid",
       message: detail,
     };
   }
@@ -293,6 +293,41 @@ async function fetchRoute(apiBase, beginId, eindeId, gebruikerTipe) {
 ============================================================ */
 let huidigeVloer = vloere[0].id;
 let laasteResultaat = null; // {pad, koste}
+let aktieweInsident = { active: false, blocked_node_ids: [] };
+
+async function laaiInsident() {
+  const apiBase = document.getElementById("apiUrl").value.trim();
+  try {
+    const response = await fetch(`${apiBase.replace(/\/$/, "")}/incident`);
+    if (!response.ok) return;
+    aktieweInsident = await response.json();
+    const banier = document.getElementById("incidentBanner");
+    banier.hidden = !aktieweInsident.active;
+    if (aktieweInsident.active) {
+      document.getElementById("incidentTitle").textContent = `Aktiewe sluiting: ${aktieweInsident.name}`;
+      document.getElementById("incidentDescription").textContent = aktieweInsident.description || "Roetes word rondom die geslote gebied bereken.";
+    }
+    merkGesloteBestemmings();
+    renderAll();
+  } catch (_) {}
+}
+
+function merkGesloteBestemmings() {
+  const gesluit = new Set(aktieweInsident.blocked_node_ids || []);
+  ["beginNode", "endNode"].forEach((id) => {
+    const lys = document.getElementById(id);
+    [...lys.options].forEach((opsie) => {
+      opsie.disabled = gesluit.has(opsie.value);
+      if (opsie.disabled && !opsie.textContent.includes("[GESLUIT]")) {
+        opsie.textContent += " [GESLUIT]";
+      }
+    });
+    if (lys.selectedOptions[0]?.disabled) {
+      const eersteOop = [...lys.options].find((opsie) => !opsie.disabled);
+      if (eersteOop) lys.value = eersteOop.value;
+    }
+  });
+}
 
 function bestemmingEtiket(item) {
   return `${item.etiket} — ${item.gebou_naam}, ${item.vloer_naam} (${item.node_id})`;
@@ -316,6 +351,7 @@ async function laaiBestemmings(soekterm, selectId, gekoseId = null) {
     if (gekoseId && [...lys.options].some((opsie) => opsie.value === gekoseId)) {
       lys.value = gekoseId;
     }
+    merkGesloteBestemmings();
   } catch (_) {
     // Die roete-foutboodskap hanteer 'n API wat nie bereikbaar is nie.
   }
@@ -421,6 +457,7 @@ function renderPlan() {
   const highlightSet = new Set(
     laasteResultaat && laasteResultaat.path ? laasteResultaat.path : [],
   );
+  const blockedSet = new Set(aktieweInsident.blocked_node_ids || []);
   const verligRande = new Set();
   if (laasteResultaat && laasteResultaat.path) {
     const p = laasteResultaat.path;
@@ -462,9 +499,12 @@ function renderPlan() {
     const cx = px(n),
       cy = py(n);
     const isHl = highlightSet.has(n.id);
+    const isBlocked = blockedSet.has(n.id);
     const g = document.createElementNS(NS, "g");
-    g.style.cursor = "pointer";
+    g.style.cursor = isBlocked ? "not-allowed" : "pointer";
+    if (isBlocked) g.classList.add("blocked-node");
     g.onclick = () => {
+      if (isBlocked) return;
       const beginSel = document.getElementById("beginNode"),
         endSel = document.getElementById("endNode");
       if (!g.dataset.pickedOnce) {
@@ -494,9 +534,9 @@ function renderPlan() {
     circle.setAttribute("cx", cx);
     circle.setAttribute("cy", cy);
     circle.setAttribute("r", isHl ? 9 : 6.5);
-    circle.setAttribute("fill", NODE_KLEURE[n.tipe] || "#333");
-    circle.setAttribute("stroke", isHl ? "#FFB100" : "#fff");
-    circle.setAttribute("stroke-width", isHl ? 2.4 : 1.2);
+    circle.setAttribute("fill", isBlocked ? "#E14B4B" : NODE_KLEURE[n.tipe] || "#333");
+    circle.setAttribute("stroke", isBlocked ? "#7b1414" : isHl ? "#FFB100" : "#fff");
+    circle.setAttribute("stroke-width", isBlocked || isHl ? 2.4 : 1.2);
     g.appendChild(circle);
 
     // Probeer verskeie posisies en kies die een met die minste botsings.
@@ -516,7 +556,7 @@ function renderPlan() {
       ...etiketPosisies.slice(0, beginPosisie),
       ...etiketPosisies.slice(4),
     ];
-    const etiket = n.etiket + (n.beperkte ? ` [${n.beperkte}]` : "");
+    const etiket = n.etiket + (isBlocked ? " [GESLUIT]" : n.beperkte ? ` [${n.beperkte}]` : "");
     const woorde = etiket.split(" ");
     const middelpunt = Math.ceil(woorde.length / 2);
     const etiketLyne =
@@ -765,3 +805,4 @@ document.getElementById("clearBtn").onclick = () => {
 populateSelects();
 renderLegend();
 renderAll();
+laaiInsident();

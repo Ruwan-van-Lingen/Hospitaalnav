@@ -138,6 +138,7 @@ class HospitaalGrafiek:
         begin: str,
         doel: str,
         gebruiker_tipe: str = "PUBLIEK",
+        geblokkeerde_nodes: Optional[set[str]] = None,
     ) -> Optional[tuple[list[str], float, float]]:
         """
         Gee 'n tuple met die node-ID's, totale koste in sekondes en totale
@@ -151,8 +152,11 @@ class HospitaalGrafiek:
             raise ValueError("begin/doel node nie gevind in grafiek nie.")
 
         toegelaat = self.toegelate_groepe(gebruiker_tipe)
+        geblokkeer = geblokkeerde_nodes or set()
 
         def is_bruikbaar(node_id: str) -> bool:
+            if node_id in geblokkeer:
+                return False
             groep = self.nodes[node_id]["beperkte_groep"]
             return groep is None or groep in toegelaat
 

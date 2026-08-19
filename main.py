@@ -1,11 +1,18 @@
 # main.py
 import os
 import tempfile
-from contextlib import asynccontextmanager
+import base64
+import hashlib
+import hmac
+import json
+import sqlite3
+import time
+from contextlib import asynccontextmanager, contextmanager
 from pathlib import Path
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import Cookie, Depends, FastAPI, HTTPException, Query, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
+from pydantic import BaseModel, Field
 from HospitaalGrafiek import HospitaalGrafiek, bou_demo_db
 from starlette.background import BackgroundTask
 from VloerPlan import teken_vloer_plan
@@ -15,6 +22,56 @@ DB_PAD = BASE_GIDS / "hospitaal.db"
 SKEMA_PAD = BASE_GIDS / "Skema.sql"
 SEED_PAD = BASE_GIDS / "SeedData.sql"
 AUTO_HERBOU_DB = os.getenv("AUTO_HERBOU_DB", "true").lower() == "true"
+ADMIN_GEBRUIKERSNAAM = os.getenv("ADMIN_GEBRUIKERSNAAM", "admin")
+ADMIN_WAGWOORD = os.getenv("ADMIN_WAGWOORD", "admin")
+SESSIE_GEHEIM = os.getenv("SESSIE_GEHEIM", "verander-hierdie-ontwikkelingsgeheim")
+SESSIE_SEKONDES = 60 * 60
+SESSIE_KOEKIE = "hospitaal_admin_sessie"
+
+
+class AdminAanmelding(BaseModel):
+    gebruikersnaam: str
+    wagwoord: str
+
+
+class InsidentInvoer(BaseModel):
+    kode_id: str
+    beskrywing: str = Field(default="", max_length=500)
+    node_ids: list[str] = Field(min_length=1)
+
+
+def verseker_insident_skema():
+    """Voeg die MVP-tabelle by 'n bestaande databasis sonder dat data verlore gaan."""
+    conn = sqlite3.connect(DB_PAD)
+    try:
+        conn.executescript(
+            """
+            PRAGMA foreign_keys = ON;
+            CREATE TABLE IF NOT EXISTS noodkodes (
+                kode_id TEXT PRIMARY KEY,
+                naam TEXT NOT NULL
+            );
+            CREATE TABLE IF NOT EXISTS aktiewe_insident (
+                insident_id INTEGER PRIMARY KEY CHECK (insident_id = 1),
+                kode_id TEXT NOT NULL REFERENCES noodkodes (kode_id),
+                beskrywing TEXT,
+                geaktiveer_op TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            );
+            CREATE TABLE IF NOT EXISTS insident_nodes (
+                insident_id INTEGER NOT NULL REFERENCES aktiewe_insident (insident_id) ON DELETE CASCADE,
+                node_id TEXT NOT NULL REFERENCES nodes (node_id),
+                PRIMARY KEY (insident_id, node_id)
+            );
+            INSERT OR IGNORE INTO noodkodes (kode_id, naam) VALUES
+                ('ONDERHOUD', 'Onderhoud'),
+                ('SKOONMAAK', 'Skoonmaak'),
+                ('GEEL', 'Gevaarlike materiaal'),
+                ('SEKURITEIT', 'Sekuriteitsvoorval');
+            """
+        )
+        conn.commit()
+    finally:
+        conn.close()
 
 
 @asynccontextmanager
@@ -22,8 +79,9 @@ async def lifespan(app: FastAPI):
     """Berei die databasis en grafiek voor voordat die API versoeke ontvang."""
     # Herbou die databasis by elke begin tydens ontwikkeling.
     # AUTO_HERBOU_DB=false om bestaande data in 'n produksie-omgewing te behou.
-    if AUTO_HERBOU_DB:
+    if AUTO_HERBOU_DB or not DB_PAD.exists():
         bou_demo_db(str(DB_PAD), str(SKEMA_PAD), str(SEED_PAD))
+    verseker_insident_skema()
 
     # Laai die grafiek een keer in die toepassingsgeheue vir hergebruik.
     app.state.grafiek = HospitaalGrafiek(str(DB_PAD))
@@ -68,6 +126,72 @@ def formateer_afstand(meter: float) -> str:
     return f"{round(meter)}m"
 
 
+@contextmanager
+def db_verbinding():
+    conn = sqlite3.connect(DB_PAD)
+    conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA foreign_keys = ON")
+    try:
+        yield conn
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+
+def kry_insident() -> dict:
+    with db_verbinding() as conn:
+        ry = conn.execute(
+            """
+            SELECT ai.kode_id, nk.naam, ai.beskrywing, ai.geaktiveer_op
+            FROM aktiewe_insident ai
+            JOIN noodkodes nk ON nk.kode_id = ai.kode_id
+            WHERE ai.insident_id = 1
+            """
+        ).fetchone()
+        if ry is None:
+            return {"active": False, "blocked_node_ids": []}
+        nodes = conn.execute(
+            "SELECT node_id FROM insident_nodes WHERE insident_id = 1 ORDER BY node_id"
+        ).fetchall()
+    return {
+        "active": True,
+        "code": ry["kode_id"],
+        "name": ry["naam"],
+        "description": ry["beskrywing"] or "",
+        "activated_at": ry["geaktiveer_op"],
+        "blocked_node_ids": [node["node_id"] for node in nodes],
+    }
+
+
+def skep_sessie() -> str:
+    inhoud = json.dumps(
+        {"sub": ADMIN_GEBRUIKERSNAAM, "exp": int(time.time()) + SESSIE_SEKONDES},
+        separators=(",", ":"),
+    ).encode()
+    data = base64.urlsafe_b64encode(inhoud).decode().rstrip("=")
+    handtekening = hmac.new(SESSIE_GEHEIM.encode(), data.encode(), hashlib.sha256).hexdigest()
+    return f"{data}.{handtekening}"
+
+
+def vereis_admin(hospitaal_admin_sessie: str | None = Cookie(default=None)) -> str:
+    if not hospitaal_admin_sessie:
+        raise HTTPException(status_code=401, detail="Adminaanmelding word vereis.")
+    try:
+        data, handtekening = hospitaal_admin_sessie.rsplit(".", 1)
+        verwag = hmac.new(SESSIE_GEHEIM.encode(), data.encode(), hashlib.sha256).hexdigest()
+        if not hmac.compare_digest(handtekening, verwag):
+            raise ValueError
+        inhoud = json.loads(base64.urlsafe_b64decode(data + "=" * (-len(data) % 4)))
+        if inhoud.get("sub") != ADMIN_GEBRUIKERSNAAM or inhoud.get("exp", 0) < time.time():
+            raise ValueError
+        return inhoud["sub"]
+    except (ValueError, TypeError, json.JSONDecodeError):
+        raise HTTPException(status_code=401, detail="Die adminsessie is ongeldig of het verval.")
+
+
 @app.get("/")
 def tuisblad():
     return {"boodskap": "Welkom by die Hospitaal Navigasie API. Gaan na /docs vir die dokumentasie."}
@@ -80,6 +204,24 @@ def ui():
     if not html_pad.exists():
         raise HTTPException(status_code=404, detail="hospitaal_wayfinder.html nie gevind nie.")
     return FileResponse(str(html_pad))
+
+
+@app.get("/admin")
+def admin_ui():
+    html_pad = BASE_GIDS / "admin.html"
+    if not html_pad.exists():
+        raise HTTPException(status_code=404, detail="admin.html nie gevind nie.")
+    return FileResponse(str(html_pad))
+
+
+@app.get("/admin.css", include_in_schema=False)
+def admin_css():
+    return FileResponse(str(BASE_GIDS / "admin.css"), media_type="text/css")
+
+
+@app.get("/admin.js", include_in_schema=False)
+def admin_javascript():
+    return FileResponse(str(BASE_GIDS / "admin.js"), media_type="text/javascript")
 
 
 @app.get("/hospitaal_wayfinder.css", include_in_schema=False)
@@ -112,6 +254,104 @@ def soek_bestemmings(
     }
 
 
+@app.get("/incident")
+def lees_insident():
+    """Gee die huidige sluiting vir die openbare wayfinder terug."""
+    return kry_insident()
+
+
+@app.post("/admin/login")
+def admin_login(invoer: AdminAanmelding, response: Response):
+    gebruiker_ok = hmac.compare_digest(invoer.gebruikersnaam, ADMIN_GEBRUIKERSNAAM)
+    wagwoord_ok = hmac.compare_digest(invoer.wagwoord, ADMIN_WAGWOORD)
+    if not (gebruiker_ok and wagwoord_ok):
+        raise HTTPException(status_code=401, detail="Verkeerde gebruikersnaam of wagwoord.")
+    response.set_cookie(
+        SESSIE_KOEKIE,
+        skep_sessie(),
+        max_age=SESSIE_SEKONDES,
+        httponly=True,
+        samesite="strict",
+        secure=False,
+    )
+    return {"message": "Aanmelding suksesvol."}
+
+
+@app.post("/admin/logout")
+def admin_logout(response: Response):
+    response.delete_cookie(SESSIE_KOEKIE)
+    return {"message": "Afgemeld."}
+
+
+@app.get("/admin/map")
+def admin_kaart(_: str = Depends(vereis_admin)):
+    with db_verbinding() as conn:
+        geboue = conn.execute(
+            "SELECT gebou_id, naam FROM geboue ORDER BY naam"
+        ).fetchall()
+        resultaat = []
+        for gebou in geboue:
+            vloere = conn.execute(
+                """SELECT vloer_id, naam, level_nommer FROM vloere
+                   WHERE gebou_id = ? ORDER BY level_nommer""",
+                (gebou["gebou_id"],),
+            ).fetchall()
+            vloer_data = []
+            for vloer in vloere:
+                nodes = conn.execute(
+                    """SELECT node_id, etiket, tipe_kode FROM nodes
+                       WHERE vloer_id = ? ORDER BY etiket""",
+                    (vloer["vloer_id"],),
+                ).fetchall()
+                vloer_data.append({**dict(vloer), "nodes": [dict(n) for n in nodes]})
+            resultaat.append({**dict(gebou), "vloere": vloer_data})
+        kodes = [dict(ry) for ry in conn.execute(
+            "SELECT kode_id, naam FROM noodkodes ORDER BY naam"
+        ).fetchall()]
+    return {"geboue": resultaat, "noodkodes": kodes, "incident": kry_insident()}
+
+
+@app.post("/admin/incident")
+def aktiveer_insident(invoer: InsidentInvoer, _: str = Depends(vereis_admin)):
+    node_ids = list(dict.fromkeys(invoer.node_ids))
+    with db_verbinding() as conn:
+        kode = conn.execute(
+            "SELECT 1 FROM noodkodes WHERE kode_id = ?", (invoer.kode_id,)
+        ).fetchone()
+        if kode is None:
+            raise HTTPException(status_code=400, detail="Ongeldige noodkode.")
+        plekhouers = ",".join("?" for _ in node_ids)
+        gevind = {
+            ry["node_id"]
+            for ry in conn.execute(
+                f"SELECT node_id FROM nodes WHERE node_id IN ({plekhouers})", node_ids
+            ).fetchall()
+        }
+        ontbreek = sorted(set(node_ids) - gevind)
+        if ontbreek:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Onbekende node-ID(s): {', '.join(ontbreek)}",
+            )
+        conn.execute("DELETE FROM aktiewe_insident")
+        conn.execute(
+            "INSERT INTO aktiewe_insident (insident_id, kode_id, beskrywing) VALUES (1, ?, ?)",
+            (invoer.kode_id, invoer.beskrywing.strip()),
+        )
+        conn.executemany(
+            "INSERT INTO insident_nodes (insident_id, node_id) VALUES (1, ?)",
+            [(node_id,) for node_id in node_ids],
+        )
+    return kry_insident()
+
+
+@app.delete("/admin/incident")
+def kanselleer_insident(_: str = Depends(vereis_admin)):
+    with db_verbinding() as conn:
+        conn.execute("DELETE FROM aktiewe_insident")
+    return {"active": False, "blocked_node_ids": []}
+
+
 @app.get("/route")
 def kry_roete(
     begin: str = Query(..., description="Die beginnodusse ID (bv. MAIN-G-ENT)"),
@@ -120,12 +360,21 @@ def kry_roete(
 ):
     """Bereken die vinnigste toegelate roete vir die gebruikerstipe."""
     try:
-        resultaat = app.state.grafiek.astar(begin, doel, gebruiker_tipe=gebruiker_tipe)
+        insident = kry_insident()
+        geblokkeer = set(insident["blocked_node_ids"])
+        if begin in geblokkeer:
+            raise HTTPException(status_code=409, detail="Die beginpunt is binne die geslote gebied.")
+        if doel in geblokkeer:
+            raise HTTPException(status_code=409, detail="Die bestemming is tydelik gesluit.")
+        resultaat = app.state.grafiek.astar(
+            begin, doel, gebruiker_tipe=gebruiker_tipe,
+            geblokkeerde_nodes=geblokkeer,
+        )
 
         if resultaat is None:
             raise HTTPException(
-                status_code=403,
-                detail="Geen roete gevind nie. Die pad bestaan nie of jy het nie toegang tot sekere nodusse nie."
+                status_code=409 if insident["active"] else 403,
+                detail="Geen beskikbare roete om die huidige sluiting nie." if insident["active"] else "Geen roete gevind nie. Die pad bestaan nie of jy het nie toegang tot sekere nodusse nie."
             )
 
         pad, tyd_sekondes, afstand_m = resultaat
@@ -138,7 +387,10 @@ def kry_roete(
             "geskatte_afstand_m": round(afstand_m, 1),
             "geskatte_afstand": formateer_afstand(afstand_m),
             "node_telling": len(pad),
-            "pad": pad
+            "pad": pad,
+            "incident_active": insident["active"],
+            "incident_code": insident.get("code"),
+            "avoided_nodes": insident["blocked_node_ids"],
         }
 
     except ValueError as e:
@@ -155,8 +407,10 @@ def kry_roete_prentjie(
 ):
     """Gee 'n PNG-vloerplan terug waarop die berekende roete uitgelig is."""
     try:
+        insident = kry_insident()
         resultaat = app.state.grafiek.astar(
-            begin, doel, gebruiker_tipe=gebruiker_tipe
+            begin, doel, gebruiker_tipe=gebruiker_tipe,
+            geblokkeerde_nodes=set(insident["blocked_node_ids"]),
         )
         if resultaat is None:
             raise HTTPException(status_code=403, detail="Geen roete gevind nie.")

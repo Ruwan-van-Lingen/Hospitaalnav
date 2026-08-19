@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="af">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Hospitaal Sluitingsadministrasie</title>
+    <link rel="stylesheet" href="/admin.css" />
+  </head>
+  <body>
+    <header>
+      <div>
+        <p class="eyebrow">Hospitaalnavigasie</p>
+        <h1>Sluitingsadministrasie</h1>
+      </div>
+      <a href="/ui">Open openbare kaart</a>
+    </header>
+
+    <main>
+      <section class="card login" id="loginPaneel">
+        <h2>Adminaanmelding</h2>
+        <p>Gebruik ’n gemagtigde rekening om roetes te verander.</p>
+        <form id="loginForm">
+          <label>Gebruikersnaam<input id="gebruikersnaam" autocomplete="username" required /></label>
+          <label>Wagwoord<input id="wagwoord" type="password" autocomplete="current-password" required /></label>
+          <button type="submit">Meld aan</button>
+        </form>
+      </section>
+
+      <section id="adminPaneel" hidden>
+        <div class="statusbar">
+          <div><span class="statusdot"></span><span id="sessieStatus">Admin aangemeld</span></div>
+          <button class="secondary" id="logoutBtn">Meld af</button>
+        </div>
+
+        <div id="aktiewePaneel" class="card alert" hidden>
+          <div>
+            <p class="eyebrow">Aktiewe insident</p>
+            <h2 id="aktieweTitel"></h2>
+            <p id="aktieweBeskrywing"></p>
+            <p id="aktieweNodes" class="muted"></p>
+          </div>
+          <button class="danger" id="clearIncidentBtn">Kanselleer sluiting</button>
+        </div>
+
+        <form id="incidentForm" class="workspace">
+          <section class="card details">
+            <p class="step">01</p>
+            <h2>Beskryf die sluiting</h2>
+            <label>Insidenttipe<select id="kode" required></select></label>
+            <label>Beskrywing<textarea id="beskrywing" maxlength="500" rows="4" placeholder="Byvoorbeeld: Waterpyp word in die oostelike gang herstel."></textarea></label>
+          </section>
+
+          <section class="card selection">
+            <p class="step">02</p>
+            <div class="section-title">
+              <div><h2>Kies geslote gebiede</h2><p>’n Gebou of vloer kies outomaties al sy nodusse.</p></div>
+              <strong id="keuseTelling">0 nodusse</strong>
+            </div>
+            <div id="boom" class="tree"></div>
+          </section>
+
+          <section class="actions">
+            <p id="boodskap" role="status"></p>
+            <button type="submit" class="activate">Aktiveer sluiting</button>
+          </section>
+        </form>
+      </section>
+    </main>
+    <script src="/admin.js"></script>
+  </body>
+</html>

@@ -114,3 +114,89 @@ def test_roeteprent_is_png():
     assert response.status_code == 200
     assert response.headers["content-type"] == "image/png"
     assert response.content.startswith(b"\x89PNG\r\n\x1a\n")
+
+
+def test_admin_eindpunte_vereis_aanmelding():
+    with TestClient(app) as client:
+        response = client.get("/admin/map")
+        blad = client.get("/admin")
+
+    assert response.status_code == 401
+    assert blad.status_code == 200
+    assert "Sluitingsadministrasie" in blad.text
+
+
+def test_admin_kan_sluiting_aktiveer_en_kanselleer():
+    with TestClient(app) as client:
+        login = client.post(
+            "/admin/login",
+            json={"gebruikersnaam": "admin", "wagwoord": "admin"},
+        )
+        assert login.status_code == 200
+
+        aktiveer = client.post(
+            "/admin/incident",
+            json={
+                "kode_id": "ONDERHOUD",
+                "beskrywing": "Toetssluiting",
+                "node_ids": ["MAIN-1-BRIDGE"],
+            },
+        )
+        assert aktiveer.status_code == 200
+        assert aktiveer.json()["blocked_node_ids"] == ["MAIN-1-BRIDGE"]
+
+        openbaar = client.get("/incident")
+        assert openbaar.json()["active"] is True
+
+        kanselleer = client.delete("/admin/incident")
+        assert kanselleer.status_code == 200
+        assert client.get("/incident").json()["active"] is False
+
+
+def test_astar_roeteer_om_aktiewe_sluiting():
+    with TestClient(app) as client:
+        client.post(
+            "/admin/login",
+            json={"gebruikersnaam": "admin", "wagwoord": "admin"},
+        )
+        normaal = client.get(
+            "/route",
+            params={"begin": "MAIN-G-ENT", "doel": "SYGEBOU-1-RAD"},
+        ).json()
+        assert "MAIN-1-BRIDGE" in normaal["pad"]
+
+        client.post(
+            "/admin/incident",
+            json={
+                "kode_id": "ONDERHOUD",
+                "node_ids": ["MAIN-1-BRIDGE"],
+            },
+        )
+        ompad = client.get(
+            "/route",
+            params={"begin": "MAIN-G-ENT", "doel": "SYGEBOU-1-RAD"},
+        )
+
+        assert ompad.status_code == 200
+        assert ompad.json()["incident_active"] is True
+        assert "MAIN-1-BRIDGE" not in ompad.json()["pad"]
+        assert ompad.json()["geskatte_tyd_sekondes"] > normaal["geskatte_tyd_sekondes"]
+
+
+def test_geslote_bestemming_gee_konflik():
+    with TestClient(app) as client:
+        client.post(
+            "/admin/login",
+            json={"gebruikersnaam": "admin", "wagwoord": "admin"},
+        )
+        client.post(
+            "/admin/incident",
+            json={"kode_id": "SKOONMAAK", "node_ids": ["SYGEBOU-1-RAD"]},
+        )
+        response = client.get(
+            "/route",
+            params={"begin": "MAIN-G-ENT", "doel": "SYGEBOU-1-RAD"},
+        )
+
+        assert response.status_code == 409
+        assert "tydelik gesluit" in response.json()["detail"]

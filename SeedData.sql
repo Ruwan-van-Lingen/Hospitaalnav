@@ -106,3 +106,9 @@ INSERT INTO rande (van_node, na_node, rand_tipe, afstand_m, basis_gewig_s, wag_p
     -- Gebou-tot-gebou conneksies
     ('MAIN-1-BRIDGE', 'SYGEBOU-1-BRIDGE', 'LUGBRUG',    25, 21, 0, 0, 1),
     ('MAIN-G-TUN',     'SYGEBOU-G-TUN',   'TONNEL',    18, 15, 0, 0, 1);
+
+    INSERT INTO noodkodes (kode_id, naam) VALUES
+    ('ONDERHOUD', 'Onderhoud'),
+    ('SKOONMAAK', 'Skoonmaak'),
+    ('GEEL', 'Gevaarlike materiaal'),
+    ('SEKURITEIT', 'Sekuriteitsvoorval');

@@ -27,6 +27,10 @@ body {
 header {
   padding: 22px 28px 16px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
 }
 header h1 {
   font-family: "Space Grotesk", sans-serif;
@@ -41,6 +45,28 @@ header p {
   font-size: 13px;
   font-family: "IBM Plex Mono", monospace;
 }
+.admin-link {
+  flex: none;
+  padding: 9px 14px;
+  border: 1px solid var(--amber);
+  border-radius: 7px;
+  color: var(--amber);
+  font-size: 13px;
+  font-weight: 700;
+  text-decoration: none;
+}
+.admin-link:hover {
+  background: var(--amber);
+  color: #1b1200;
+}
+.incident-banner {
+  padding: 13px 28px;
+  background: #8f2525;
+  color: #fff;
+  border-bottom: 2px solid #ff8b8b;
+  font-size: 13px;
+}
+.incident-banner strong { margin-right: 12px; }
 .layout {
   display: grid;
   grid-template-columns: 1fr 300px;
@@ -209,6 +235,7 @@ svg {
   border-radius: 50%;
   display: inline-block;
 }
+.blocked-node { cursor: not-allowed !important; }
 
 .side {
   padding: 20px 20px 20px 0;
@@ -335,6 +362,10 @@ svg {
 }
 
 @media (max-width: 600px) {
+  header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
   .controls {
     grid-template-columns: 1fr;
   }

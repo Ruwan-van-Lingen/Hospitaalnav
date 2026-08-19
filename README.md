@@ -2,6 +2,10 @@
 
 Hierdie projek is 'n binnenshuise navigasiestelsel vir 'n hospitaal. Dit gebruik 'n topologiese grafiek en die A*-algoritme om die vinnigste toegelate roete tussen twee plekke te bereken. Die stelsel neem vloere, hysbakwagtyd, trappe, gebouverbindings en gebruikerstoegang in ag.
 
+Die sluitings-MVP voeg 'n beskermde adminblad by waarmee een aktiewe
+onderhouds-, skoonmaak- of veiligheidsinsident se nodusse gesluit kan word.
+A* bereken openbare roetes outomaties rondom die geslote nodusse.
+
 ## Hooffunksies
 
 - Soek bestemmings volgens naam, node-ID, nodetipe, gebou of vloer.
@@ -10,6 +14,24 @@ Hierdie projek is 'n binnenshuise navigasiestelsel vir 'n hospitaal. Dit gebruik
 - Wys die roete, node-telling en beraamde reistyd as JSON.
 - Genereer 'n PNG-vloerplan waarop die roete uitgelig is.
 - Wys 'n interaktiewe webkoppelvlak met vloer-oortjies en roetestappe.
+- Bestuur een aktiewe sluiting by `/admin` en wys dit op die openbare kaart.
+
+## Sluitingsadministrasie
+
+Open `http://localhost:8000/admin`. Stel die adminrekening en sessiegeheim met
+omgewingsveranderlikes; moenie die voorbeeldwaardes vir 'n ontplooiing gebruik
+nie:
+
+```powershell
+$env:ADMIN_GEBRUIKERSNAAM="admin"
+$env:ADMIN_WAGWOORD="kies-'n-sterk-wagwoord"
+$env:SESSIE_GEHEIM="kies-'n-lang-willekeurige-geheim"
+$env:AUTO_HERBOU_DB="false"
+```
+
+Wanneer `AUTO_HERBOU_DB=false` is, bly 'n aktiewe insident behoue ná 'n
+toepassingsherbegin. As die databasis nog nie bestaan nie, word dit steeds
+eenmalig uit `Skema.sql` en `SeedData.sql` geskep.
 - Bedien die webkoppelvlak direk vanaf die API by `/ui`.
 - Verwerp onbekende gebruikerstipes met 'n duidelike foutboodskap.
 
