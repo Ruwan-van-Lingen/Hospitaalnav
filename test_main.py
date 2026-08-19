@@ -89,8 +89,15 @@ def test_ui_word_bedien():
     with TestClient(app) as client:
         response = client.get("/ui")
 
+        css_response = client.get("/hospitaal_wayfinder.css")
+        js_response = client.get("/hospitaal_wayfinder.js")
+
     assert response.status_code == 200
     assert response.headers["content-type"].startswith("text/html")
+    assert css_response.status_code == 200
+    assert css_response.headers["content-type"].startswith("text/css")
+    assert js_response.status_code == 200
+    assert js_response.headers["content-type"].startswith("text/javascript")
 
 
 def test_roeteprent_is_png():

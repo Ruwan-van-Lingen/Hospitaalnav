@@ -82,6 +82,24 @@ def ui():
     return FileResponse(str(html_pad))
 
 
+@app.get("/hospitaal_wayfinder.css", include_in_schema=False)
+def ui_css():
+    """Bedien die webkoppelvlak se aparte stylblad."""
+    css_pad = BASE_GIDS / "hospitaal_wayfinder.css"
+    if not css_pad.exists():
+        raise HTTPException(status_code=404, detail="hospitaal_wayfinder.css nie gevind nie.")
+    return FileResponse(str(css_pad), media_type="text/css")
+
+
+@app.get("/hospitaal_wayfinder.js", include_in_schema=False)
+def ui_javascript():
+    """Bedien die webkoppelvlak se aparte JavaScript."""
+    js_pad = BASE_GIDS / "hospitaal_wayfinder.js"
+    if not js_pad.exists():
+        raise HTTPException(status_code=404, detail="hospitaal_wayfinder.js nie gevind nie.")
+    return FileResponse(str(js_pad), media_type="text/javascript")
+
+
 @app.get("/destinations")
 def soek_bestemmings(
     q: str = Query("", description="Naam, node-ID, tipe, gebou of vloer"),
