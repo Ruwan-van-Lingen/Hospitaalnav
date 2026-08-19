@@ -416,6 +416,8 @@ function renderPlan() {
   svg.innerHTML = "";
 
   const vloerNodes = nodes.filter((n) => n.vloer === huidigeVloer);
+  const vloerLyne = [];
+  const geplaasdeEtikette = [];
   const highlightSet = new Set(
     laasteResultaat && laasteResultaat.path ? laasteResultaat.path : [],
   );
@@ -436,6 +438,7 @@ function renderPlan() {
     ) {
       const a = nodeById[van],
         b = nodeById[na];
+      vloerLyne.push({ x1: px(a), y1: py(a), x2: px(b), y2: py(b) });
       const isHl = verligRande.has(van + "|" + na);
       const line = document.createElementNS(NS, "line");
       line.setAttribute("x1", px(a));
@@ -496,14 +499,23 @@ function renderPlan() {
     circle.setAttribute("stroke-width", isHl ? 2.4 : 1.2);
     g.appendChild(circle);
 
-    // Versprei opeenvolgende etikette onder, bo, regs en links van hul nodes.
+    // Probeer verskeie posisies en kies die een met die minste botsings.
     const etiketPosisies = [
       { dx: 0, dy: 20, anchor: "middle" },
       { dx: 0, dy: -21, anchor: "middle" },
       { dx: 14, dy: -5, anchor: "start" },
       { dx: -14, dy: -5, anchor: "end" },
+      { dx: 12, dy: 18, anchor: "start" },
+      { dx: -12, dy: 18, anchor: "end" },
+      { dx: 12, dy: -18, anchor: "start" },
+      { dx: -12, dy: -18, anchor: "end" },
     ];
-    const etiketPosisie = etiketPosisies[i % etiketPosisies.length];
+    const beginPosisie = i % 4;
+    const kandidaatPosisies = [
+      ...etiketPosisies.slice(beginPosisie, 4),
+      ...etiketPosisies.slice(0, beginPosisie),
+      ...etiketPosisies.slice(4),
+    ];
     const etiket = n.etiket + (n.beperkte ? ` [${n.beperkte}]` : "");
     const woorde = etiket.split(" ");
     const middelpunt = Math.ceil(woorde.length / 2);
@@ -516,11 +528,6 @@ function renderPlan() {
         : [etiket];
 
     const text = document.createElementNS(NS, "text");
-    const etiketX = cx + etiketPosisie.dx;
-    const etiketY = cy + etiketPosisie.dy;
-    text.setAttribute("x", etiketX);
-    text.setAttribute("y", etiketY);
-    text.setAttribute("text-anchor", etiketPosisie.anchor);
     text.setAttribute("font-size", "9");
     text.setAttribute("font-family", "Inter, sans-serif");
     text.setAttribute("fill", "#12222E");
@@ -529,14 +536,113 @@ function renderPlan() {
     text.setAttribute("stroke-width", "3");
     etiketLyne.forEach((lyn, lynNommer) => {
       const tspan = document.createElementNS(NS, "tspan");
-      tspan.setAttribute("x", etiketX);
       tspan.setAttribute("dy", lynNommer === 0 ? 0 : 11);
       tspan.textContent = lyn;
       text.appendChild(tspan);
     });
     g.appendChild(text);
-
     svg.appendChild(g);
+
+    const reghoekeOorvleuel = (a, b, spasie = 3) =>
+      a.x < b.x + b.width + spasie &&
+      a.x + a.width + spasie > b.x &&
+      a.y < b.y + b.height + spasie &&
+      a.y + a.height + spasie > b.y;
+    const puntInReghoek = (x, y, b, spasie = 2) =>
+      x >= b.x - spasie &&
+      x <= b.x + b.width + spasie &&
+      y >= b.y - spasie &&
+      y <= b.y + b.height + spasie;
+    const orientasie = (ax, ay, bx, by, cx2, cy2) =>
+      (bx - ax) * (cy2 - ay) - (by - ay) * (cx2 - ax);
+    const segmenteKruis = (a, b, c, d) =>
+      Math.max(a.x, b.x) >= Math.min(c.x, d.x) &&
+      Math.max(c.x, d.x) >= Math.min(a.x, b.x) &&
+      Math.max(a.y, b.y) >= Math.min(c.y, d.y) &&
+      Math.max(c.y, d.y) >= Math.min(a.y, b.y) &&
+      orientasie(a.x, a.y, b.x, b.y, c.x, c.y) *
+          orientasie(a.x, a.y, b.x, b.y, d.x, d.y) <=
+        0 &&
+      orientasie(c.x, c.y, d.x, d.y, a.x, a.y) *
+          orientasie(c.x, c.y, d.x, d.y, b.x, b.y) <=
+        0;
+    const lynKruisReghoek = (lyn, b) => {
+      if (
+        puntInReghoek(lyn.x1, lyn.y1, b) ||
+        puntInReghoek(lyn.x2, lyn.y2, b)
+      ) {
+        return true;
+      }
+      const hoeke = [
+        { x: b.x, y: b.y },
+        { x: b.x + b.width, y: b.y },
+        { x: b.x + b.width, y: b.y + b.height },
+        { x: b.x, y: b.y + b.height },
+      ];
+      const begin = { x: lyn.x1, y: lyn.y1 };
+      const einde = { x: lyn.x2, y: lyn.y2 };
+      return hoeke.some((hoek, hoekNommer) =>
+        segmenteKruis(
+          begin,
+          einde,
+          hoek,
+          hoeke[(hoekNommer + 1) % hoeke.length],
+        ),
+      );
+    };
+
+    let beste = null;
+    kandidaatPosisies.forEach((posisie, kandidaatNommer) => {
+      const x = cx + posisie.dx;
+      const y = cy + posisie.dy;
+      text.setAttribute("x", x);
+      text.setAttribute("y", y);
+      text.setAttribute("text-anchor", posisie.anchor);
+      [...text.children].forEach((tspan) => tspan.setAttribute("x", x));
+
+      const boks = text.getBBox();
+      let telling = kandidaatNommer;
+      if (
+        boks.x < 8 ||
+        boks.y < 42 ||
+        boks.x + boks.width > 772 ||
+        boks.y + boks.height > 552
+      ) {
+        telling += 100000;
+      }
+      telling +=
+        geplaasdeEtikette.filter((ander) =>
+          reghoekeOorvleuel(boks, ander, 5),
+        ).length * 10000;
+      telling +=
+        vloerNodes.filter(
+          (ander) =>
+            ander.id !== n.id && puntInReghoek(px(ander), py(ander), boks, 9),
+        ).length * 3000;
+      telling +=
+        vloerLyne.filter((lyn) => lynKruisReghoek(lyn, boks)).length * 500;
+
+      if (!beste || telling < beste.telling) {
+        beste = {
+          posisie,
+          x,
+          y,
+          telling,
+          boks: {
+            x: boks.x,
+            y: boks.y,
+            width: boks.width,
+            height: boks.height,
+          },
+        };
+      }
+    });
+
+    text.setAttribute("x", beste.x);
+    text.setAttribute("y", beste.y);
+    text.setAttribute("text-anchor", beste.posisie.anchor);
+    [...text.children].forEach((tspan) => tspan.setAttribute("x", beste.x));
+    geplaasdeEtikette.push(beste.boks);
   });
 
   const title = document.createElementNS(NS, "text");
