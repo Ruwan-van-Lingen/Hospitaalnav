@@ -1,3 +1,7 @@
+/* ============================================================
+    
+  ============================================================ */
+
 const loginPaneel = document.getElementById("loginPaneel");
 const adminPaneel = document.getElementById("adminPaneel");
 const boodskap = document.getElementById("boodskap");

@@ -1,5 +1,5 @@
-"""
-Hospitaalpadvinder: grafieklaaier en A*-roetebepaling.
+"""==========================================================================
+HOSPITAALNAVIGASIE: grafieklaaier en A*-roetebepaling.
 
 Laai die topologiese grafiek uit die SQLite-databasis en gebruik die
 A*-algoritme om 'n roete tussen twee nodusse te bepaal. Die algoritme
@@ -8,7 +8,7 @@ kan byvoorbeeld nie deur die ICU of operasieteater beweeg nie.
 
 Die heuristiek gebruik die reguitlynafstand tussen nodusse se plaaslike
 vloerplankoördinate en 'n vaste strafwaarde vir elke vloerverandering.
-"""
+============================================================================"""
 
 import sqlite3
 import math

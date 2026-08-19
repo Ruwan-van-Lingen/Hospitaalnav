@@ -1,4 +1,4 @@
-"""
+"""============================================================================
 Lewer die topologiese grafiek as 'n vloerplandiagram met een paneel per
 vloer. Nodusse word volgens hulle plaaslike (pos_x, pos_y)-koördinate geplaas
 en rande word tussen hulle geteken. Vertikale verbindings, soos hysbakke en
@@ -6,7 +6,7 @@ trappe, en verbindings tussen geboue word duidelik aangedui.
 
 'n Pad wat deur HospitaalGrafiek.astar() of 'n ander roete-algoritme
 teruggestuur is, kan opsioneel uitgelig word.
-"""
+==========================================================================="""
 
 import sqlite3
 import matplotlib

@@ -1,5 +1,6 @@
 /* ============================================================
     DATA — verkry direk vanaf Skema.sql + SeedData.sql
+    Gebruik sodat ons nie elke keur nuwe sql entries hoef te skep nie
   ============================================================ */
 const VLOER_VERANDER_PENALTY_S = 20.0;
 
