@@ -91,9 +91,9 @@ const nodes = [
     "ICU Gang Kruising",
     20,
     5,
-    "ICU_ONLY",
+    "SLEGS_ICU",
   ],
-  ["MAIN-2-ICU", "MAIN-2", "DEPARTEMENT", "ICU", 25, 0, "ICU_ONLY"],
+  ["MAIN-2-ICU", "MAIN-2", "DEPARTEMENT", "ICU", 25, 0, "SLEGS_ICU"],
   [
     "MAIN-2-OR",
     "MAIN-2",
@@ -213,9 +213,9 @@ const randRye = [
 
 const toegangToestemmings = {
   PUBLIEK: new Set(),
-  PERSONEEL: new Set(["SLEGS_PERSONEEL", "ICU_ONLY"]),
+  PERSONEEL: new Set(["SLEGS_PERSONEEL", "SLEGS_ICU"]),
   PASIENT_VERVOER: new Set(["SLEGS_PERSONEEL"]),
-  NOODGEVAL: new Set(["SLEGS_PERSONEEL", "ICU_ONLY"]),
+  NOODGEVAL: new Set(["SLEGS_PERSONEEL", "SLEGS_ICU"]),
 };
 const gebruikerTipeEtikette = {
   PUBLIEK: "Publiek / Besoeker",
@@ -241,6 +241,15 @@ const RAND_KLEURE = {
   LUGBRUG: "#6D5DD3",
   TONNEL: "#6D5DD3",
 };
+
+// Sentinel "vloer" wat die oorsigmodus (alle vloere gelaag) verteenwoordig.
+const OORSIG_ID = "OORSIG";
+// Elke vloer kry sy eie kleur in oorsigmodus, sodat gelaagde nodusse (bv.
+// hysbakke wat doelbewus dieselfde x/y oor vloere heen deel) onderskei kan word.
+const VLOER_KLEURE_PALET = ["#2E8B57", "#1E6FA8", "#D97706", "#6D5DD3", "#E14B4B", "#C7A008"];
+const VLOER_KLEURE = Object.fromEntries(
+  vloere.map((f, i) => [f.id, VLOER_KLEURE_PALET[i % VLOER_KLEURE_PALET.length]]),
+);
 
 /* ============================================================
    NODE/VLOER LOOKUPS — gebruik slegs vir tekening van vloer plan 
@@ -291,7 +300,7 @@ async function fetchRoute(apiBase, beginId, eindeId, gebruikerTipe) {
 /* ============================================================
                         UI TOESTANDE
 ============================================================ */
-let huidigeVloer = vloere[0].id;
+let huidigeVloer = OORSIG_ID;
 let laasteResultaat = null; // {pad, koste}
 let aktieweInsident = { active: false, blocked_node_ids: [] };
 
@@ -309,7 +318,7 @@ async function laaiInsident() {
     }
     merkGesloteBestemmings();
     renderAll();
-  } catch (_) {}
+  } catch (_) { }
 }
 
 function merkGesloteBestemmings() {
@@ -392,6 +401,19 @@ function renderTabs() {
     laasteResultaat && laasteResultaat.path
       ? new Set(laasteResultaat.path.map((id) => nodeById[id].vloer))
       : new Set();
+
+  const oorsig = document.createElement("div");
+  oorsig.className =
+    "tab" +
+    (huidigeVloer === OORSIG_ID ? " active" : "") +
+    (roeterVloere.size > 1 ? " on-route" : "");
+  oorsig.textContent = "Oorsig — Alle Vloere";
+  oorsig.onclick = () => {
+    huidigeVloer = OORSIG_ID;
+    renderAll();
+  };
+  tabsEl.appendChild(oorsig);
+
   vloere.forEach((f) => {
     const d = document.createElement("div");
     d.className =
@@ -420,13 +442,25 @@ function renderIndicator() {
       "ind-row" +
       (f.id === huidigeVloer ? " current" : "") +
       (roeterVloere.has(f.id) ? " onroute" : "");
-    row.innerHTML = `<span class="dot"></span><span>${f.gebou} L${f.level} — ${f.naam}</span>`;
+    row.innerHTML = `<span class="dot" style="background:${VLOER_KLEURE[f.id]}"></span><span>${f.gebou} L${f.level} — ${f.naam}</span>`;
     row.onclick = () => {
       huidigeVloer = f.id;
       renderAll();
     };
     el.appendChild(row);
   });
+  // Laaste in die DOM = eerste bo-aan, want .indicator gebruik column-reverse.
+  const oorsigRow = document.createElement("div");
+  oorsigRow.className =
+    "ind-row" +
+    (huidigeVloer === OORSIG_ID ? " current" : "") +
+    (roeterVloere.size > 1 ? " onroute" : "");
+  oorsigRow.innerHTML = `<span class="dot"></span><span>Oorsig — Alle Vloere</span>`;
+  oorsigRow.onclick = () => {
+    huidigeVloer = OORSIG_ID;
+    renderAll();
+  };
+  el.appendChild(oorsigRow);
 }
 
 function renderLegend() {
@@ -435,6 +469,15 @@ function renderLegend() {
   Object.entries(NODE_KLEURE).forEach(([tipe, color]) => {
     const s = document.createElement("span");
     s.innerHTML = `<span class="swatch" style="background:${color}"></span>${tipe}`;
+    el.appendChild(s);
+  });
+  const skeiding = document.createElement("span");
+  skeiding.textContent = "•";
+  skeiding.style.opacity = "0.4";
+  el.appendChild(skeiding);
+  vloere.forEach((f) => {
+    const s = document.createElement("span");
+    s.innerHTML = `<span class="swatch" style="background:${VLOER_KLEURE[f.id]}"></span>${f.gebou} · ${f.naam}`;
     el.appendChild(s);
   });
 }
@@ -451,7 +494,11 @@ function renderPlan() {
   const NS = "http://www.w3.org/2000/svg";
   svg.innerHTML = "";
 
-  const vloerNodes = nodes.filter((n) => n.vloer === huidigeVloer);
+  const oorsigModus = huidigeVloer === OORSIG_ID;
+  // In oorsigmodus word elke vloer se nodusse gelaag op dieselfde kaart getoon (die hele kampus deel reeds een koördinaatstelsel: hysbakke en trappe het doelbewus identiese x/y oor vloere heen). Andersins word net die huidige vloer se nodusse gewys.
+  const vloerNodes = oorsigModus
+    ? nodes
+    : nodes.filter((n) => n.vloer === huidigeVloer);
   const vloerLyne = [];
   const geplaasdeEtikette = [];
   const highlightSet = new Set(
@@ -467,12 +514,38 @@ function renderPlan() {
     }
   }
 
-  // teken selfde-vloer rande 
+  // Groepeer nodusse wat presies dieselfde x/y deel (bv. 'n hysbakgroep wat
+  // oor drie vloere strek) sodat hulle in oorsigmodus effens uitmekaar
+  // geskuif kan word — andersins sou hulle heeltemal oorvleuel en
+  // onsigbaar wees.
+  const posisieGroepe = new Map();
+  if (oorsigModus) {
+    vloerNodes.forEach((n) => {
+      const sleutel = `${n.x},${n.y}`;
+      if (!posisieGroepe.has(sleutel)) posisieGroepe.set(sleutel, []);
+      posisieGroepe.get(sleutel).push(n);
+    });
+  }
+  const gejitterOffset = (n) => {
+    if (!oorsigModus) return { dx: 0, dy: 0 };
+    const groep = posisieGroepe.get(`${n.x},${n.y}`);
+    if (!groep || groep.length < 2) return { dx: 0, dy: 0 };
+    const idx = groep.indexOf(n);
+    const hoek = (2 * Math.PI * idx) / groep.length;
+    const straal = 7;
+    return { dx: Math.cos(hoek) * straal, dy: Math.sin(hoek) * straal };
+  };
+
+  // teken rande — in oorsigmodus word alle vloere se gange, lugbrûe en
+  // tonnels gewys (vertikale hysbak-/trap-rande word oorgeslaan omdat hul
+  // eindpunte doelbewus saamval en dus as onsigbare stippel-lyne sou teken);
+  // andersins net die huidige vloer se rande.
   randRye.forEach(([van, na, tipe]) => {
-    if (
-      nodeById[van].vloer === huidigeVloer &&
-      nodeById[na].vloer === huidigeVloer
-    ) {
+    const magTeken = oorsigModus
+      ? tipe !== "HUISBAK" && tipe !== "TRAPPE"
+      : nodeById[van].vloer === huidigeVloer &&
+      nodeById[na].vloer === huidigeVloer;
+    if (magTeken) {
       const a = nodeById[van],
         b = nodeById[na];
       vloerLyne.push({ x1: px(a), y1: py(a), x2: px(b), y2: py(b) });
@@ -490,6 +563,7 @@ function renderPlan() {
       if (isHl) {
         line.setAttribute("stroke-linecap", "round");
       }
+      if (oorsigModus) line.setAttribute("opacity", "0.75");
       svg.appendChild(line);
     }
   });
@@ -523,7 +597,7 @@ function renderPlan() {
       ring.setAttribute("fill", "none");
       ring.setAttribute(
         "stroke",
-        n.beperkte === "ICU_ONLY" ? "#E14B4B" : "#6D5DD3",
+        n.beperkte === "SLEGS_ICU" ? "#E14B4B" : "#6D5DD3",
       );
       ring.setAttribute("stroke-width", 1.6);
       ring.setAttribute("stroke-dasharray", "3,3");
@@ -562,9 +636,9 @@ function renderPlan() {
     const etiketLyne =
       woorde.length > 2
         ? [
-            woorde.slice(0, middelpunt).join(" "),
-            woorde.slice(middelpunt).join(" "),
-          ]
+          woorde.slice(0, middelpunt).join(" "),
+          woorde.slice(middelpunt).join(" "),
+        ]
         : [etiket];
 
     const text = document.createElementNS(NS, "text");
@@ -601,11 +675,11 @@ function renderPlan() {
       Math.max(a.y, b.y) >= Math.min(c.y, d.y) &&
       Math.max(c.y, d.y) >= Math.min(a.y, b.y) &&
       orientasie(a.x, a.y, b.x, b.y, c.x, c.y) *
-          orientasie(a.x, a.y, b.x, b.y, d.x, d.y) <=
-        0 &&
+      orientasie(a.x, a.y, b.x, b.y, d.x, d.y) <=
+      0 &&
       orientasie(c.x, c.y, d.x, d.y, a.x, a.y) *
-          orientasie(c.x, c.y, d.x, d.y, b.x, b.y) <=
-        0;
+      orientasie(c.x, c.y, d.x, d.y, b.x, b.y) <=
+      0;
     const lynKruisReghoek = (lyn, b) => {
       if (
         puntInReghoek(lyn.x1, lyn.y1, b) ||

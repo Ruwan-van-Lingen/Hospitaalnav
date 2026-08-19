@@ -135,10 +135,10 @@ INSERT INTO
     toegang_toestemmings (gebruiker_tipe, beperkte_groep)
 VALUES
     ('PERSONEEL', 'SLEGS_PERSONEEL'),
-    ('PERSONEEL', 'ICU_ONLY'),
+    ('PERSONEEL', 'SLEGS_ICU'),
     ('PASIENT_VERVOER', 'SLEGS_PERSONEEL'),
     ('NOODGEVAL', 'SLEGS_PERSONEEL'),
-    ('NOODGEVAL', 'ICU_ONLY');
+    ('NOODGEVAL', 'SLEGS_ICU');
 
 CREATE TABLE
     noodkodes (

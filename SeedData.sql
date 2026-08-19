@@ -38,8 +38,8 @@ INSERT INTO nodes (node_id, vloer_id, tipe_kode, etiket, pos_x, pos_y, is_beperk
     -- Hoofgebou: vlak 2 (beperkte ICU- en operasieteatergebied)
     ('MAIN-2-ELV',   'MAIN-2', 'HUISBAK_GROEP', 'Huisbak Groep L2',      15,  5, 0, NULL),
     ('MAIN-2-STA',   'MAIN-2', 'TRAPHUIS',      'Traphuis L2',           15, 10, 0, NULL),
-    ('MAIN-2-J01',   'MAIN-2', 'AANSLUITING',   'ICU Gang Jct',          20,  5, 1, 'ICU_ONLY'),
-    ('MAIN-2-ICU',   'MAIN-2', 'DEPARTEMENT',   'ICU',                   25,  0, 1, 'ICU_ONLY'),
+    ('MAIN-2-J01',   'MAIN-2', 'AANSLUITING',   'ICU Gang Jct',          20,  5, 1, 'SLEGS_ICU'),
+    ('MAIN-2-ICU',   'MAIN-2', 'DEPARTEMENT',   'ICU',                   25,  0, 1, 'SLEGS_ICU'),
     ('MAIN-2-OR',    'MAIN-2', 'DEPARTEMENT',   'OR',                    25, 10, 1, 'SLEGS_PERSONEEL'),
 
     -- SYGEBOU Grond vloer
