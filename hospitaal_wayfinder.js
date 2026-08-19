@@ -496,22 +496,44 @@ function renderPlan() {
     circle.setAttribute("stroke-width", isHl ? 2.4 : 1.2);
     g.appendChild(circle);
 
-    // alternate bo/onder per node sodat die twee naby-gespasieerde nodes op dies ry nie hulle etikette bo op mekaar stack nie 
-    const below = i % 2 === 0;
-    const ty = below ? cy + 18 : cy - 12;
+    // Versprei opeenvolgende etikette onder, bo, regs en links van hul nodes.
+    const etiketPosisies = [
+      { dx: 0, dy: 20, anchor: "middle" },
+      { dx: 0, dy: -21, anchor: "middle" },
+      { dx: 14, dy: -5, anchor: "start" },
+      { dx: -14, dy: -5, anchor: "end" },
+    ];
+    const etiketPosisie = etiketPosisies[i % etiketPosisies.length];
+    const etiket = n.etiket + (n.beperkte ? ` [${n.beperkte}]` : "");
+    const woorde = etiket.split(" ");
+    const middelpunt = Math.ceil(woorde.length / 2);
+    const etiketLyne =
+      woorde.length > 2
+        ? [
+            woorde.slice(0, middelpunt).join(" "),
+            woorde.slice(middelpunt).join(" "),
+          ]
+        : [etiket];
 
     const text = document.createElementNS(NS, "text");
-    text.setAttribute("x", cx);
-    text.setAttribute("y", ty);
-    text.setAttribute("text-anchor", "middle");
+    const etiketX = cx + etiketPosisie.dx;
+    const etiketY = cy + etiketPosisie.dy;
+    text.setAttribute("x", etiketX);
+    text.setAttribute("y", etiketY);
+    text.setAttribute("text-anchor", etiketPosisie.anchor);
     text.setAttribute("font-size", "9");
     text.setAttribute("font-family", "Inter, sans-serif");
     text.setAttribute("fill", "#12222E");
     text.setAttribute("paint-order", "stroke");
     text.setAttribute("stroke", "#E7EEF2");
     text.setAttribute("stroke-width", "3");
-    text.textContent =
-      n.etiket + (n.beperkte ? ` [${n.beperkte}]` : "");
+    etiketLyne.forEach((lyn, lynNommer) => {
+      const tspan = document.createElementNS(NS, "tspan");
+      tspan.setAttribute("x", etiketX);
+      tspan.setAttribute("dy", lynNommer === 0 ? 0 : 11);
+      tspan.textContent = lyn;
+      text.appendChild(tspan);
+    });
     g.appendChild(text);
 
     svg.appendChild(g);
