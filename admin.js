@@ -7,8 +7,7 @@
  *   • Aanmelding en afmelding (POST /admin/login, POST /admin/logout).
  *   • Laai van die gebou-/vloer-/nodusstruktuur (GET /admin/map).
  *   • Rendering van die interaktiewe keuseboom (gebou → vloer → nodusse).
- *   • Aktivering van 'n nuwe sluiting, insluitend ontruimingsmodus
- *     (POST /admin/incident).
+ *   • Aktivering van 'n nuwe sluiting, insluitend ontruimingsmodus (POST /admin/incident).
  *   • Kansellering van die aktiewe sluiting (DELETE /admin/incident).
  *   • Vertoon van die aktiewe insidentstatus bo-aan die vorm.
  *

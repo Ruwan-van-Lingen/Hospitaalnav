@@ -13,10 +13,8 @@
   Hoofkomponente
   ---------------
   • Kopstuk (header)       — Hospitaalnaam, subtitel en adminskakels.
-  • Insidentbanier         — Rooi streep wat vertoon wanneer 'n aktiewe
-                             sluiting of ontruimingsmodus van krag is.
-  • Uitlegrooster (layout) — Tweekolomrooster: hoofskolom (kaart + beheer)
-                             en sykantpaneel (vloerindikator + roeteljst).
+  • Insidentbanier         — Rooi streep wat vertoon wanneer 'n aktiewe sluiting of ontruimingsmodus van krag is.
+  • Uitlegrooster (layout) — Tweekolomrooster: hoofskolom (kaart + beheer) en sykantpaneel (vloerindikator + roeteljst).
   • Beheerpaneel (controls)— Soekkvelde, gebruikertipe-keuse en knoppe.
   • Vloeroortjies (tabs)   — Een oortjie per vloer, plus 'n "Oorsig"-oortjie.
   • Vloerplan (plan-wrap)  — SVG-kaart-omhulsel met skadueffek.
