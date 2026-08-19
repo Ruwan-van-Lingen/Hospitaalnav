@@ -51,20 +51,33 @@ header p {
   padding: 20px 24px;
 }
 .controls {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns:
+    190px
+    190px
+    minmax(260px, 1fr)
+    minmax(260px, 1fr)
+    auto
+    auto;
   gap: 10px;
-  align-items: flex-end;
+  align-items: end;
   margin-bottom: 16px;
+  padding: 14px 16px;
   background: var(--navy-2);
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 10px;
-  padding: 14px 16px;
 }
 .field {
   display: flex;
   flex-direction: column;
   gap: 5px;
+  min-width: 0;
+}
+
+.field input,
+.field select {
+  width: 100%;
+  min-width: 0;
 }
 .field label {
   font-size: 10.5px;
@@ -312,5 +325,17 @@ svg {
   }
   .side {
     padding: 0 24px 24px;
+  }
+}
+
+@media (max-width: 1100px) {
+  .controls {
+    grid-template-columns: repeat(2, minmax(240px, 1fr));
+  }
+}
+
+@media (max-width: 600px) {
+  .controls {
+    grid-template-columns: 1fr;
   }
 }
