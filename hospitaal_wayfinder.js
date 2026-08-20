@@ -1,4 +1,4 @@
-/**
+/**===========================================================================================
  * hospitaal_wayfinder.js
  * =======================
  * Interaktiewe webkoppelvlak vir die Hospitaal Navigasiestelsel (/ui).

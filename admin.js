@@ -1,4 +1,4 @@
-/**
+/**==========================================================================================
  * admin.js
  * =========
  * Kliëntkant-logika vir die Hospitaal Sluitingsadministrasieblad (/admin).

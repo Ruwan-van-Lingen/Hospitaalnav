@@ -1,4 +1,4 @@
-"""
+"""================================================================================================================
 VloerPlan.py
 =============
 Matplotlib-gebaseerde vloerplanvisualiseerder vir die Hospitaal Navigasiestelsel.
