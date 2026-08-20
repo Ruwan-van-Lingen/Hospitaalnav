@@ -149,7 +149,18 @@ VALUES
 CREATE TABLE
     noodkodes (
         kode_id TEXT PRIMARY KEY, -- Byvoorbeeld 'VUUR', 'MEDIES'
-        naam TEXT NOT NULL
+        naam TEXT NOT NULL,
+        -- Outomatiese gedrag by aktivering van hierdie kode. NULL beteken
+        -- 'n gewone handmatige sluiting (admin kies self nodusse, soos tot
+        -- dusver). Ondersteunde waardes:
+        --   'ONTRUIM_ALMAL' — ontruim outomaties ALMAL na die naaste
+        --                      nooduitgang; geen nodus-keuse word vereis nie
+        --                      (bv. Kode Rooi/brand).
+        --   'SLUIT_ALLES'   — sluit die HELE hospitaal outomaties (elke
+        --                      nodus word geblokkeer); geen roetes is
+        --                      moontlik totdat die insident gekanselleer
+        --                      word nie (bv. Kode Pink/algehele grendel).
+        outomaties_modus TEXT
     );
 
 CREATE TABLE

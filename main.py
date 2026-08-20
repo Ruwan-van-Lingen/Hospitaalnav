@@ -85,12 +85,17 @@ class InsidentInvoer(BaseModel):
     Invoer vir die aktivering van 'n sluiting.
 
     node_ids         : Een of meer node-ID's wat as geblokkeer gemerk word.
+                       Vir outomatiese noodkodes (sien noodkodes.outomaties_modus)
+                       word hierdie veld deur die bediener oorskryf/geïgnoreer,
+                       dus mag dit leeg gelaat word.
     ontruimings_modus: Indien True, word die gebruiker na die naaste nooduitgang
                        gestuur (bestemming word geïgnoreer; hysbakke verbied).
+                       Word ook deur die bediener afgedwing vir 'n
+                       'ONTRUIM_ALMAL'-noodkode, ongeag wat hier gestuur word.
     """
     kode_id: str
     beskrywing: str = Field(default="", max_length=500)
-    node_ids: list[str] = Field(min_length=1)
+    node_ids: list[str] = Field(default_factory=list)
     ontruimings_modus: bool = False
 
 
@@ -133,6 +138,23 @@ def verseker_insident_skema():
                 ('GEEL',       'Gevaarlike materiaal'),
                 ('SEKURITEIT', 'Sekuriteitsvoorval');
             """
+        )
+
+        # Migrasiestap: voeg outomaties_modus-kolom by noodkodes as dit in 'n
+        # ouer databasisskema ontbreek (sien Skema.sql vir die betekenis van
+        # 'ONTRUIM_ALMAL' en 'SLUIT_ALLES').
+        kode_cols = {row[1] for row in conn.execute("PRAGMA table_info(noodkodes)")}
+        if "outomaties_modus" not in kode_cols:
+            conn.execute("ALTER TABLE noodkodes ADD COLUMN outomaties_modus TEXT")
+
+        # Voeg die twee outomatiese noodkodes by (idempotent) — dit gebeur
+        # hier eerder as net in SeedData.sql sodat produksiedatabasisse wat
+        # AUTO_HERBOU_DB=false gebruik (en dus SeedData.sql nooit weer
+        # uitvoer nie) hulle ook by 'n opstart-migrasie kry.
+        conn.execute(
+            """INSERT OR IGNORE INTO noodkodes (kode_id, naam, outomaties_modus) VALUES
+                ('ROOI', 'Kode Rooi — Brand (ontruim almal)', 'ONTRUIM_ALMAL'),
+                ('PINK', 'Kode Pink — Ontvoering (algehele grendel)', 'SLUIT_ALLES')"""
         )
 
         # Migrasiestap: voeg ontruimings_modus-kolom by as dit in 'n ouer
@@ -251,7 +273,7 @@ def kry_insident() -> dict:
         ry = conn.execute(
             """
             SELECT ai.kode_id, nk.naam, ai.beskrywing,
-                   ai.geaktiveer_op, ai.ontruimings_modus
+                   ai.geaktiveer_op, ai.ontruimings_modus, nk.outomaties_modus
             FROM aktiewe_insident ai
             JOIN noodkodes nk ON nk.kode_id = ai.kode_id
             WHERE ai.insident_id = 1
@@ -272,6 +294,10 @@ def kry_insident() -> dict:
         # Die ontruimings_modus-vlag word deur die webkoppelvlak gebruik om
         # /route/ontruim eerder as /route aan te roep.
         "ontruimings_modus": bool(ry["ontruimings_modus"]),
+        # 'ONTRUIM_ALMAL', 'SLUIT_ALLES' of None — laat die admin- en
+        # webkoppelvlak toe om outomaties-geaktiveerde insidente anders te
+        # vertoon (bv. "Algehele grendel aktief" i.p.v. 'n rou nodus-telling).
+        "outomaties_modus": ry["outomaties_modus"],
     }
 
 
@@ -639,7 +665,7 @@ def admin_kaart(_: str = Depends(vereis_admin)):
                 vloer_data.append({**dict(vloer), "nodes": [dict(n) for n in nodes]})
             resultaat.append({**dict(gebou), "vloere": vloer_data})
         kodes = [dict(ry) for ry in conn.execute(
-            "SELECT kode_id, naam FROM noodkodes ORDER BY naam"
+            "SELECT kode_id, naam, outomaties_modus FROM noodkodes ORDER BY naam"
         ).fetchall()]
     return {"geboue": resultaat, "noodkodes": kodes, "incident": kry_insident()}
 
@@ -650,31 +676,59 @@ def aktiveer_insident(invoer: InsidentInvoer, _: str = Depends(vereis_admin)):
     Aktiveer 'n nuwe sluiting.
 
     Vervang enige bestaande aktiewe insident (slegs een insident op 'n slag).
-    Valideer alle node-ID's teen die databasis voordat die insident gestoor word.
+    Vir gewone (handmatige) noodkodes word invoer.node_ids gebruik en teen
+    die databasis gevalideer, presies soos voorheen.
+
+    Vir OUTOMATIESE noodkodes (noodkodes.outomaties_modus) word die
+    kliënt se node_ids/ontruimings_modus geïgnoreer en deur die bediener
+    self bepaal — dit verseker dat 'n Kode Rooi/Pink altyd dieselfde
+    waarborg gee ongeag wat die admin-webblad toevallig gestuur het:
+      • 'ONTRUIM_ALMAL' (bv. Kode Rooi/brand): geen nodusse word geblokkeer
+        nie, maar ontruimings_modus word geforseer AAN — elke gebruiker
+        word na die naaste nooduitgang gestuur.
+      • 'SLUIT_ALLES' (bv. Kode Pink/algehele grendel): ELKE nodus in die
+        hospitaal word geblokkeer — geen roete is moontlik totdat die
+        insident gekanselleer word nie.
     """
-    # Verwyder duplikate terwyl die volgorde behou word.
-    node_ids = list(dict.fromkeys(invoer.node_ids))
     with db_verbinding() as conn:
         kode = conn.execute(
-            "SELECT 1 FROM noodkodes WHERE kode_id = ?", (invoer.kode_id,)
+            "SELECT outomaties_modus FROM noodkodes WHERE kode_id = ?", (invoer.kode_id,)
         ).fetchone()
         if kode is None:
             raise HTTPException(status_code=400, detail="Ongeldige noodkode.")
+        outomaties_modus = kode["outomaties_modus"]
 
-        # Valideer alle node-ID's in een SQL-navraag.
-        plekhouers = ",".join("?" for _ in node_ids)
-        gevind = {
-            ry["node_id"]
-            for ry in conn.execute(
-                f"SELECT node_id FROM nodes WHERE node_id IN ({plekhouers})", node_ids
-            ).fetchall()
-        }
-        ontbreek = sorted(set(node_ids) - gevind)
-        if ontbreek:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Onbekende node-ID(s): {', '.join(ontbreek)}",
-            )
+        # Verwyder duplikate terwyl die volgorde behou word.
+        node_ids = list(dict.fromkeys(invoer.node_ids))
+        ontruimings_modus = invoer.ontruimings_modus
+
+        if outomaties_modus == "ONTRUIM_ALMAL":
+            node_ids = []
+            ontruimings_modus = True
+        elif outomaties_modus == "SLUIT_ALLES":
+            node_ids = [r["node_id"] for r in conn.execute("SELECT node_id FROM nodes")]
+            ontruimings_modus = False
+        else:
+            # Gewone handmatige sluiting: minstens een nodus word vereis,
+            # en elke node-ID moet in die databasis bestaan.
+            if not node_ids:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Kies minstens een nodus vir hierdie sluitingstipe.",
+                )
+            plekhouers = ",".join("?" for _ in node_ids)
+            gevind = {
+                ry["node_id"]
+                for ry in conn.execute(
+                    f"SELECT node_id FROM nodes WHERE node_id IN ({plekhouers})", node_ids
+                ).fetchall()
+            }
+            ontbreek = sorted(set(node_ids) - gevind)
+            if ontbreek:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Onbekende node-ID(s): {', '.join(ontbreek)}",
+                )
 
         # Vervang die huidige insident (DELETE + INSERT verseker dat slegs een
         # insident met insident_id=1 op 'n slag kan bestaan).
@@ -682,7 +736,7 @@ def aktiveer_insident(invoer: InsidentInvoer, _: str = Depends(vereis_admin)):
         conn.execute(
             """INSERT INTO aktiewe_insident (insident_id, kode_id, beskrywing, ontruimings_modus)
                VALUES (1, ?, ?, ?)""",
-            (invoer.kode_id, invoer.beskrywing.strip(), int(invoer.ontruimings_modus)),
+            (invoer.kode_id, invoer.beskrywing.strip(), int(ontruimings_modus)),
         )
         conn.executemany(
             "INSERT INTO insident_nodes (insident_id, node_id) VALUES (1, ?)",

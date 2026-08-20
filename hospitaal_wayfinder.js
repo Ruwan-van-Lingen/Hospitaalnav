@@ -362,9 +362,12 @@ async function laaiInsident() {
     // Herlaai die seleksielyste nadat die insidentdata ontvang is sodat
     // geblokkeerde nodusse gewaarborg gedeaktiveer word, ongeag watter
     // API-aanroep eerste voltooi het.
+    // Stoor die tans-gekose waardes sodat hulle na herlaai herstel kan word.
+    const huidigeBegin = document.getElementById("beginNode").value;
+    const huidigeEinde = document.getElementById("endNode").value;
     await Promise.all([
-      laaiBestemmings(document.getElementById("beginSoek").value, "beginNode"),
-      laaiBestemmings(document.getElementById("eindSoek").value, "endNode"),
+      laaiBestemmings(document.getElementById("beginSoek").value, "beginNode", huidigeBegin || null),
+      laaiBestemmings(document.getElementById("eindSoek").value, "endNode", huidigeEinde || null),
     ]);
     renderAll();
   } catch (_) { }
@@ -396,7 +399,13 @@ async function laaiBestemmings(soekterm, selectId, gekoseId = null) {
   const url = `${apiBase.replace(/\/$/, "")}/destinations?q=${encodeURIComponent(soekterm)}&limiet=100`;
   try {
     const response = await fetch(url);
-    if (!response.ok) return;
+    if (!response.ok) {
+      // Voorheen het 'n nie-OK antwoord hier stilweg 'n leë seleksielys
+      // gelaat, sonder enige aanduiding aan die gebruiker wat verkeerd
+      // geloop het. Wys dit nou sigbaar in die statusreël.
+      wysBestemmingFout(`⚠ Kon nie bestemmings laai nie (HTTP ${response.status}). Is die API basis-URL korrek?`);
+      return;
+    }
     const data = await response.json();
     const lys = document.getElementById(selectId);
     lys.innerHTML = "";
@@ -410,9 +419,22 @@ async function laaiBestemmings(soekterm, selectId, gekoseId = null) {
       lys.value = gekoseId;
     }
     merkGesloteBestemmings();
-  } catch (_) {
-    // Die roete-foutboodskap hanteer 'n API wat nie bereikbaar is nie.
+  } catch (netwerkFout) {
+    // Voorheen is netwerkfoute (verkeerde poort, API nie aan die gang nie,
+    // CORS geblokkeer, ens.) hier stilweg geïgnoreer — die "Vanaf"/"Na"
+    // seleksielyste het dan net leeg gebly sonder enige verduideliking.
+    // Wys dit nou sigbaar sodat die probleem dadelik opgemerk kan word.
+    wysBestemmingFout(
+      `⚠ Kon nie ${apiBase || "die API"} bereik om bestemmings te laai nie. Loop die API? Is die basis-URL korrek?`,
+    );
   }
+}
+
+/** Wys 'n foutboodskap in die hoof-statusreël (dieselfde element as renderStatus() gebruik). */
+function wysBestemmingFout(boodskap) {
+  const el = document.getElementById("status");
+  el.textContent = boodskap;
+  el.className = "status blocked";
 }
 
 function koppelBestemmingSoektog(inputId, selectId) {
@@ -820,7 +842,9 @@ function renderPlan() {
   title.setAttribute("font-weight", "700");
   title.setAttribute("font-family", "Space Grotesk, sans-serif");
   title.setAttribute("fill", "#12222E");
-  title.textContent = `${f.gebou} — ${f.naam}`;
+  // In oorsigmodus is huidigeVloer === OORSIG_ID, wat nie in vloerById bestaan nie.
+  // Gebruik 'n veilige terugvalwaarde sodat die funksie nie crash nie.
+  title.textContent = f ? `${f.gebou} — ${f.naam}` : "Oorsig — Alle Vloere";
   svg.appendChild(title);
 }
 

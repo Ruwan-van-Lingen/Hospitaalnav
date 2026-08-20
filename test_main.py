@@ -362,3 +362,97 @@ def test_geslote_bestemming_gee_konflik():
         )
         assert response.status_code == 409
         assert "tydelik gesluit" in response.json()["detail"]
+
+
+# ---------------------------------------------------------------------------
+# Outomatiese noodkodes (Kode Rooi / Kode Pink)
+# ---------------------------------------------------------------------------
+
+def test_kode_rooi_ontruim_almal_sonder_nodus_keuse():
+    """
+    Kode Rooi (ROOI, outomaties_modus='ONTRUIM_ALMAL') moet ontruimingsmodus
+    aktiveer sonder dat enige node_ids verskaf word, en geen nodusse moet
+    geblokkeer wees nie (die brand se presiese ligging word nie gemodelleer
+    nie — almal word bloot na die naaste uitgang gestuur).
+    """
+    with TestClient(app) as client:
+        client.post("/admin/login", json={"gebruikersnaam": "admin", "wagwoord": "admin"})
+
+        aktiveer = client.post("/admin/incident", json={"kode_id": "ROOI", "node_ids": []})
+        assert aktiveer.status_code == 200
+        data = aktiveer.json()
+        assert data["ontruimings_modus"] is True
+        assert data["blocked_node_ids"] == []
+        assert data["outomaties_modus"] == "ONTRUIM_ALMAL"
+
+        # 'n Gewone publieke gebruiker moet steeds 'n ontruimingsroete kry.
+        ontruim = client.get("/route/ontruim", params={"begin": "MAIN-2-ICU", "gebruiker_tipe": "PERSONEEL"})
+        assert ontruim.status_code == 200
+
+        client.delete("/admin/incident")
+
+
+def test_kode_rooi_ignoreer_kliënt_nodus_keuse():
+    """
+    Selfs as die kliënt (per ongeluk of moedswillig) node_ids saam met Kode
+    Rooi stuur, moet die bediener dit ignoreer — die outomatiese gedrag is
+    altyd bedienerkant afgedwing.
+    """
+    with TestClient(app) as client:
+        client.post("/admin/login", json={"gebruikersnaam": "admin", "wagwoord": "admin"})
+        aktiveer = client.post(
+            "/admin/incident",
+            json={"kode_id": "ROOI", "node_ids": ["MAIN-1-BRIDGE"], "ontruimings_modus": False},
+        )
+        assert aktiveer.status_code == 200
+        data = aktiveer.json()
+        assert data["blocked_node_ids"] == []
+        assert data["ontruimings_modus"] is True
+        client.delete("/admin/incident")
+
+
+def test_kode_pink_sluit_die_hele_hospitaal():
+    """
+    Kode Pink (PINK, outomaties_modus='SLUIT_ALLES') moet ELKE nodus in die
+    databasis outomaties blokkeer. Daarna moet /route vir enige paar
+    beginpunt/bestemming misluk (409, want die beginpunt self is geblokkeer).
+    """
+    with TestClient(app) as client:
+        client.post("/admin/login", json={"gebruikersnaam": "admin", "wagwoord": "admin"})
+
+        aktiveer = client.post("/admin/incident", json={"kode_id": "PINK", "node_ids": []})
+        assert aktiveer.status_code == 200
+        data = aktiveer.json()
+        assert data["ontruimings_modus"] is False
+        assert data["outomaties_modus"] == "SLUIT_ALLES"
+        assert len(data["blocked_node_ids"]) > 20  # elke nodus in SeedData.sql
+
+        geblokkeer = client.get(
+            "/route", params={"begin": "MAIN-G-ENT", "doel": "SYGEBOU-1-RAD"}
+        )
+        assert geblokkeer.status_code == 409
+
+        client.delete("/admin/incident")
+
+
+def test_gewone_noodkode_vereis_steeds_minstens_een_nodus():
+    """
+    'n Handmatige (nie-outomatiese) noodkode moet steeds die bestaande
+    reël afdwing: minstens een nodus moet gekies word.
+    """
+    with TestClient(app) as client:
+        client.post("/admin/login", json={"gebruikersnaam": "admin", "wagwoord": "admin"})
+        response = client.post("/admin/incident", json={"kode_id": "ONDERHOUD", "node_ids": []})
+        assert response.status_code == 400
+        assert "minstens een nodus" in response.json()["detail"]
+
+
+def test_admin_map_bevat_outomaties_modus_per_kode():
+    """/admin/map se noodkodes-lys moet outomaties_modus insluit sodat die admin-UI kan aanpas."""
+    with TestClient(app) as client:
+        client.post("/admin/login", json={"gebruikersnaam": "admin", "wagwoord": "admin"})
+        kaart = client.get("/admin/map").json()
+    kodes = {k["kode_id"]: k["outomaties_modus"] for k in kaart["noodkodes"]}
+    assert kodes["ROOI"] == "ONTRUIM_ALMAL"
+    assert kodes["PINK"] == "SLUIT_ALLES"
+    assert kodes["ONDERHOUD"] is None

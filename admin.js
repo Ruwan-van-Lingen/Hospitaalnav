@@ -199,12 +199,56 @@ function renderInsident(insident) {
   document.getElementById("aktieweTitel").textContent = insident.name;
   document.getElementById("aktieweBeskrywing").textContent =
     insident.description || "Geen beskrywing verskaf nie.";
-  document.getElementById("aktieweNodes").textContent =
-    `${insident.blocked_node_ids.length} geslote nodus(se)`;
+
+  // Outomatiese insidente kry 'n duideliker boodskap as 'n rou nodus-telling
+  // (bv. "algehele grendel" i.p.v. "26 geslote nodus(se)").
+  const nodesEl = document.getElementById("aktieweNodes");
+  if (insident.outomaties_modus === "SLUIT_ALLES") {
+    nodesEl.textContent = "🔒 Algehele grendel — die hele hospitaal is tans ontoeganklik.";
+  } else if (insident.outomaties_modus === "ONTRUIM_ALMAL") {
+    nodesEl.textContent = "🔥 Outomatiese ontruiming — geen spesifieke nodusse is geblokkeer nie.";
+  } else {
+    nodesEl.textContent = `${insident.blocked_node_ids.length} geslote nodus(se)`;
+  }
 
   // Wys die ontruimingsmoduswaarskuwing slegs as die vlag aktief is.
   const ontruimRy = document.getElementById("aktieweOntruim");
   ontruimRy.hidden = !insident.ontruimings_modus;
+}
+
+/**
+ * Pas die vorm aan volgens die tans gekose noodkode se outomaties_modus:
+ *   • '' (leeg/handmatig)   — wys die keuseboom en die ontruimingskassie soos gewoonlik.
+ *   • 'ONTRUIM_ALMAL'       — verberg albei; wys 'n nota dat almal outomaties ontruim word.
+ *   • 'SLUIT_ALLES'         — verberg albei; wys 'n nota dat die hele hospitaal sluit.
+ * Die bediener dwing hierdie gedrag in elk geval af (sien main.py), maar die
+ * UI hoort dit eerlik te weerspieël sodat die admin nie 'n nodus-keuse of
+ * ontruimingskassie sien wat eintlik geen effek sal hê nie.
+ */
+function opdateerVormVirKode() {
+  const kodeSel = document.getElementById("kode");
+  const outomaties = kodeSel.selectedOptions[0]?.dataset.outomaties || "";
+  const seleksieKaart = document.querySelector(".selection");
+  const ontruimToggle = document.querySelector(".ontruim-toggle");
+  const nota = document.getElementById("kodeOutomatiesNota");
+
+  if (outomaties === "ONTRUIM_ALMAL") {
+    seleksieKaart.hidden = true;
+    ontruimToggle.hidden = true;
+    nota.hidden = false;
+    nota.textContent =
+      "🔥 Hierdie noodkode ontruim outomaties ALMAL na die naaste nooduitgang. Geen nodus-keuse is nodig nie.";
+  } else if (outomaties === "SLUIT_ALLES") {
+    seleksieKaart.hidden = true;
+    ontruimToggle.hidden = true;
+    nota.hidden = false;
+    nota.textContent =
+      "🔒 Hierdie noodkode sluit die HELE hospitaal outomaties — geen roetes sal beskikbaar wees totdat die insident gekanselleer word nie.";
+  } else {
+    seleksieKaart.hidden = false;
+    ontruimToggle.hidden = false;
+    nota.hidden = true;
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -221,13 +265,20 @@ async function laaiAdmin() {
   loginPaneel.hidden = true;
   adminPaneel.hidden = false;
 
-  // Vul die noodkode-keuselys met opsies uit die databasis.
+  // Vul die noodkode-keuselys met opsies uit die databasis. Elke opsie dra
+  // sy outomaties_modus as 'n data-attribuut sodat opdateerVormVirKode() dit
+  // sonder 'n verdere API-oproep kan lees.
   const kode = document.getElementById("kode");
   kode.innerHTML = "";
-  kaartData.noodkodes.forEach((item) => kode.add(new Option(item.naam, item.kode_id)));
+  kaartData.noodkodes.forEach((item) => {
+    const opsie = new Option(item.naam, item.kode_id);
+    opsie.dataset.outomaties = item.outomaties_modus || "";
+    kode.add(opsie);
+  });
 
   renderBoom();
   renderInsident(kaartData.incident);
+  opdateerVormVirKode();
 }
 
 // ---------------------------------------------------------------------------
@@ -252,26 +303,43 @@ document.getElementById("loginForm").addEventListener("submit", async (event) =>
   }
 });
 
+/** Wissel die vorm se sigbaarheid elke keer as die admin 'n ander noodkode kies. */
+document.getElementById("kode").addEventListener("change", opdateerVormVirKode);
+
 /** Insidentvorm: bevestig dan aktiveer die sluiting met die gekose nodusse. */
 document.getElementById("incidentForm").addEventListener("submit", async (event) => {
   event.preventDefault();
   boodskap.textContent = "";
 
-  const node_ids = nodeCheckboxes(document)
-    .filter((n) => n.checked)
-    .map((n) => n.value);
+  const kodeSel = document.getElementById("kode");
+  const outomaties = kodeSel.selectedOptions[0]?.dataset.outomaties || "";
 
-  if (!node_ids.length) {
-    boodskap.textContent = "Kies minstens een nodus.";
-    return;
+  // Vir outomatiese noodkodes word geen nodus-keuse benodig of gestuur nie —
+  // die bediener bepaal self die geblokkeerde nodusse/ontruimingsvlag.
+  let node_ids = [];
+  if (!outomaties) {
+    node_ids = nodeCheckboxes(document)
+      .filter((n) => n.checked)
+      .map((n) => n.value);
+    if (!node_ids.length) {
+      boodskap.textContent = "Kies minstens een nodus.";
+      return;
+    }
   }
-  if (!confirm(`Aktiveer die sluiting vir ${node_ids.length} nodus(se)?`)) return;
+
+  const bevestigBoodskap =
+    outomaties === "ONTRUIM_ALMAL"
+      ? "Aktiveer outomatiese ontruiming vir ALMAL?"
+      : outomaties === "SLUIT_ALLES"
+        ? "Aktiveer 'n algehele grendel vir die HELE hospitaal?"
+        : `Aktiveer die sluiting vir ${node_ids.length} nodus(se)?`;
+  if (!confirm(bevestigBoodskap)) return;
 
   try {
     const insident = await api("/admin/incident", {
       method: "POST",
       body: JSON.stringify({
-        kode_id: document.getElementById("kode").value,
+        kode_id: kodeSel.value,
         beskrywing: document.getElementById("beskrywing").value,
         node_ids,
         ontruimings_modus: document.getElementById("ontruimingsModus").checked,

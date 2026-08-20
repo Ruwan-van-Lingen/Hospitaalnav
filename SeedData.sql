@@ -114,3 +114,9 @@ INSERT INTO rande (van_node, na_node, rand_tipe, afstand_m, basis_gewig_s, wag_p
     ('SKOONMAAK', 'Skoonmaak'),
     ('GEEL', 'Gevaarlike materiaal'),
     ('SEKURITEIT', 'Sekuriteitsvoorval');
+
+    -- Outomatiese noodkodes: geen nodus-keuse deur die admin word vereis
+    -- nie — die gedrag word deur outomaties_modus in main.py afgedwing.
+    INSERT INTO noodkodes (kode_id, naam, outomaties_modus) VALUES
+    ('ROOI', 'Kode Rooi — Brand (ontruim almal)', 'ONTRUIM_ALMAL'),
+    ('PINK', 'Kode Pink — Ontvoering (algehele grendel)', 'SLUIT_ALLES');

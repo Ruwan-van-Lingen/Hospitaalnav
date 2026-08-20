@@ -63,6 +63,11 @@
             <p class="step">01</p>
             <h2>Beskryf die sluiting</h2>
             <label>Insidenttipe<select id="kode" required></select></label>
+            <!-- Wys 'n verduideliking wanneer die gekose kode outomaties optree
+                 (Kode Rooi/Pink) — sien opdateerVormVirKode() in admin.js.
+                 Vir sulke kodes word nodus-keuse oorgeslaan; die bediener
+                 bepaal self die geblokkeerde nodusse/ontruimingsvlag. -->
+            <p id="kodeOutomatiesNota" class="muted" hidden></p>
             <label>Beskrywing<textarea id="beskrywing" maxlength="500" rows="4" placeholder="Byvoorbeeld: Waterpyp word in die oostelike gang herstel."></textarea></label>
             <!-- Ontruimingsmodus: ignoreer bestemming, stuur gebruikers na naaste nooduitgang. -->
             <!-- Hysbakke word outomaties verbied; slegs trappe/lugbrûe/tonnels. -->
