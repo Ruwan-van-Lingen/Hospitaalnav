@@ -134,9 +134,7 @@ def verseker_insident_skema():
 
             INSERT OR IGNORE INTO noodkodes (kode_id, naam) VALUES
                 ('ONDERHOUD',  'Onderhoud'),
-                ('SKOONMAAK',  'Skoonmaak'),
-                ('GEEL',       'Gevaarlike materiaal'),
-                ('SEKURITEIT', 'Sekuriteitsvoorval');
+                ('SKOONMAAK',  'Skoonmaak');
             """
         )
 
@@ -155,6 +153,34 @@ def verseker_insident_skema():
             """INSERT OR IGNORE INTO noodkodes (kode_id, naam, outomaties_modus) VALUES
                 ('ROOI', 'Kode Rooi — Brand (ontruim almal)', 'ONTRUIM_ALMAL'),
                 ('PINK', 'Kode Pink — Ontvoering (algehele grendel)', 'SLUIT_ALLES')"""
+        )
+
+        # Verwyder afgetrede noodkodes, insluitend enige ou aktiewe insident
+        # wat nog daarna verwys, sodat hulle nie via die API gebruik kan word nie.
+        conn.execute(
+            "DELETE FROM aktiewe_insident WHERE kode_id IN ('GEEL', 'SEKURITEIT')"
+        )
+        conn.execute("DELETE FROM noodkodes WHERE kode_id IN ('GEEL', 'SEKURITEIT')")
+
+        conn.execute(
+            """CREATE TABLE IF NOT EXISTS noodkode_vooraf_nodes (
+                   kode_id TEXT NOT NULL REFERENCES noodkodes (kode_id) ON DELETE CASCADE,
+                   node_id TEXT NOT NULL REFERENCES nodes (node_id),
+                   PRIMARY KEY (kode_id, node_id)
+               )"""
+        )
+        conn.executemany(
+            "INSERT OR IGNORE INTO noodkode_vooraf_nodes (kode_id, node_id) VALUES (?, ?)",
+            [
+                ("ONDERHOUD", "MAIN-G-ELV"),
+                ("ONDERHOUD", "MAIN-1-ELV"),
+                ("ONDERHOUD", "MAIN-2-ELV"),
+                ("ONDERHOUD", "SYGEBOU-G-ELV"),
+                ("ONDERHOUD", "SYGEBOU-1-ELV"),
+                ("SKOONMAAK", "MAIN-1-WARDA"),
+                ("SKOONMAAK", "MAIN-1-WARDB"),
+                ("SKOONMAAK", "MAIN-2-OR"),
+            ],
         )
 
         # Migrasiestap: voeg ontruimings_modus-kolom by as dit in 'n ouer
@@ -667,6 +693,15 @@ def admin_kaart(_: str = Depends(vereis_admin)):
         kodes = [dict(ry) for ry in conn.execute(
             "SELECT kode_id, naam, outomaties_modus FROM noodkodes ORDER BY naam"
         ).fetchall()]
+        for kode in kodes:
+            kode["vooraf_node_ids"] = [
+                ry["node_id"]
+                for ry in conn.execute(
+                    """SELECT node_id FROM noodkode_vooraf_nodes
+                       WHERE kode_id = ? ORDER BY node_id""",
+                    (kode["kode_id"],),
+                ).fetchall()
+            ]
     return {"geboue": resultaat, "noodkodes": kodes, "incident": kry_insident()}
 
 

@@ -307,7 +307,7 @@ def test_ontruimingsmodus_insident_aktiveer_en_roeteer():
         aktiveer = client.post(
             "/admin/incident",
             json={
-                "kode_id": "GEEL",
+                "kode_id": "SKOONMAAK",
                 "beskrywing": "Gevaarlike materiaal gevind",
                 "node_ids": ["MAIN-1-BRIDGE"],
                 "ontruimings_modus": True,
@@ -456,3 +456,27 @@ def test_admin_map_bevat_outomaties_modus_per_kode():
     assert kodes["ROOI"] == "ONTRUIM_ALMAL"
     assert kodes["PINK"] == "SLUIT_ALLES"
     assert kodes["ONDERHOUD"] is None
+
+
+def test_admin_map_bevat_voorafkeuses_en_slegs_aktiewe_insidenttipes():
+    """Die admin-dropdown moet die korrekte tipes en hul voorafgekose nodusse ontvang."""
+    with TestClient(app) as client:
+        client.post("/admin/login", json={"gebruikersnaam": "admin", "wagwoord": "admin"})
+        kaart = client.get("/admin/map").json()
+
+    kodes = {kode["kode_id"]: kode for kode in kaart["noodkodes"]}
+    assert set(kodes) == {"ONDERHOUD", "SKOONMAAK", "ROOI", "PINK"}
+    assert set(kodes["ONDERHOUD"]["vooraf_node_ids"]) == {
+        "MAIN-G-ELV",
+        "MAIN-1-ELV",
+        "MAIN-2-ELV",
+        "SYGEBOU-G-ELV",
+        "SYGEBOU-1-ELV",
+    }
+    assert set(kodes["SKOONMAAK"]["vooraf_node_ids"]) == {
+        "MAIN-1-WARDA",
+        "MAIN-1-WARDB",
+        "MAIN-2-OR",
+    }
+    assert kodes["ROOI"]["vooraf_node_ids"] == []
+    assert kodes["PINK"]["vooraf_node_ids"] == []

@@ -260,7 +260,7 @@ Voer die toetsstel uit met:
 python -m pytest -q
 ```
 
-Die huidige 22 toetse bevestig onder meer dat:
+Die huidige 23 toetse bevestig onder meer dat:
 
 - Radiologie volgens naam gevind word.
 - Soektogte nie hooflettersensitief is nie.
@@ -276,6 +276,7 @@ Die huidige 22 toetse bevestig onder meer dat:
 - Ontruimingsroetes 'n veilige uitgang vind sonder om hysbakke te gebruik.
 - Kode Rooi almal outomaties ontruim en Kode Pink die hele hospitaal sluit.
 - Gewone noodkodes minstens een nodus vereis en noodkodemetadata beskikbaar is.
+- Die admin-dropdown die korrekte voorafgekose nodusse per insidenttipe ontvang.
 
 ## Databasismodel
 

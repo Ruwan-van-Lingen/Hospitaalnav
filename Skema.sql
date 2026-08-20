@@ -163,6 +163,15 @@ CREATE TABLE
         outomaties_modus TEXT
     );
 
+-- Voorafkeuses wat die adminblad merk wanneer 'n gewone insidenttipe gekies
+-- word. Die admin kan hierdie keuses steeds aanpas voordat dit geaktiveer word.
+CREATE TABLE
+    noodkode_vooraf_nodes (
+        kode_id TEXT NOT NULL REFERENCES noodkodes (kode_id) ON DELETE CASCADE,
+        node_id TEXT NOT NULL REFERENCES nodes (node_id),
+        PRIMARY KEY (kode_id, node_id)
+    );
+
 CREATE TABLE
     aktiewe_insident (
         insident_id INTEGER PRIMARY KEY CHECK (insident_id = 1),

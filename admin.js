@@ -217,10 +217,9 @@ function renderInsident(insident) {
 }
 
 /**
- * Pas die vorm aan volgens die tans gekose noodkode se outomaties_modus:
- *   • '' (leeg/handmatig)   — wys die keuseboom en die ontruimingskassie soos gewoonlik.
- *   • 'ONTRUIM_ALMAL'       — verberg albei; wys 'n nota dat almal outomaties ontruim word.
- *   • 'SLUIT_ALLES'         — verberg albei; wys 'n nota dat die hele hospitaal sluit.
+ * Pas die vorm aan volgens die tans gekose noodkode en merk die nodusse wat
+ * daardie tipe by verstek sluit. Gewone tipes se voorafkeuses bly wysigbaar;
+ * outomatiese tipes is 'n leesalleen-voorskou van bediener-afgedwonge gedrag.
  * Die bediener dwing hierdie gedrag in elk geval af (sien main.py), maar die
  * UI hoort dit eerlik te weerspieël sodat die admin nie 'n nodus-keuse of
  * ontruimingskassie sien wat eintlik geen effek sal hê nie.
@@ -231,21 +230,32 @@ function opdateerVormVirKode() {
   const seleksieKaart = document.querySelector(".selection");
   const ontruimToggle = document.querySelector(".ontruim-toggle");
   const nota = document.getElementById("kodeOutomatiesNota");
+  const vooraf = new Set(
+    JSON.parse(kodeSel.selectedOptions[0]?.dataset.voorafNodusse || "[]"),
+  );
+  const nodusse = nodeCheckboxes(seleksieKaart);
+
+  seleksieKaart.hidden = false;
+  nodusse.forEach((node) => {
+    node.checked = outomaties === "SLUIT_ALLES" || vooraf.has(node.value);
+    node.disabled = Boolean(outomaties);
+  });
+  document
+    .querySelectorAll('input[data-kind="floor"], input[data-kind="building"]')
+    .forEach((keuse) => (keuse.disabled = Boolean(outomaties)));
+  werkOuersBy();
 
   if (outomaties === "ONTRUIM_ALMAL") {
-    seleksieKaart.hidden = true;
     ontruimToggle.hidden = true;
     nota.hidden = false;
     nota.textContent =
-      "🔥 Hierdie noodkode ontruim outomaties ALMAL na die naaste nooduitgang. Geen nodus-keuse is nodig nie.";
+      "🔥 Hierdie noodkode ontruim almal na die naaste nooduitgang en sluit geen spesifieke nodusse nie.";
   } else if (outomaties === "SLUIT_ALLES") {
-    seleksieKaart.hidden = true;
     ontruimToggle.hidden = true;
     nota.hidden = false;
     nota.textContent =
       "🔒 Hierdie noodkode sluit die HELE hospitaal outomaties — geen roetes sal beskikbaar wees totdat die insident gekanselleer word nie.";
   } else {
-    seleksieKaart.hidden = false;
     ontruimToggle.hidden = false;
     nota.hidden = true;
   }
@@ -273,6 +283,7 @@ async function laaiAdmin() {
   kaartData.noodkodes.forEach((item) => {
     const opsie = new Option(item.naam, item.kode_id);
     opsie.dataset.outomaties = item.outomaties_modus || "";
+    opsie.dataset.voorafNodusse = JSON.stringify(item.vooraf_node_ids || []);
     kode.add(opsie);
   });
 
