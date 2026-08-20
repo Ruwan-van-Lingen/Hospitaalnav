@@ -606,6 +606,10 @@ function renderPlan() {
     const straal = 7;
     return { dx: Math.cos(hoek) * straal, dy: Math.sin(hoek) * straal };
   };
+  const vertoonPosisie = (n) => {
+    const { dx, dy } = gejitterOffset(n);
+    return { x: px(n) + dx, y: py(n) + dy };
+  };
 
   // teken rande — in oorsigmodus word alle vloere se gange, lugbrûe en
   // tonnels gewys (vertikale hysbak-/trap-rande word oorgeslaan omdat hul
@@ -619,17 +623,19 @@ function renderPlan() {
     if (magTeken) {
       const a = nodeById[van],
         b = nodeById[na];
-      vloerLyne.push({ x1: px(a), y1: py(a), x2: px(b), y2: py(b) });
+      const aPos = vertoonPosisie(a);
+      const bPos = vertoonPosisie(b);
+      vloerLyne.push({ x1: aPos.x, y1: aPos.y, x2: bPos.x, y2: bPos.y });
       const isHl = verligRande.has(van + "|" + na);
       // 'n Rand word rooi geteken as BEIDE eindpunte geblokkeer is —
       // dit wys die geslote area as 'n samehangende rooi sone eerder
       // as net geïsoleerde rooi kolle.
       const isBlocked = blockedSet.has(van) && blockedSet.has(na);
       const line = document.createElementNS(NS, "line");
-      line.setAttribute("x1", px(a));
-      line.setAttribute("y1", py(a));
-      line.setAttribute("x2", px(b));
-      line.setAttribute("y2", py(b));
+      line.setAttribute("x1", aPos.x);
+      line.setAttribute("y1", aPos.y);
+      line.setAttribute("x2", bPos.x);
+      line.setAttribute("y2", bPos.y);
       line.setAttribute(
         "stroke",
         isHl ? "#FFB100" : isBlocked ? "#D94B4B" : RAND_KLEURE[tipe] || "#ccc",
@@ -645,8 +651,9 @@ function renderPlan() {
 
   // teken nodes - etikette is gesentreer direk onder (of alternating above ), elke node met n soliede halo sodat hulle leesbaar bly en nie bots in aaneengrensende etikette of gang lyne in nie.
   vloerNodes.forEach((n, i) => {
-    const cx = px(n),
-      cy = py(n);
+    const posisie = vertoonPosisie(n);
+    const cx = posisie.x,
+      cy = posisie.y;
     const isHl = highlightSet.has(n.id);
     const isBlocked = blockedSet.has(n.id);
     const g = document.createElementNS(NS, "g");
@@ -663,6 +670,18 @@ function renderPlan() {
         endSel.value = n.id;
       }
     };
+
+    if (oorsigModus) {
+      const vloerHalo = document.createElementNS(NS, "circle");
+      vloerHalo.setAttribute("cx", cx);
+      vloerHalo.setAttribute("cy", cy);
+      vloerHalo.setAttribute("r", isHl ? 13 : 10);
+      vloerHalo.setAttribute("fill", "none");
+      vloerHalo.setAttribute("stroke", VLOER_KLEURE[n.vloer]);
+      vloerHalo.setAttribute("stroke-width", 2.5);
+      vloerHalo.setAttribute("opacity", "0.9");
+      g.appendChild(vloerHalo);
+    }
 
     if (n.beperkte) {
       const ring = document.createElementNS(NS, "circle");
@@ -805,8 +824,11 @@ function renderPlan() {
         ).length * 10000;
       telling +=
         vloerNodes.filter(
-          (ander) =>
-            ander.id !== n.id && puntInReghoek(px(ander), py(ander), boks, 9),
+          (ander) => {
+            const anderPosisie = vertoonPosisie(ander);
+            return ander.id !== n.id &&
+              puntInReghoek(anderPosisie.x, anderPosisie.y, boks, 9);
+          },
         ).length * 3000;
       telling +=
         vloerLyne.filter((lyn) => lynKruisReghoek(lyn, boks)).length * 500;
