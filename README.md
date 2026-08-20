@@ -260,7 +260,7 @@ Voer die toetsstel uit met:
 python -m pytest -q
 ```
 
-Die huidige toetse bevestig dat:
+Die huidige 22 toetse bevestig onder meer dat:
 
 - Radiologie volgens naam gevind word.
 - Soektogte nie hooflettersensitief is nie.
@@ -271,7 +271,11 @@ Die huidige toetse bevestig dat:
 - `/ui` 'n HTML-webkoppelvlak bedien.
 - `/route/image` 'n geldige PNG-lêer lewer.
 
-Die huidige toetsstel bevat agt toetse.
+- Admin-eindpunte aanmelding vereis en admins sluitings kan aktiveer en kanselleer.
+- A* om aktiewe sluitings roeteer en geblokkeerde bestemmings korrek verwerp word.
+- Ontruimingsroetes 'n veilige uitgang vind sonder om hysbakke te gebruik.
+- Kode Rooi almal outomaties ontruim en Kode Pink die hele hospitaal sluit.
+- Gewone noodkodes minstens een nodus vereis en noodkodemetadata beskikbaar is.
 
 ## Databasismodel
 
