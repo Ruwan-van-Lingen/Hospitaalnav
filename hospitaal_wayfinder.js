@@ -935,10 +935,13 @@ document.getElementById("findBtn").onclick = async () => {
   const ut = document.getElementById("gebruikerTipe").value;
   const apiBase = document.getElementById("apiUrl").value.trim();
 
-  if (!begin || !end) {
+  const ontruimModus = aktieweInsident.active && aktieweInsident.ontruimings_modus;
+  if (!begin || (!end && !ontruimModus)) {
     laasteResultaat = {
       error: "invalid",
-      message: "Kies asseblief 'n geldige beginpunt en bestemming uit die soeklys.",
+      message: ontruimModus
+        ? "Kies asseblief 'n geldige beginpunt uit die soeklys."
+        : "Kies asseblief 'n geldige beginpunt en bestemming uit die soeklys.",
     };
     renderAll();
     return;
