@@ -1,8 +1,7 @@
 <!doctype html>
-<!--========================================================================
-  admin.html
-  ===========
-  Adminblad vir die Hospitaal Sluitingsadministrasie.
+<!-- 
+admin.html
+  Adminblad vir die Hospitaal administrasie bladsy.
 
   Hierdie bladsy laat gemagtigde gebruikers toe om:
     • Aan te meld met 'n gebruikersnaam en wagwoord (sessie-koekie).
@@ -11,8 +10,8 @@
     • Die aktiewe sluiting te kanselleer.
 
   Alle API-kommunikasie word hanteer deur admin.js.
-  Die keuseboom-struktuur word dinamies gebou uit /admin/map.
--->
+  Die keuseboom-struktuur word dinamies gebou uit /admin/map. -->
+
 <html lang="af">
   <head>
     <meta charset="UTF-8" />
@@ -26,13 +25,13 @@
         <p class="eyebrow">Hospitaalnavigasie</p>
         <h1>Sluitingsadministrasie</h1>
       </div>
-      <a href="/ui">Open openbare kaart</a>
+      <a href="/ui">Openbare Kaart</a>
     </header>
 
     <main>
       <section class="card login" id="loginPaneel">
         <h2>Adminaanmelding</h2>
-        <p>Gebruik ’n gemagtigde rekening om roetes te verander.</p>
+        <p>Gebruik 'n gemagtigde rekening om roetes te verander.</p>
         <form id="loginForm">
           <label>Gebruikersnaam<input id="gebruikersnaam" autocomplete="username" required /></label>
           <label>Wagwoord<input id="wagwoord" type="password" autocomplete="current-password" required /></label>

@@ -3,7 +3,7 @@
 # ===========
 # Bou 'n produksie-gereed Docker-beeld vir die Hospitaal Navigasiestelsel.
 #
-# Gebruik
+# Commands:
 # -------
 #   docker compose up --build -d    # Bou en begin via docker-compose.yml
 #   docker build -t hospitaalnav .  # Bou die beeld direk (sonder Compose)
@@ -46,7 +46,7 @@ WORKDIR /app
 
 # Kopieer slegs requirements.txt eers om Docker se laagkas te benut:
 # as die bronkode verander maar requirements.txt dieselfde bly, hoef
-# pip nie herhaal te installeer nie.
+# pip nie weer geinstalleer te word nie.
 COPY requirements.txt ./
 RUN python -m pip install --no-cache-dir --upgrade pip \
     && python -m pip install --no-cache-dir -r requirements.txt

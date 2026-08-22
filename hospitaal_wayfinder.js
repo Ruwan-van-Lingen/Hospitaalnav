@@ -10,7 +10,7 @@
  *   • Roeteberekening via die FastAPI-agterkant (/route of /route/ontruim).
  *     A* loop bediener-kant (HospitaalGrafiek.py) — hierdie lêer stuur
  *     slegs die versoek en vertoon die resultaat.
- *   • SVG-vloerplan-rendering: nodusse, rande, paduitligging, etiketplaatsing.
+ *   • SVG-vloerplan-rendering: nodusse, rande, paduitligging, etiketplasing.
  *   • Vloer-oortjies en die hysbak-styl vloerindikator (sykolom).
  *   • Soekveld-integrasie met /destinations vir mensleesbare bestemmings.
  *   • Ontruimingsmodus-ondersteuning: die banner en /route/ontruim-aanroep.
@@ -19,13 +19,12 @@
  * --------------------------------
  * Die "Oorsig — Alle Vloere"-oortjie laag alle vloere op een SVG-kaart.
  * Nodusse wat presies dieselfde (x, y) koördinate deel oor vloere (bv.
- * hysbakke) word effens uitmekaar geskuif met 'n jitter-algoritme sodat
- * hulle onderskei kan word. Vertikale hysbak- en trap-rande word in
+ * hysbakke) word net een keer geteken. Vertikale hysbak- en trap-rande word in
  * oorsigmodus oorgeslaan omdat hulle as onsigbare lyne sou teken.
  *
  * Etiketplaatsing
  * -----------------
- * Die plaatsingsalgoritme probeer 8 kandidaatposisies per etiket en kies
+ * Die plasingsalgoritme probeer 8 kandidaatposisies per etiket en kies
  * die posisie met die minste botsings teen ander etikette, noduspunte en
  * gangslyne. Dit verhoed dat etikette oor mekaar of oor punte lê.
  */
@@ -568,7 +567,7 @@ function renderPlan() {
   const oorsigModus = huidigeVloer === OORSIG_ID;
   // In oorsigmodus word elke vloer se nodusse gelaag op dieselfde kaart getoon (die hele kampus deel reeds een koördinaatstelsel: hysbakke en trappe het doelbewus identiese x/y oor vloere heen). Andersins word net die huidige vloer se nodusse gewys.
   const vloerNodes = oorsigModus
-    ? nodes
+    ? [...new Map(nodes.map((n) => [`${n.x},${n.y}`, n])).values()]
     : nodes.filter((n) => n.vloer === huidigeVloer);
   const vloerLyne = [];
   const geplaasdeEtikette = [];
@@ -584,32 +583,8 @@ function renderPlan() {
       verligRande.add(p[i + 1] + "|" + p[i]);
     }
   }
-
-  // Groepeer nodusse wat presies dieselfde x/y deel (bv. 'n hysbakgroep wat
-  // oor drie vloere strek) sodat hulle in oorsigmodus effens uitmekaar
-  // geskuif kan word — andersins sou hulle heeltemal oorvleuel en
-  // onsigbaar wees.
-  const posisieGroepe = new Map();
-  if (oorsigModus) {
-    vloerNodes.forEach((n) => {
-      const sleutel = `${n.x},${n.y}`;
-      if (!posisieGroepe.has(sleutel)) posisieGroepe.set(sleutel, []);
-      posisieGroepe.get(sleutel).push(n);
-    });
-  }
-  const gejitterOffset = (n) => {
-    if (!oorsigModus) return { dx: 0, dy: 0 };
-    const groep = posisieGroepe.get(`${n.x},${n.y}`);
-    if (!groep || groep.length < 2) return { dx: 0, dy: 0 };
-    const idx = groep.indexOf(n);
-    const hoek = (2 * Math.PI * idx) / groep.length;
-    const straal = 7;
-    return { dx: Math.cos(hoek) * straal, dy: Math.sin(hoek) * straal };
-  };
-  const vertoonPosisie = (n) => {
-    const { dx, dy } = gejitterOffset(n);
-    return { x: px(n) + dx, y: py(n) + dy };
-  };
+  // Bepaal die posisie om 'n node te teken
+  const vertoonPosisie = (n) => ({ x: px(n), y: py(n) });
 
   // teken rande — in oorsigmodus word alle vloere se gange, lugbrûe en
   // tonnels gewys (vertikale hysbak-/trap-rande word oorgeslaan omdat hul

@@ -1,9 +1,9 @@
 # ==========================================================================================
 # docker-compose.yml
 # ===================
-# Orkestreert die Hospitaal Navigasiestelsel as 'n enkele Docker-diens.
+# Orkestreer die Hospitaal Navigasiestelsel as 'n enkele Docker-diens.
 #
-# Gebruik
+# Gebruik:
 # -------
 #   docker compose up --build -d    # Bou en begin in die agtergrond (eerste keer)
 #   docker compose up --build       # Bou en begin met logs in die voorgrond
@@ -13,12 +13,12 @@
 # URL's (nadat die diens begin het)
 # ----------------------------------
 #   http://localhost:8000/ui       — Interaktiewe webkoppelvlak (publiek)
-#   http://localhost:8000/admin    — Sluitingsadministrasie (admin-aanmelding vereist)
+#   http://localhost:8000/admin    — Sluitingsadministrasie (admin-aanmelding benodig)
 #   http://localhost:8000/docs     — Swagger API-dokumentasie
 #
 # Sekuriteit
 # -----------
-# VERANDER die omgewingsveranderlikes hier onder voordat die diens in
+# Verander die omgewings veranderlikes hier onder voordat die diens in
 # produksie ontplooi word. Moenie die verstekwaardes gebruik nie.
 
 services:

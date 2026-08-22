@@ -96,7 +96,7 @@ function werkOuersBy() {
  * Skep 'n etiket-element met 'n kassie binne-in.
  *
  * @param {string} kind  - Kassietipe: 'node', 'floor' of 'building'.
- * @param {string} label - Sigbare tekst langs die kassie.
+ * @param {string} label - Sigbare teks langs die kassie.
  * @param {string} value - Waarde van die kassie (die node-ID vir nodes).
  * @returns {{ ry: HTMLLabelElement, input: HTMLInputElement }}
  */

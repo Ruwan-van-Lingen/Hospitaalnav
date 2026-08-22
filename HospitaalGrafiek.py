@@ -20,9 +20,9 @@ uitbreidings soos dinamiese verkeerslading.
 
 Waarom Multi-bron Dijkstra vir ontruimingsmodus?
 -------------------------------------------------
-Tydens 'n noodsituasie is ons doel NIET om na 'n spesifieke bestemming te
+Tydens 'n noodsituasie is ons doel NIE om na 'n spesifieke bestemming te
 navigeer nie — ons wil die NAASTE veilige nooduitgang vind uit ENIGE van die
-moontlike uitgange. Hierdie probleem heet "single-source, multiple-target
+moontlike uitgange. Hierdie probleem het "single-source, multiple-target
 shortest path" en word doeltreffend opgelos deur omgekeerde multi-bron
 Dijkstra:
 

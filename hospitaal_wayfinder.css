@@ -14,13 +14,13 @@
   ---------------
   • Kopstuk (header)       — Hospitaalnaam, subtitel en adminskakels.
   • Insidentbanier         — Rooi streep wat vertoon wanneer 'n aktiewe sluiting of ontruimingsmodus van krag is.
-  • Uitlegrooster (layout) — Tweekolomrooster: hoofskolom (kaart + beheer) en sykantpaneel (vloerindikator + roeteljst).
-  • Beheerpaneel (controls)— Soekkvelde, gebruikertipe-keuse en knoppe.
+  • Uitlegrooster (layout) — Tweekolomrooster: hoofkolom (kaart + beheer) en sykantpaneel (vloerindikator + roetelys).
+  • Beheerpaneel (controls)— Soekvelde, gebruikertipe-keuse en knoppies.
   • Vloeroortjies (tabs)   — Een oortjie per vloer, plus 'n "Oorsig"-oortjie.
-  • Vloerplan (plan-wrap)  — SVG-kaart-omhulsel met skadueffek.
+  • Vloerplan (plan-wrap)  — SVG-kaart-omhulsel met skaduwee-effek.
   • Legende (legend)       — Kleursleutel vir nodustipes en vloere.
-  • Hysbakstyl-aanwyser    — Vloer-vir-vloer-aanduider in die sykantpaneel.
-  • Roeteljst (route-list) — Stap-vir-stap-instruksies in die sykantpaneel.
+  • Hysbakstyl-aanwyser    — Vloer-vir-vloer-aanduiding in die sykantpaneel.
+  • Roetelys (route-list) — Stap-vir-stap-instruksies in die sykantpaneel.
 */
 :root {
   --navy: #12222e;
