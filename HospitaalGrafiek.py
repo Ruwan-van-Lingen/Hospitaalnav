@@ -328,7 +328,7 @@ class HospitaalGrafiek:
             return None
 
         # --- Bou die omgekeerde aangrensingsstruktuur ---
-        # In die gewone adjacency-lys wys 'A → B'. Hier wys 'B → A',
+        # In die gewone aangrensingslys wys 'A → B'. Hier wys 'B → A',
         # sodat Dijkstra kan "terugloop" van uitgange na die beginpunt.
         omgekeerde: dict[str, list[Rand]] = {nid: [] for nid in self.nodes}
         for van_node, rande in self.adjacency.items():
@@ -345,7 +345,7 @@ class HospitaalGrafiek:
                     Rand(rand.na_node, rand.gewig_s, rand.rand_tipe, rand.vloer_verander, rand.afstand_m)
                 )
 
-        # Verwyder duplikate wat onstaan het deurdat bidirectionele rande twee keer verwerk is.
+        # Verwyder duplikate wat ontstaan het deurdat tweerigting rande twee keer verwerk is.
         for nid in omgekeerde:
             gesien: set[tuple] = set()
             uniek: list[Rand] = []
@@ -356,7 +356,7 @@ class HospitaalGrafiek:
                     uniek.append(rand)
             omgekeerde[nid] = uniek
 
-        # --- Multi-bron Dijkstra ---
+        # --- Multibron Dijkstra ---
         # Laai alle bereikbare nooduitgange as beginpunte met koste 0.
         g_score: dict[str, float] = {}
         afstand_score: dict[str, float] = {}

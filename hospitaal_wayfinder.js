@@ -1,32 +1,32 @@
 /**===========================================================================================
  * hospitaal_wayfinder.js
  * =======================
- * Interaktiewe webkoppelvlak vir die Hospitaal Navigasiestelsel (/ui).
+ * Interaktiewe webkoppelvlak vir die Hospitaalnavigasiestelsel (/ui).
  *
  * Hierdie lêer bevat:
- *   • Statiese topologiese grafieksdata (nodusse, rande, vloere, geboue)
+ *   • Statiese topologiese grafiekdata (nodusse, rande, vloere, geboue)
  *     wat direk vanuit Skema.sql + SeedData.sql afgelei is en kliëntkant
  *     gebruik word vir SVG-tekening.
  *   • Roeteberekening via die FastAPI-agterkant (/route of /route/ontruim).
- *     A* loop bediener-kant (HospitaalGrafiek.py) — hierdie lêer stuur
+ *     A* loop bedienerkant (HospitaalGrafiek.py) — hierdie lêer stuur
  *     slegs die versoek en vertoon die resultaat.
- *   • SVG-vloerplan-rendering: nodusse, rande, paduitligging, etiketplasing.
+ *   • SVG-vloerplan-tekening: nodusse, rande, paduitligging, etiketplasing.
  *   • Vloer-oortjies en die hysbak-styl vloerindikator (sykolom).
  *   • Soekveld-integrasie met /destinations vir mensleesbare bestemmings.
- *   • Ontruimingsmodus-ondersteuning: die banner en /route/ontruim-aanroep.
+ *   • Ontruimingsmodus-ondersteuning: die waarskuwingsbanier en /route/ontruim-aanroep.
  *
  * Kaart-oorsigmodus (OORSIG_ID)
  * --------------------------------
- * Die "Oorsig — Alle Vloere"-oortjie laag alle vloere op een SVG-kaart.
+ * Die "Oorsig — Alle Vloere"-oortjie vertoon alle vloere in lae op een SVG-kaart.
  * Nodusse wat presies dieselfde (x, y) koördinate deel oor vloere (bv.
  * hysbakke) word net een keer geteken. Vertikale hysbak- en trap-rande word in
  * oorsigmodus oorgeslaan omdat hulle as onsigbare lyne sou teken.
  *
- * Etiketplaatsing
+ * Etiketplasing
  * -----------------
  * Die plasingsalgoritme probeer 8 kandidaatposisies per etiket en kies
  * die posisie met die minste botsings teen ander etikette, noduspunte en
- * gangslyne. Dit verhoed dat etikette oor mekaar of oor punte lê.
+ * ganglyne. Dit verhoed dat etikette oor mekaar of oor punte lê.
  */
 
 
@@ -552,7 +552,9 @@ function renderLegend() {
   });
 }
 
-// Uitleg konstantes: SCALE spasieer nodes ver genoeg weg van mekaar dat hulle nooit bots nie; PAD_Y reserveer n duidelike band aan die bokant vir die vloer titel so dat dit nooit onder n node etiktt sit nie
+// Uitlegkonstantes:
+// SCALE plaas nodusse ver genoeg uitmekaar om oorvleueling te voorkom.
+// PAD_Y laat ruimte bo-aan vir die vloertitel, sodat dit nie ’n nodusetiket oorvleuel nie.
 const SCALE = 15;
 const PAD_X = 55;
 const PAD_Y = 90;
@@ -565,7 +567,9 @@ function renderPlan() {
   svg.innerHTML = "";
 
   const oorsigModus = huidigeVloer === OORSIG_ID;
-  // In oorsigmodus word elke vloer se nodusse gelaag op dieselfde kaart getoon (die hele kampus deel reeds een koördinaatstelsel: hysbakke en trappe het doelbewus identiese x/y oor vloere heen). Andersins word net die huidige vloer se nodusse gewys.
+  // In oorsigmodus word elke vloer se nodusse in lae op dieselfde kaart vertoon
+  // (die hele kampus deel reeds een koördinaatstelsel: hysbakke en trappe het doelbewus 
+  // identiese x/y oor vloere heen). Andersins word net die huidige vloer se nodusse gewys.
   const vloerNodes = oorsigModus
     ? [...new Map(nodes.map((n) => [`${n.x},${n.y}`, n])).values()]
     : nodes.filter((n) => n.vloer === huidigeVloer);
@@ -583,12 +587,12 @@ function renderPlan() {
       verligRande.add(p[i + 1] + "|" + p[i]);
     }
   }
-  // Bepaal die posisie om 'n node te teken
+  // Bepaal die posisie om 'n nodus te teken.
   const vertoonPosisie = (n) => ({ x: px(n), y: py(n) });
 
-  // teken rande — in oorsigmodus word alle vloere se gange, lugbrûe en
+  // Teken rande — in oorsigmodus word alle vloere se gange, lugbrûe en
   // tonnels gewys (vertikale hysbak-/trap-rande word oorgeslaan omdat hul
-  // eindpunte doelbewus saamval en dus as onsigbare stippel-lyne sou teken);
+  // eindpunte doelbewus saamval en dus as onsigbare stippellyne sou teken);
   // andersins net die huidige vloer se rande.
   randRye.forEach(([van, na, tipe]) => {
     const magTeken = oorsigModus
@@ -624,7 +628,9 @@ function renderPlan() {
     }
   });
 
-  // teken nodes - etikette is gesentreer direk onder (of alternating above ), elke node met n soliede halo sodat hulle leesbaar bly en nie bots in aaneengrensende etikette of gang lyne in nie.
+  // Teken die nodusse met ’n soliede buitelyn sodat hulle duidelik sigbaar bly.
+  // Plaas elke etiket onder of, waar nodig, bo die nodus om oorvleueling
+  // met aangrensende etikette en ganglyne te beperk.
   vloerNodes.forEach((n, i) => {
     const posisie = vertoonPosisie(n);
     const cx = posisie.x,
@@ -840,7 +846,7 @@ function renderPlan() {
   title.setAttribute("font-family", "Space Grotesk, sans-serif");
   title.setAttribute("fill", "#12222E");
   // In oorsigmodus is huidigeVloer === OORSIG_ID, wat nie in vloerById bestaan nie.
-  // Gebruik 'n veilige terugvalwaarde sodat die funksie nie crash nie.
+  // Gebruik 'n veilige terugvalwaarde sodat die funksie nie misluk nie.
   title.textContent = f ? `${f.gebou} — ${f.naam}` : "Oorsig — Alle Vloere";
   svg.appendChild(title);
 }
@@ -964,7 +970,7 @@ document.getElementById("clearBtn").onclick = () => {
 
 // Laai eers die insidentstatus voordat die seleksielyste gevul word,
 // sodat merkGesloteBestemmings() gewaarborg die korrekte geblokkeerde
-// node-lys het wanneer dit die opsies deaktiveer.
+// nodusly s het wanneer dit die opsies deaktiveer.
 renderLegend();
 renderAll();
 populateSelects();

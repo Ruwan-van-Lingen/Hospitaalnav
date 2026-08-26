@@ -166,7 +166,7 @@ def test_admin_eindpunte_vereis_aanmelding():
         blad     = client.get("/admin")
 
     assert response.status_code == 401
-    # Die adminblaad self is publiek — slegs die API-eindpunte is beskerm.
+    # Die adminblad self is publiek — slegs die API-eindpunte is beskerm.
     assert blad.status_code == 200
     assert "Sluitingsadministrasie" in blad.text
 

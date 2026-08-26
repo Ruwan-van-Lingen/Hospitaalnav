@@ -37,6 +37,6 @@ services:
 
       # VERANDER hierdie waardes vir enige nie-ontwikkelingsomgewing!
       ADMIN_GEBRUIKERSNAAM: "admin"
-      ADMIN_WAGWOORD: "verander-my"
+      ADMIN_WAGWOORD: "heuningbye123!"
       SESSIE_GEHEIM: "vervang-met-n-lang-willekeurige-geheim"
     restart: unless-stopped

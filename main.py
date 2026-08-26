@@ -49,7 +49,7 @@ from VloerPlan import teken_vloer_plan
 
 # ---------------------------------------------------------------------------
 # Padvariabele — alle lêerpaaie word relatief tot hierdie lêer se gids
-# bereken sodat die toepassing vanuit enige gids gestart kan word.
+# bereken sodat die toepassing vanuit enige gids begin kan word.
 # ---------------------------------------------------------------------------
 BASE_GIDS  = Path(__file__).resolve().parent
 DB_PAD     = BASE_GIDS / "hospitaal.db"

@@ -33,7 +33,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from matplotlib.lines import Line2D
 
-# Kleurpalet vir node-tipes — ooreenstemmend met die webkoppelvlak se CSS-veranderlikes.
+# Kleurpalet vir nodustipes — ooreenstemmend met die webkoppelvlak se CSS-veranderlikes.
 NODE_KLEURE = {
     "AANSLUITING":   "#8899a6",  # Grys  — gang-aansluitingspunte
     "HUISBAK_GROEP": "#e67e22",  # Oranje — hysbakke

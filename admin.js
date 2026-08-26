@@ -1,12 +1,12 @@
 /**==========================================================================================
  * admin.js
  * =========
- * Kliëntkant-logika vir die Hospitaal Sluitingsadministrasieblad (/admin).
+ * Kliëntkant-logika vir die Hospitaalsluitingsadministrasieblad (/admin).
  *
  * Hierdie lêer hanteer:
  *   • Aanmelding en afmelding (POST /admin/login, POST /admin/logout).
  *   • Laai van die gebou-/vloer-/nodusstruktuur (GET /admin/map).
- *   • Rendering van die interaktiewe keuseboom (gebou → vloer → nodusse).
+ *   • Tekening van die interaktiewe keuseboom (gebou → vloer → nodusse).
  *   • Aktivering van 'n nuwe sluiting, insluitend ontruimingsmodus (POST /admin/incident).
  *   • Kansellering van die aktiewe sluiting (DELETE /admin/incident).
  *   • Vertoon van die aktiewe insidentstatus bo-aan die vorm.
@@ -51,7 +51,7 @@ async function api(path, options = {}) {
 // ---------------------------------------------------------------------------
 
 /**
- * Gee alle node-kassies binne die opgegee houer terug.
+ * Gee alle noduskassies binne die opgegee houer terug.
  * @param {Element} container - DOM-element om binne te soek.
  * @returns {HTMLInputElement[]}
  */
@@ -65,7 +65,7 @@ function nodeCheckboxes(container) {
  *   • Gemerk (✓)  as AL sy kinders gemerk is.
  *   • Onbepaald (—) as SOMMIGE kinders gemerk is.
  *   • Ongemerk   as GEEN kinders gemerk is nie.
- * Werk ook die "N nodusse"-teller in die seksieheading by.
+ * Werk ook die "N nodusse"-teller in die afdelingsopskrif by.
  */
 function werkOuersBy() {
   // Werk vloer-kassies by op grond van hul nodus-kinders.
@@ -86,7 +86,7 @@ function werkOuersBy() {
     gebou.indeterminate = gekies > 0 && gekies < kinders.length;
   });
 
-  // Werk die keuseletelling in die kopteks by.
+  // Werk die keusetelling in die kopteks by.
   const totaal = document.querySelectorAll('input[data-kind="node"]:checked').length;
   document.getElementById("keuseTelling").textContent =
     `${totaal} nodus${totaal === 1 ? "" : "se"}`;

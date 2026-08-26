@@ -181,7 +181,7 @@ CREATE TABLE
         ---------------------------------------------------------------------------
         -- Ontruimingsmodus: 1 = ignoreer die gebruiker se gewenste bestemming
         -- en stuur hom/haar eerder na die naaste veilige nooduitgang.
-        -- Hysbakke word verbied tydens ontruiming (trap/lug brug/tonnel slegs).
+        -- Slegs trappe, lugbrûe eb tonnels mag tydens ontruiming gebruik word.
         ---------------------------------------------------------------------------
         ontruimings_modus INTEGER NOT NULL DEFAULT 0
     );

@@ -44,14 +44,14 @@ INSERT INTO nodes (node_id, vloer_id, tipe_kode, etiket, pos_x, pos_y, is_beperk
     ('MAIN-2-ICU',   'MAIN-2', 'DEPARTEMENT',   'ICU',                   25,  0, 1, 'SLEGS_ICU', 0),
     ('MAIN-2-OR',    'MAIN-2', 'DEPARTEMENT',   'OR',                    25, 10, 1, 'SLEGS_PERSONEEL', 0),
 
-    -- SYGEBOU Grond vloer
+    -- SYGEBOU grondvloer
     ('SYGEBOU-G-ENT',  'SYGEBOU-G','INGANG',         'Sygebou Ingang',        40,  0, 0, NULL, 1),
     ('SYGEBOU-G-J01',  'SYGEBOU-G','AANSLUITING',    'Sygebou Lobby Jct',     40, 10, 0, NULL, 0),
     ('SYGEBOU-G-ELV',  'SYGEBOU-G','HUISBAK_GROEP',  'Sygebou Huisbak',       40, 15, 0, NULL, 0),
     ('SYGEBOU-G-TUN',  'SYGEBOU-G','TONNEL',         'Tonnel na Main',        10, 30, 0, NULL, 0),
     ('SYGEBOU-G-OUT',  'SYGEBOU-G','DEPARTEMENT',    'Uitpasient Ontvangs',   45, 10, 0, NULL, 0),
 
-    -- SYGEBOU Level 1
+    -- SYGEBOU Vlak 1
     ('SYGEBOU-1-ELV',  'SYGEBOU-1','HUISBAK_GROEP', 'Sygebou Huisbak L1',    40, 15, 0, NULL, 0),
     ('SYGEBOU-1-BRIDGE','SYGEBOU-1','LUGBRUG',       'Lug Brug na Main',      30, 20, 0, NULL, 0),
     ('SYGEBOU-1-RAD',   'SYGEBOU-1','DEPARTEMENT',   'Radiologie',            45, 20, 0, NULL, 0);
@@ -92,20 +92,20 @@ INSERT INTO rande (van_node, na_node, rand_tipe, afstand_m, basis_gewig_s, wag_p
     ('MAIN-2-J01', 'MAIN-2-ICU', 'GANG', 6, 5, 0, 0, 1),
     ('MAIN-2-J01', 'MAIN-2-OR',  'GANG', 6, 5, 0, 0, 1),
 
-    -- SYGEBOU Grond vloer gange
+    -- SYGEBOU Grondvloer gange
     ('SYGEBOU-G-ENT', 'SYGEBOU-G-J01', 'GANG', 10, 8, 0, 0, 1),
     ('SYGEBOU-G-J01', 'SYGEBOU-G-ELV', 'GANG', 6,  5, 0, 0, 1),
     ('SYGEBOU-G-J01', 'SYGEBOU-G-OUT', 'GANG', 6,  5, 0, 0, 1),
     ('SYGEBOU-G-J01', 'SYGEBOU-G-TUN', 'GANG', 30, 25, 0, 0, 1),
 
-    -- SYGEBOU vertikale circulation
+    -- SYGEBOU vertikale beweging
     ('SYGEBOU-G-ELV', 'SYGEBOU-1-ELV', 'HUISBAK', 0, 8, 25, 1, 1),
 
-    -- SYGEBOU Level 1
+    -- SYGEBOU Vlak 1
     ('SYGEBOU-1-ELV', 'SYGEBOU-1-BRIDGE', 'GANG', 10, 8, 0, 0, 1),
     ('SYGEBOU-1-ELV', 'SYGEBOU-1-RAD',    'GANG', 6,  5, 0, 0, 1),
 
-    -- Gebou-tot-gebou conneksies
+    -- Gebou-tot-gebou verbindings
     ('MAIN-1-BRIDGE', 'SYGEBOU-1-BRIDGE', 'LUGBRUG',    25, 21, 0, 0, 1),
     ('MAIN-G-TUN',     'SYGEBOU-G-TUN',   'TONNEL',    18, 15, 0, 0, 1);
 

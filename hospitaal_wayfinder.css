@@ -281,7 +281,7 @@ svg {
   letter-spacing: 0.03em;
 }
 
-/* Huisbakstyle vloer indikator strip — signature element */
+/* Vloerindikator in hysbakstyl - 'n kenmerkende ontwerpelement. */
 .indicator {
   display: flex;
   flex-direction: column-reverse;
