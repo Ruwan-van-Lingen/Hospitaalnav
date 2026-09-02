@@ -2,6 +2,10 @@
 
 Hierdie projek is 'n binnenshuise navigasiestelsel vir 'n hospitaal. Dit gebruik 'n topologiese grafiek en die A*-algoritme om die vinnigste toegelate roete tussen twee plekke te bereken. Die stelsel neem vloere, hysbakwagtyd, trappe, gebouverbindings en gebruikerstoegang in ag.
 
+Die sluitings-MVP voeg 'n beskermde adminblad by waarmee een aktiewe
+onderhouds-, skoonmaak- of veiligheidsinsident se nodusse gesluit kan word.
+A* bereken openbare roetes outomaties rondom die geslote nodusse.
+
 ## Hooffunksies
 
 - Soek bestemmings volgens naam, node-ID, nodetipe, gebou of vloer.
@@ -10,6 +14,23 @@ Hierdie projek is 'n binnenshuise navigasiestelsel vir 'n hospitaal. Dit gebruik
 - Wys die roete, node-telling en beraamde reistyd as JSON.
 - Genereer 'n PNG-vloerplan waarop die roete uitgelig is.
 - Wys 'n interaktiewe webkoppelvlak met vloer-oortjies en roetestappe.
+- Bestuur een aktiewe sluiting by `/admin` en wys dit op die openbare kaart.
+
+## Sluitingsadministrasie
+
+Open `http://localhost:8000/admin`. Stel die adminrekening en sessiegeheim met
+omgewingsveranderlikes:
+
+```powershell
+$env:ADMIN_GEBRUIKERSNAAM="admin"
+$env:ADMIN_WAGWOORD="kies-'n-sterk-wagwoord"
+$env:SESSIE_GEHEIM="kies-'n-lang-willekeurige-geheim"
+$env:AUTO_HERBOU_DB="false"
+```
+
+Wanneer `AUTO_HERBOU_DB=false` is, bly 'n aktiewe insident behoue ná 'n
+toepassingsherbegin. As die databasis nog nie bestaan nie, word dit steeds
+eenmalig uit `Skema.sql` en `SeedData.sql` geskep.
 - Bedien die webkoppelvlak direk vanaf die API by `/ui`.
 - Verwerp onbekende gebruikerstipes met 'n duidelike foutboodskap.
 
@@ -196,6 +217,8 @@ Voorbeeldantwoord:
   "gebruiker_tipe": "PUBLIEK",
   "geskatte_tyd_sekondes": 83.0,
   "geskatte_tyd": "1m 23s",
+  "geskatte_afstand_m": 83.0,
+  "geskatte_afstand": "83m",
   "node_telling": 9,
   "pad": [
     "MAIN-G-ENT",
@@ -236,7 +259,7 @@ Voer die toetsstel uit met:
 python -m pytest -q
 ```
 
-Die huidige toetse bevestig dat:
+Die huidige 23 toetse bevestig onder meer dat:
 
 - Radiologie volgens naam gevind word.
 - Soektogte nie hooflettersensitief is nie.
@@ -247,7 +270,12 @@ Die huidige toetse bevestig dat:
 - `/ui` 'n HTML-webkoppelvlak bedien.
 - `/route/image` 'n geldige PNG-lêer lewer.
 
-Die huidige toetsstel bevat agt toetse.
+- Admin-eindpunte aanmelding vereis en admins sluitings kan aktiveer en kanselleer.
+- A* om aktiewe sluitings roeteer en geblokkeerde bestemmings korrek verwerp word.
+- Ontruimingsroetes 'n veilige uitgang vind sonder om hysbakke te gebruik.
+- Kode Rooi almal outomaties ontruim en Kode Pink die hele hospitaal sluit.
+- Gewone noodkodes minstens een nodus vereis en noodkodemetadata beskikbaar is.
+- Die admin-dropdown die korrekte voorafgekose nodusse per insidenttipe ontvang.
 
 ## Databasismodel
 
