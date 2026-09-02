@@ -19,8 +19,7 @@ A* bereken openbare roetes outomaties rondom die geslote nodusse.
 ## Sluitingsadministrasie
 
 Open `http://localhost:8000/admin`. Stel die adminrekening en sessiegeheim met
-omgewingsveranderlikes; moenie die voorbeeldwaardes vir 'n ontplooiing gebruik
-nie:
+omgewingsveranderlikes:
 
 ```powershell
 $env:ADMIN_GEBRUIKERSNAAM="admin"
