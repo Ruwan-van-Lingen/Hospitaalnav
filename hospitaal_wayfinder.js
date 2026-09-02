@@ -732,18 +732,54 @@ function renderPlan() {
     g.appendChild(text);
     svg.appendChild(g);
 
+    // -----------------------------------------------------------------------
+    // Geometriese hulpfunksies vir etiketplasing
+    // -----------------------------------------------------------------------
+
+    // Kruisboks-toets vir twee as-gelynd uitgelynde reghoeke (AABB).
+    // Teorie: twee reghoeke oorvleuel as en slegs as hulle BEIDE op die
+    // x-as EN op die y-as oormekaar projekteer. Die "spasie"-buffer
+    // vergroot elke reghoek effektief sodat etikette 'n minimumwit-
+    // ruimte tussen mekaar behou (verstekwaarde: 3px).
     const reghoekeOorvleuel = (a, b, spasie = 3) =>
       a.x < b.x + b.width + spasie &&
       a.x + a.width + spasie > b.x &&
       a.y < b.y + b.height + spasie &&
       a.y + a.height + spasie > b.y;
+    
+    // Toets of 'n punt (x, y) binne 'n as-gelynd uitgelynde reghoek b val.
+    // Die spasie-buffer vergroot die reghoek sodat nodusse wat naby
+    // maar nie binne die etiketteks val nie, steeds as "botsing" beskou word.
     const puntInReghoek = (x, y, b, spasie = 2) =>
       x >= b.x - spasie &&
       x <= b.x + b.width + spasie &&
       y >= b.y - spasie &&
       y <= b.y + b.height + spasie;
+    
+    // Kruisproduk-oriëntasietoets (skaalmaat van die 2D kruisproduk AB × AC).
+    // Bereken die z-komponent van die kruisproduk van vektore AB en AC:
+    //   AB = (bx-ax, by-ay),  AC = (cx-ax, cy-ay)
+    //   z  = (bx-ax)(cy-ay) - (by-ay)(cx-ax)
+    // Interpretasie van die teken:
+    //   > 0 : C lê links van AB  (teenkloksgewys)
+    //   < 0 : C lê regs van AB   (kloksgewys)
+    //   = 0 : A, B, C is kollineêr (op een lyn)
+    // Dit word gebruik in segmenteKruis() om te bepaal aan watter kant van
+
+    // 'n lyn-segment elke eindpunt van 'n ander segment lê
     const orientasie = (ax, ay, bx, by, cx2, cy2) =>
       (bx - ax) * (cy2 - ay) - (by - ay) * (cx2 - ax);
+
+    // Toets of lyne-semente AB en CD mekaar sny.
+    // Metode: klassieke kruisproduk-snypunt-algoritme (Shamos-Hoey-variant):
+    //   Stap 1 — Begrensingskas-toets ("bounding box check"): as die begrensings-
+    //            kasse van AB en CD nie oorvleuel nie, kan die segmente onmoontlik
+    //            kruis — goedkoop vroeë afwysing.
+    //   Stap 2 — Oriëntasietoets: segment AB sny CD as en slegs as C en D aan
+    //            TEENOORGESTELDE kante van lyn AB lê (orientasie-produkte ≤ 0),
+    //            EN A en B aan teenoorgestelde kante van CD lê.
+    //            Die ≤ 0 (eerder as < 0) dek die randgeval waar eindpunte
+    //            presies op die teenoorgestelde segment lê (kollineêr).
     const segmenteKruis = (a, b, c, d) =>
       Math.max(a.x, b.x) >= Math.min(c.x, d.x) &&
       Math.max(c.x, d.x) >= Math.min(a.x, b.x) &&
@@ -755,6 +791,16 @@ function renderPlan() {
       orientasie(c.x, c.y, d.x, d.y, a.x, a.y) *
       orientasie(c.x, c.y, d.x, d.y, b.x, b.y) <=
       0;
+    
+    // Toets of 'n lynstuk 'n as-gelynd uitgelynde reghoek sny.
+    // Tweeledige strategie:
+    //   1. Vinnige geval: as ENIGE eindpunt van die lyn binne die reghoek
+    //      val (puntInReghoek), kruis die lyn noodwendig die reghoek.
+    //   2. Randgeval: 'n lyn kan deur 'n reghoek steek sonder dat enige
+    //      eindpunt daarin val (bv. 'n diagonale lyn wat hoek tot hoek
+    //      deurstoot). Vir hierdie geval word segmenteKruis() geroep teen
+    //      elkeen van die vier sye van die reghoek (gedefinieer as vier
+    //      opeenvolgende hoekpunte) — as enige sy gesny word, gee True terug.
     const lynKruisReghoek = (lyn, b) => {
       if (
         puntInReghoek(lyn.x1, lyn.y1, b) ||
@@ -780,6 +826,35 @@ function renderPlan() {
       );
     };
 
+    // -----------------------------------------------------------------------
+    // Kandidaat-posisie-tellingslus
+    // Elke kandidaatposisie kry 'n "botsingstellings"-waarde; laagste eenwen.
+    // Die gewigshiërargie is doelbewus sterk geskei sodat elke vlak van
+    // onaanvaarbaarheid altyd swaarder weeg as enige aantal van die volgende:
+    //
+    //   kandidaatNommer (+0 … +7)
+    //     Kies vroë (linkse/bo) kandidate as alles gelyk is — breek bande
+    //     ten gunste van voorspelbare visuele uitleg.
+    //
+    //   Buite SVG-grense (+100 000 per oortreding)
+    //     'n Etiket wat die tekeningarea verlaat is ALTYD onaanvaarbaar,
+    //     ongeag hoeveel ander kandidate bots. Die groot gaping verseker
+    //     dat selfs 'n kandidaat met 9 × 10 000 ander-etiket-botsings
+    //     (90 000) steeds verkies word bo enige buiteperke-posisie.
+    //
+    //   Ander-etiket-botsings (+10 000 elk)
+    //     Etikette oor mekaar is erger as 'n etiket oor 'n noduspunt —
+    //     dit maak die kaart onleesbaar vir meer mense tegelyk.
+    //
+    //   Noduspunt binne etiket (+3 000 elk)
+    //     'n Etiket wat 'n noduspunt oorvleuel verbloem die grafiek-
+    //     topologie, maar is minder erg as tekste wat mekaar dek.
+    //
+    //   Ganglyn kruis etiket (+500 elk)
+    //     Ganglyne wat agter etiketteks deurloop is visueel hinderlik,
+    //     maar aanvaarbaar as geen beter posisie beskikbaar is nie.
+    // -----------------------------------------------------------------------
+
     let beste = null;
     kandidaatPosisies.forEach((posisie, kandidaatNommer) => {
       const x = cx + posisie.dx;
@@ -789,7 +864,9 @@ function renderPlan() {
       text.setAttribute("text-anchor", posisie.anchor);
       [...text.children].forEach((tspan) => tspan.setAttribute("x", x));
 
+      // Begin met die kandidaatindeks as basiswaarde — vroëre kandidate (nader aan eerste in die lys) word liggies verkies by gelykstelling.
       const boks = text.getBBox();
+      // Straf swaar as enige deel van die etiket buite die SVG-tekengebied val.
       let telling = kandidaatNommer;
       if (
         boks.x < 8 ||
@@ -799,10 +876,12 @@ function renderPlan() {
       ) {
         telling += 100000;
       }
+      // Etiket-op-etiket oorvleueling: hoogste prioriteit na buiteperke.
       telling +=
         geplaasdeEtikette.filter((ander) =>
           reghoekeOorvleuel(boks, ander, 5),
         ).length * 10000;
+        // Noduspunt binne die etiketteks: tweede prioriteit.
       telling +=
         vloerNodes.filter(
           (ander) => {
@@ -811,6 +890,7 @@ function renderPlan() {
               puntInReghoek(anderPosisie.x, anderPosisie.y, boks, 9);
           },
         ).length * 3000;
+        // Ganglyn wat die etiket kruis: laagste prioriteit — word aanvaar as laaste uitweg.
       telling +=
         vloerLyne.filter((lyn) => lynKruisReghoek(lyn, boks)).length * 500;
 
