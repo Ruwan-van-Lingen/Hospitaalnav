@@ -393,11 +393,17 @@ function bestemmingEtiket(item) {
   return `${item.etiket} — ${item.gebou_naam}, ${item.vloer_naam} (${item.node_id})`;
 }
 
+// Slegs die jongste versoek per keuselys mag sy resultate vertoon.
+const bestemmingVersoeke = new Map();
+
 async function laaiBestemmings(soekterm, selectId, gekoseId = null) {
   const apiBase = document.getElementById("apiUrl").value.trim();
+  const versoek = (bestemmingVersoeke.get(selectId) || 0) + 1;
+  bestemmingVersoeke.set(selectId, versoek);
   const url = `${apiBase.replace(/\/$/, "")}/destinations?q=${encodeURIComponent(soekterm)}&limiet=100`;
   try {
     const response = await fetch(url);
+    if (bestemmingVersoeke.get(selectId) !== versoek) return;
     if (!response.ok) {
       // Voorheen het 'n nie-OK antwoord hier stilweg 'n leë seleksielys
       // gelaat, sonder enige aanduiding aan die gebruiker wat verkeerd
@@ -406,8 +412,15 @@ async function laaiBestemmings(soekterm, selectId, gekoseId = null) {
       return;
     }
     const data = await response.json();
+    if (bestemmingVersoeke.get(selectId) !== versoek) return;
     const lys = document.getElementById(selectId);
     lys.innerHTML = "";
+    if (!data.bestemmings.length) {
+      const opsie = document.createElement("option");
+      opsie.value = "";
+      opsie.textContent = "Geen bestemmings gevind nie";
+      lys.appendChild(opsie);
+    }
     data.bestemmings.forEach((item) => {
       const opsie = document.createElement("option");
       opsie.value = item.node_id;
@@ -419,6 +432,7 @@ async function laaiBestemmings(soekterm, selectId, gekoseId = null) {
     }
     merkGesloteBestemmings();
   } catch (netwerkFout) {
+    if (bestemmingVersoeke.get(selectId) !== versoek) return;
     // Voorheen is netwerkfoute (verkeerde poort, API nie aan die gang nie,
     // CORS geblokkeer, ens.) hier stilweg geïgnoreer — die "Vanaf"/"Na"
     // seleksielyste het dan net leeg gebly sonder enige verduideliking.

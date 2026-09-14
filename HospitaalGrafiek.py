@@ -48,6 +48,7 @@ import math
 import heapq
 from dataclasses import dataclass, field
 from typing import Optional
+from Boom24 import Boom24
 
 # Straftyd (sekondes) wat bygevoeg word vir elke vloerverandering in die
 # A*-heuristiek. Hierdie waarde verseker dat die heuristiek toelaatbaar bly
@@ -123,6 +124,35 @@ class HospitaalGrafiek:
 
         conn.close()
 
+        # Geordende bestemmingsmetadata vir die boomsoektog.
+        self.herbou_bestemmingsindeks()
+
+    def herbou_bestemmingsindeks(self):
+        """Herlaai bestemmings uit SQLite, bv. ná 'n naamverandering.
+
+        Bou eers 'n volledige nuwe boom en vervang dan die verwysing, sodat
+        lesers nie 'n gedeeltelik opgeboude indeks ontvang nie.
+        """
+        indeks = Boom24()
+        conn = sqlite3.connect(self.db_pad)
+        conn.row_factory = sqlite3.Row
+        try:
+            rye = conn.execute("""
+                SELECT n.node_id, n.etiket, n.tipe_kode, n.beperkte_groep,
+                       f.vloer_id, f.naam AS vloer_naam,
+                       g.gebou_id, g.naam AS gebou_naam
+                FROM nodes n
+                JOIN vloere f ON n.vloer_id = f.vloer_id
+                JOIN geboue g ON f.gebou_id = g.gebou_id
+            """)
+            for ry in rye:
+                bestemming = dict(ry)
+                sleutel = (bestemming["etiket"].strip().casefold(), bestemming["node_id"])
+                indeks.voeg_in(sleutel, bestemming)
+        finally:
+            conn.close()
+        self.bestemmingsindeks = indeks
+
     def toegelate_groepe(self, gebruiker_tipe: str) -> set[str]:
         """
         Gee die stel beperkte groepe terug wat hierdie gebruikerstipe mag betree.
@@ -151,39 +181,15 @@ class HospitaalGrafiek:
 
     def soek_bestemmings(self, soekterm: str = "", limiet: int = 20) -> list[dict]:
         """
-        Soek navigeerbare bestemmings volgens naam, node-ID, tipe, gebou of vloer.
+        Soek naam, node-ID, tipe, gebou en vloer in die 2-4-boom se metadata.
 
         Gebruik deur die /destinations eindpunt in main.py sodat die webkoppelvlak
         mensleesbare etikette (met gebou- en vloerinligting) kan vertoon sonder
         dat die gebruiker raw node-ID's hoef te ken.
         """
-        term = f"%{soekterm.strip()}%"
-        conn = sqlite3.connect(self.db_pad)
-        conn.row_factory = sqlite3.Row
-        cur = conn.cursor()
-        cur.execute(
-            """
-            SELECT n.node_id, n.etiket, n.tipe_kode, n.beperkte_groep,
-                   f.vloer_id, f.naam AS vloer_naam,
-                   g.gebou_id, g.naam AS gebou_naam
-            FROM nodes n
-            JOIN vloere f ON n.vloer_id = f.vloer_id
-            JOIN geboue g ON f.gebou_id = g.gebou_id
-            WHERE n.etiket LIKE ? COLLATE NOCASE
-               OR n.node_id LIKE ? COLLATE NOCASE
-               OR n.tipe_kode LIKE ? COLLATE NOCASE
-               OR f.naam LIKE ? COLLATE NOCASE
-               OR g.naam LIKE ? COLLATE NOCASE
-            ORDER BY
-                CASE WHEN n.etiket LIKE ? COLLATE NOCASE THEN 0 ELSE 1 END,
-                n.etiket
-            LIMIT ?
-            """,
-            (term, term, term, term, term, term, limiet),
-        )
-        bestemmings = [dict(ry) for ry in cur.fetchall()]
-        conn.close()
-        return bestemmings
+        # Kopieë beskerm die indeks se metadata teen verandering deur 'n leser.
+        return [dict(item) for item in
+                self.bestemmingsindeks.soek_metadata(soekterm, limiet)]
 
     def _heuristic(self, a: str, b: str) -> float:
         """

@@ -60,11 +60,14 @@ Matplotlib gebruik die nie-interaktiewe `Agg`-agterkant, sodat roeteprente veili
 |---|---|
 | `main.py` | FastAPI-toepassing en HTTP-eindpunte |
 | `HospitaalGrafiek.py` | Databasislaaier, bestemmingsoektog en A*-roetebepaling |
+| `Boom24.py` | Selfbalanserende 2-4-boom met metadata-soektog vir bestemmings |
 | `VloerPlan.py` | Matplotlib-vloerplan en roeteprent |
 | `Skema.sql` | SQLite-databasisskema |
 | `SeedData.sql` | Voorbeeldgeboue, vloere, nodes en rande |
 | `hospitaal_wayfinder.html` | Interaktiewe webkoppelvlak |
 | `test_main.py` | Geoutomatiseerde API-toetse |
+| `test_boom24.py`, `test_bestemmingsindeks.py` | Boomreëls, invoeging en indeksintegrasie |
+| `conftest.py` | Afsonderlike tydelike databasis per toets |
 | `.gitignore` | Verhoed dat gegenereerde lêers na Git gestoot word |
 
 ## Installasie
@@ -192,6 +195,60 @@ Voorbeeld:
 GET http://127.0.0.1:8000/destinations?q=Radiologie
 ```
 
+Die beginpunt- en bestemmingslyste op `/ui` gebruik een metadata-soektog
+deur die 2-4-boom. Tik byvoorbeeld `diologie` om `Radiologie` te vind:
+
+```text
+GET http://127.0.0.1:8000/destinations?q=diologie&limiet=20
+```
+
+Die soekterm word met `strip().casefold()` genormaliseer en as letterlike teks
+enige plek in die naam, node-ID, nodustipe, gebounaam of vloernaam gesoek.
+Naamtreffers kom eerste, gevolg deur ander metadata-treffers; elke groep is
+in genormaliseerde naamvolgorde met node-ID as gelykopbreker. 'n Leë soekterm
+lewer die eerste bestemmings in boomvolgorde. `%` en `_` is gewone karakters,
+nie SQL-wildcards nie. Geen moduskeuse of SQL-soeknavraag word gebruik nie.
+
+### Fase 2: die 2-4-bestemmingsindeks
+
+`Boom24` stoor 1–3 sleutels per nieleë nodus en hou alle blare ewe diep.
+`voeg_in()` verdeel vol nodusse van bo na onder met `verdeel_kind()`;
+'n bestaande sleutel se waarde word opgedateer. Die sleutel is
+`(genormaliseerde_naam, node_id)`, sodat gelyknamige bestemmings apart bly.
+Die ooreenstemmende waarde bevat die volledige bestemmingsmetadata.
+
+Presiese soek en invoeging neem O(log n) sleutelvergelykings. `in_volgorde()`
+lewer sleutel/waarde-pare as 'n iterator; 'n volledige deurloop kos O(n).
+`soek_metadata()` ondersoek hoogstens elke bestemming en toets die vyf velde
+afsonderlik met Python se `in`. Dit kos O(n) vir 'n vaste hoeveelheid teks per
+bestemming; die koste van teksvergelykings moet andersins ook verreken word.
+Die boom verskaf die geordende deurloop sonder 'n bykomende sorteerstap.
+Naam- en ander treffers word elk tot die aangevraagde limiet versamel, waarna
+die finale lys beperk word. Dit voorkom dat vroeë geboutreffers latere
+naamtreffers verdring. Die resultaatbuffers gebruik O(limiet) geheue.
+`valideer()` kontroleer sleutelvolgorde, intervalle, kindtellings, waardes,
+hergebruikte nodusse en blaardieptes in O(n).
+
+SQLite bly die permanente databron. Die indeks word tydens opstart in
+O(n log n) gebou en gebruik O(n) geheue. Metadata-soektogte maak geen nuwe
+SQL-verbinding nie. Ná databasisveranderinge aan bestemmingsname of metadata
+moet `grafiek.herbou_bestemmingsindeks()` aangeroep of die toepassing herbegin
+word. Die metode bou eers 'n nuwe boom voordat die indeksverwysing vervang word.
+Sluitings word steeds deur die bestaande sluitings- en roetelogika hanteer.
+Verwydering uit die boom is nog nie geïmplementeer nie; herbou die indeks ná
+verwyderings in SQLite. Geen spoedwins bo SQLite word sonder metings beweer nie.
+
+```python
+from Boom24 import Boom24
+
+boom = Boom24()
+for sleutel in (10, 20, 30, 40):
+    boom.voeg_in(sleutel, f"Bestemming {sleutel}")
+assert boom.soek(30) == "Bestemming 30"
+assert boom.valideer()
+print(list(boom.in_volgorde()))
+```
+
 ### `GET /route`
 
 Bereken 'n toegelate roete.
@@ -259,7 +316,8 @@ Voer die toetsstel uit met:
 python -m pytest -q
 ```
 
-Die huidige 23 toetse bevestig onder meer dat:
+Die toetsstel gebruik tydelike databasisse sodat plaaslike insidente behoue bly,
+en bevestig onder meer dat:
 
 - Radiologie volgens naam gevind word.
 - Soektogte nie hooflettersensitief is nie.
