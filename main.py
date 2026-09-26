@@ -12,19 +12,20 @@ Hierdie lêer definieer alle HTTP-eindpunte en bestuur die toepassingslewensiklu
 
 Eindpunte
 ----------
-  GET  /                  — Verwelkomingsboodskap.
-  GET  /ui                — Webkoppelvlak (hospitaal_wayfinder.html).
-  GET  /admin             — Adminblad (admin.html).
-  GET  /destinations      — Soek navigeerbare bestemmings.
-  GET  /incident          — Huidige aktiewe sluiting (openbaar).
-  POST /admin/login       — Adminaanmelding.
-  POST /admin/logout      — Adminafmelding.
-  GET  /admin/map         — Volledige grafieksstruktuur vir die adminblad.
-  POST /admin/incident    — Aktiveer 'n nuwe sluiting.
-  DELETE /admin/incident  — Kanselleer die aktiewe sluiting.
-  GET  /route             — Bereken die kortste toegelate roete (A*).
-  GET  /route/ontruim     — Vind die naaste nooduitgang (Dijkstra).
-  GET  /route/image       — Bereken roete en lewer as PNG-vloerplan.
+  GET  /                     — Verwelkomingsboodskap.
+  GET  /ui                   — Webkoppelvlak (hospitaal_wayfinder.html).
+  GET  /admin                — Adminblad (admin.html).
+  GET  /destinations         — Soek navigeerbare bestemmings.
+  GET  /incident             — Huidige aktiewe sluiting (openbaar).
+  POST /admin/login          — Adminaanmelding.
+  POST /admin/logout         — Adminafmelding.
+  GET  /admin/map            — Volledige grafieksstruktuur vir die adminblad.
+  GET  /admin/dekking-kontrole — Kontroleer ontruimingsdekking vir alle nodusse (parallel).
+  POST /admin/incident       — Aktiveer 'n nuwe sluiting.
+  DELETE /admin/incident     — Kanselleer die aktiewe sluiting.
+  GET  /route                — Bereken die kortste toegelate roete (A*).
+  GET  /route/ontruim        — Vind die naaste nooduitgang (Dijkstra).
+  GET  /route/image          — Bereken roete en lewer as PNG-vloerplan.
 """
 
 import os
@@ -37,6 +38,7 @@ import sqlite3
 import time
 from contextlib import asynccontextmanager, contextmanager
 from pathlib import Path
+from concurrent.futures import ProcessPoolExecutor
 
 from fastapi import Cookie, Depends, FastAPI, HTTPException, Query, Response
 from fastapi.middleware.cors import CORSMiddleware
@@ -44,7 +46,12 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 from starlette.background import BackgroundTask
 
-from HospitaalGrafiek import HospitaalGrafiek, bou_demo_db
+from HospitaalGrafiek import (
+    HospitaalGrafiek,
+    bou_demo_db,
+    init_werker,
+    kontroleer_alle_nodusse_dekking_parallel,
+)
 from VloerPlan import teken_vloer_plan
 
 # ---------------------------------------------------------------------------
@@ -216,12 +223,24 @@ async def lifespan(app: FastAPI):
     2. Verseker dat insident-tabelle en nuwe kolomme bestaan.
     3. Laai die hospitaalgrafiek eenmalig in geheue — alle roeteversoeke
        hergebruik hierdie enkele instansie sonder verdere databasistoegange.
+
+    Die dekking-kontrole-werkprosespoel (dekking_pool) word doelbewus NIE
+    hier geskep nie — sien kry_dekking_pool() vir waarom dit lui (lazy)
+    geskep word by die eerste versoek eerder as onvoorwaardelik hier.
     """
     if AUTO_HERBOU_DB or not DB_PAD.exists():
         bou_demo_db(str(DB_PAD), str(SKEMA_PAD), str(SEED_PAD))
     verseker_insident_skema()
     app.state.grafiek = HospitaalGrafiek(str(DB_PAD))
+    app.state.dekking_pool = None  # Sien kry_dekking_pool() — lui geskep.
+
     yield  # Die toepassing bedien versoeke tussen hier en die einde van die blok.
+
+    # Sluit die poel net af as dit ooit werklik geskep is — 'n toets- of
+    # kortstondige sessie wat /admin/dekking-kontrole nooit aanroep nie,
+    # het dan niks om af te sluit nie.
+    if app.state.dekking_pool is not None:
+        app.state.dekking_pool.shutdown(wait=True)
 
 
 app = FastAPI(
@@ -325,6 +344,32 @@ def kry_insident() -> dict:
         # vertoon (bv. "Algehele grendel aktief" i.p.v. 'n rou nodus-telling).
         "outomaties_modus": ry["outomaties_modus"],
     }
+
+
+def kry_dekking_pool(app: FastAPI) -> ProcessPoolExecutor:
+    """
+    Gee die dekking-kontrole-werkprosespoel terug, en skep dit LUI (lazy) —
+    eers wanneer dit werklik die eerste keer nodig is — eerder as
+    onvoorwaardelik in lifespan().
+
+    Waarom lui, nie in lifespan() nie?
+    ------------------------------------
+    test_main.py se toetse gebruik amper almal 'n eie
+    `with TestClient(app) as client:`-blok, wat lifespan() op elke toets
+    laat loop. As die pool onvoorwaardelik in lifespan() geskep word, spawn
+    ELKE toets — selfs dié wat /admin/dekking-kontrole nooit aanroep nie —
+    'n hele stel OS-werkprosesse, wat die toetsstel aansienlik vertraag (en
+    op sommige stelsels selfs kan faal weens proses-/hulpbronbeperkings).
+
+    Met hierdie lui-patroon betaal net die toetse wat werklik
+    /admin/dekking-kontrole aanroep die opstartkoste — presies dieselfde
+    gedrag as in produksie, sonder enige toets-spesifieke spesiale geval.
+    """
+    if app.state.dekking_pool is None:
+        app.state.dekking_pool = ProcessPoolExecutor(
+            initializer=init_werker, initargs=(str(DB_PAD),)
+        )
+    return app.state.dekking_pool
 
 
 # ---------------------------------------------------------------------------
@@ -703,6 +748,42 @@ def admin_kaart(_: str = Depends(vereis_admin)):
                 ).fetchall()
             ]
     return {"geboue": resultaat, "noodkodes": kodes, "incident": kry_insident()}
+
+
+@app.get("/admin/dekking-kontrole")
+def dekking_kontrole(
+    gebruiker_tipe: str = Query("PUBLIEK", description="Gebruikerstipe om ontruimingstoegang mee te toets"),
+    _: str = Depends(vereis_admin),
+):
+    """
+    Admin-eindpunt: kontroleer, vir ELKE nodus in die hospitaal, of 'n
+    veilige ontruimingsroete steeds bestaan gegewe die huidige aktiewe
+    sluiting. Nuttig ná 'n admin 'n paar nodusse sluit (bv. vir onderhoud)
+    om dadelik te sien of dit per ongeluk 'n vleuel sonder ontruimingsroete
+    laat.
+
+    Leesalleen — wysig geen databasistoestand nie, roep net
+    naaste_veilige_uitgang() herhaaldelik aan (via kontroleer_nodus_dekking()
+    in HospitaalGrafiek.py), oor 'n ProcessPoolExecutor-poel versprei omdat
+    elke nodus se kontrole heeltemal onafhanklik van die ander s'n is.
+    """
+    insident = kry_insident()
+    geblokkeer = set(insident["blocked_node_ids"])
+    node_ids = list(app.state.grafiek.nodes.keys())
+
+    resultate = kontroleer_alle_nodusse_dekking_parallel(
+        node_ids, gebruiker_tipe, geblokkeer, kry_dekking_pool(app),
+    )
+
+    onbereikbaar = [r for r in resultate if not r["bereikbaar"]]
+    return {
+        "gebruiker_tipe": gebruiker_tipe,
+        "incident_active": insident["active"],
+        "totaal_nodusse": len(resultate),
+        "onbereikbaar_telling": len(onbereikbaar),
+        "onbereikbaar": onbereikbaar,
+        "alle_resultate": resultate,
+    }
 
 
 @app.post("/admin/incident")

@@ -41,6 +41,20 @@ heuristiek is hier eenvoudiger en onfeilbaar korrek.
 
 Brandveiligheidsreël: Hysbakrande word outomaties uitgelaat tydens
 ontruiming — slegs trappe, lugbrûe en tonnels word toegelaat.
+
+Fase 4 — parallelle ontruimingsdekking-kontrole
+-------------------------------------------------
+Benewens die twee algoritmes hierbo bied hierdie module ook
+kontroleer_nodus_dekking() en kontroleer_alle_nodusse_dekking_parallel():
+'n admin-gerigte kontrole wat, VIR ELKE NODUS in die hospitaal, vasstel of
+'n veilige ontruimingsroete steeds bestaan gegewe die huidige aktiewe
+sluiting. Elke nodus se kontrole is heeltemal onafhanklik van die ander s'n
+("embarrassingly parallel"), dus word dit oor 'n ProcessPoolExecutor-poel
+versprei — sien die kommentaar by daardie funksies vir die volledige
+ontwerp-redenasie. Word deur /admin/dekking-kontrole in main.py blootgestel.
+Hierdie kontrole is heeltemal onafhanklik van astar()/naaste_veilige_uitgang()
+se bestaande, reeds-getoetste gedrag — dit ROEP net naaste_veilige_uitgang()
+herhaaldelik aan en verander dit nooit nie.
 """
 
 import sqlite3
@@ -48,6 +62,7 @@ import math
 import heapq
 from dataclasses import dataclass, field
 from typing import Optional
+from concurrent.futures import ProcessPoolExecutor
 from Boom24 import Boom24
 
 # Straftyd (sekondes) wat bygevoeg word vir elke vloerverandering in die
@@ -422,6 +437,162 @@ class HospitaalGrafiek:
             pad.append(huidig)
         pad.reverse()
         return pad
+
+
+# ---------------------------------------------------------------------------
+# Ontruimingsdekking-kontrole (parallelle verwerking Fase 4)
+# ---------------------------------------------------------------------------
+# Hierdie funksies is doelbewus LOS, module-vlak funksies (nie metodes op
+# HospitaalGrafiek nie), vir twee redes:
+#   1. kontroleer_nodus_dekking() moet later direk deur ProcessPoolExecutor-
+#      werkprosesse aangeroep kan word — 'n gebonde metode (wat 'n hele
+#      self-objek sou probeer piekel) is minder geskik daarvoor as 'n
+#      gewone funksie wat sy grafiek as parameter ontvang.
+#   2. Dit hou hierdie admin-kontrole duidelik geskei van die kern-
+#      roetebepalingsklas — astar() en naaste_veilige_uitgang() self bly
+#      heeltemal ongewysig; hierdie kode ROEP hulle net aan.
+
+def kontroleer_nodus_dekking(
+    graf: HospitaalGrafiek,
+    node_id: str,
+    gebruiker_tipe: str,
+    geblokkeerde_nodes: set[str],
+) -> dict:
+    """
+    Kontroleer of 'n veilige ontruimingsroete van 'n gegewe nodus af steeds
+    bestaan, gegewe die huidige stel geblokkeerde nodusse (bv. weens 'n
+    aktiewe insident).
+
+    Gee altyd 'n woordeboek terug met minstens 'node_id' en 'bereikbaar'.
+    By sukses word uitgangsinligting bygevoeg; by mislukking 'n 'rede'-veld
+    sodat die admin-koppelvlak kan onderskei TUSSEN "hierdie nodus is self
+    geblokkeer" en "hierdie nodus is afgesny van alle uitgange" — dis nie
+    dieselfde probleem vir 'n admin om te evalueer nie.
+    """
+    # Geval 1: die nodus self is geblokkeer. 'n Ander situasie as "geen
+    # uitgang gevind nie" — ons kan nie eers 'n roete hiervandaan begin
+    # bereken nie, dus moet ons dit vroeg en eksplisiet uitsonder.
+    if node_id in geblokkeerde_nodes:
+        return {
+            "node_id": node_id,
+            "bereikbaar": False,
+            "rede": "nodus_geblokkeer",
+        }
+
+    resultaat = graf.naaste_veilige_uitgang(
+        node_id,
+        gebruiker_tipe=gebruiker_tipe,
+        geblokkeerde_nodes=geblokkeerde_nodes,
+    )
+
+    # Geval 2: geen bereikbare nooduitgang nie — bv. die nodus is deur die
+    # geblokkeerde nodusse van alle uitgange afgesny, of elke uitgang is
+    # self geblokkeer.
+    if resultaat is None:
+        return {
+            "node_id": node_id,
+            "bereikbaar": False,
+            "rede": "geen_bereikbare_uitgang",
+        }
+
+    # Geval 3: 'n veilige roete is gevind — pak die relevante velde uit.
+    pad, tyd_sekondes, afstand_m = resultaat
+    return {
+        "node_id": node_id,
+        "bereikbaar": True,
+        "uitgang_node": pad[-1],  # Laaste nodus in die pad is die bereikte uitgang.
+        "tyd_sekondes": round(tyd_sekondes, 1),
+        "afstand_m": round(afstand_m, 1),
+        "node_telling": len(pad),
+    }
+
+
+def kontroleer_alle_nodusse_dekking(
+    graf: HospitaalGrafiek,
+    gebruiker_tipe: str,
+    geblokkeerde_nodes: set[str],
+) -> list[dict]:
+    """
+    Sekwensiële basislyn: loop deur ELKE nodus in die grafiek en kontroleer
+    of 'n veilige ontruimingsroete daarvandaan steeds bestaan.
+
+    Loop doelbewus sekwensieel (geen multiprocessing hier nie) — dit is die
+    korrektheids- EN spoedbasislyn waarteen die parallelle weergawe hier
+    onder vergelyk word.
+    """
+    return [
+        kontroleer_nodus_dekking(graf, node_id, gebruiker_tipe, geblokkeerde_nodes)
+        for node_id in graf.nodes
+    ]
+
+
+# Proses-plaaslike veranderlike: bestaan net binne-in 'n werkproses se eie
+# geheue, word NOOIT gedeel met die hoofproses of ander werkprosesse nie.
+# Bly doelbewus 'n modulevlak-privaat naam (voorloop-onderstreep) — dit
+# word nooit buite hierdie lêer ingevoer of direk gebruik nie.
+_WERKER_GRAF: Optional[HospitaalGrafiek] = None
+
+
+def init_werker(db_pad: str) -> None:
+    """
+    Werkproses-inisialiseerder: word EEN KEER per werkproses aangeroep
+    wanneer die ProcessPoolExecutor-poel geskep word (sien kry_dekking_pool()
+    in main.py), NIE een keer per taak nie. Laai die grafiek in 'n
+    proses-plaaslike globale veranderlike sodat elke daaropvolgende taak
+    in dieselfde proses dit sonder herlaai kan hergebruik.
+
+    Word oor die prosesgrens heen aan die pool deurgegee as die
+    'initializer'-argument — moet dus 'n gewone, module-vlak funksie wees
+    (piekelbaar), nie 'n lambda of geneste funksie nie.
+    """
+    global _WERKER_GRAF
+    _WERKER_GRAF = HospitaalGrafiek(db_pad)
+
+
+def _kontroleer_nodus_dekking_taak(
+    node_id: str,
+    gebruiker_tipe: str,
+    geblokkeerde_nodes: set[str],
+) -> dict:
+    """
+    Dun omhulsel wat DEUR ELKE WERKTAAK aangeroep word. Neem doelbewus net
+    klein, maklik-processeerbare argumente — nooit die grafiek self nie — en
+    gebruik eerder die reeds-gelaaide _WERKER_GRAF vanaf init_werker().
+    """
+    if _WERKER_GRAF is None:
+        raise RuntimeError(
+            "_WERKER_GRAF is nie geïnitialiseer nie — is init_werker() as "
+            "die pool se initializer ingestel?"
+        )
+    return kontroleer_nodus_dekking(
+        _WERKER_GRAF, node_id, gebruiker_tipe, geblokkeerde_nodes
+    )
+
+
+def kontroleer_alle_nodusse_dekking_parallel(
+    node_ids: list[str],
+    gebruiker_tipe: str,
+    geblokkeerde_nodes: set[str],
+    uitvoerder: ProcessPoolExecutor,
+) -> list[dict]:
+    """
+    Parallelle weergawe van kontroleer_alle_nodusse_dekking(): dien EEN
+    taak per nodus in by 'n reeds-bestaande ProcessPoolExecutor-poel en
+    wag vir almal se resultate.
+
+    Let wel: 'uitvoerder' word van BUITE ingegee, nie hier geskep nie —
+    'n nuwe pool per versoek te skep sou werkprosesse elke keer laat
+    "spawn", wat presies die opstart-oorhoof weer inbring wat die
+    initializer-patroon (init_werker) probeer vermy. Sien kry_dekking_pool()
+    in main.py vir hoe die poel lui (lazy) geskep en hergebruik word.
+    """
+    take = [
+        uitvoerder.submit(
+            _kontroleer_nodus_dekking_taak, node_id, gebruiker_tipe, geblokkeerde_nodes
+        )
+        for node_id in node_ids
+    ]
+    return [taak.result() for taak in take]
 
 
 def bou_demo_db(db_pad: str, skema_pad: str, seed_pad: str):

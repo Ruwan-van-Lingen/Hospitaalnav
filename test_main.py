@@ -1,7 +1,7 @@
 """=================================================================================================================
 test_main.py
 =============
-Geoutomatiseerde toetsstel vir die Hospitaal Navigasie API.
+Geoutomatiseerde toets-stel vir die Hospitaal Navigasie API.
 
 Voer uit met:
     python -m pytest -q
