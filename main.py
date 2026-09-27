@@ -8,6 +8,7 @@ Hierdie lêer definieer alle HTTP-eindpunte en bestuur die toepassingslewensiklu
   • Grafiek-voorlading in geheue (HospitaalGrafiek word eenmalig gelaai).
   • Adminaanmelding via 'n ondertekende koekie (HMAC-SHA256).
   • Roeteberekening (A* vir normale navigasie, Dijkstra vir ontruiming).
+  • Netwerkanalise (Kruskal-MST, Edmonds-Karp-maksimum-vloei).
   • Statieseleêerbediening vir die webkoppelvlak en adminblad.
 
 Eindpunte
@@ -25,6 +26,8 @@ Eindpunte
   GET  /route             — Bereken die kortste toegelate roete (A*).
   GET  /route/ontruim     — Vind die naaste nooduitgang (Dijkstra).
   GET  /route/image       — Bereken roete en lewer as PNG-vloerplan.
+  GET  /analise/spanboom   — Minimum spanboom van die hele grafiek (Kruskal).
+  GET  /analise/maks_vloei — Maksimum deurvloei na uitgange (Edmonds-Karp).
 """
 
 import os
@@ -197,6 +200,14 @@ def verseker_insident_skema():
             conn.execute(
                 "ALTER TABLE nodes ADD COLUMN is_nooduitgang INTEGER NOT NULL DEFAULT 0"
             )
+
+        # Migrasiestap: voeg kapasiteit-kolom by rande as dit ontbreek — nodig
+        # vir /analise/maks_vloei (Edmonds-Karp). Bestaande rye kry NULL;
+        # HospitaalGrafiek._load() val dan terug op VERSTEK_KAPASITEIT totdat
+        # SeedData.sql/Skema.sql werklike waardes stel.
+        rand_cols = {row[1] for row in conn.execute("PRAGMA table_info(rande)")}
+        if "kapasiteit" not in rand_cols:
+            conn.execute("ALTER TABLE rande ADD COLUMN kapasiteit REAL")
 
         conn.commit()
     finally:
@@ -624,6 +635,88 @@ def kry_roete_prentjie(
             filename="hospitaal_roete.png",
             background=BackgroundTask(uit_pad.unlink, missing_ok=True),
         )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+# ---------------------------------------------------------------------------
+# Netwerkanalise-eindpunte (admin-beskermd)
+# ---------------------------------------------------------------------------
+# Hierdie twee eindpunte beantwoord infrastruktuur-vrae oor die HELE grafiek,
+# nie navigasie-versoeke van 'n enkele gebruiker nie — vandaar admin-beskerming
+# (Depends(vereis_admin)), soos /admin/map.
+
+@app.get("/analise/spanboom")
+def kry_min_spanboom(_: str = Depends(vereis_admin)):
+    """
+    Bereken die minimum spanboom (MST) van die hele hospitaalgrafiek (Kruskal).
+
+    Gee die goedkoopste stel korridors terug wat AL die nodusse in die
+    hospitaal verbind, sonder oortollige verbindings. Dit is NIE 'n roete
+    tussen twee punte nie (sien /route daarvoor) — dit is 'n
+    infrastruktuur-analise oor die hele netwerk.
+    """
+    mst_kante, totale_gewig = app.state.grafiek.bereken_min_spanboom()
+    return {
+        "kante": [
+            {"van": van_node, "na": na_node, "gewig_s": round(gewig, 1)}
+            for van_node, na_node, gewig in mst_kante
+        ],
+        "totale_gewig_s": round(totale_gewig, 1),
+        "totale_gewig":   formateer_tyd(totale_gewig),
+        "aantal_kante":   len(mst_kante),
+    }
+
+
+@app.get("/analise/maks_vloei")
+def kry_maks_vloei(
+    bron: str = Query(..., description="Bronnode se ID (bv. MAIN-2-ICU)"),
+    gebruiker_tipe: str = Query("PUBLIEK", description="Gebruikerstipe"),
+    _: str = Depends(vereis_admin),
+):
+    """
+    Bereken die maksimum deurvloei van 'bron' na al die nooduitgange
+    gelyktydig, met Edmonds-Karp. Gee ook die bottelneck-rande (min-snit)
+    terug wat die deurvloei beperk — nuttig om te bepaal watter korridors
+    tydens 'n grootskaalse ontruiming eerste versadig sal raak.
+
+    Respekteer die aktiewe insident (geblokkeerde nodusse) presies soos
+    /route en /route/ontruim doen.
+
+    Gee 409 terug as die bronpunt ontoeganklik is of geen nooduitgang
+    tans bereikbaar is nie.
+    """
+    try:
+        insident = kry_insident()
+        geblokkeer = set(insident["blocked_node_ids"])
+
+        if bron in geblokkeer:
+            raise HTTPException(status_code=409, detail="Die bronpunt is binne die geslote gebied.")
+
+        resultaat = app.state.grafiek.maks_vloei_na_uitgange(
+            bron,
+            gebruiker_tipe=gebruiker_tipe,
+            geblokkeerde_nodes=geblokkeer,
+        )
+
+        if resultaat is None:
+            raise HTTPException(
+                status_code=409,
+                detail="Geen nooduitgang is tans bereikbaar nie. Almal is geblokkeer of onbereikbaar.",
+            )
+
+        maks_vloei, bottelnek_kante = resultaat
+        return {
+            "bron_node":                bron,
+            "gebruiker_tipe":           gebruiker_tipe,
+            "maks_vloei_persone_per_s": round(maks_vloei, 2),
+            "bottelnek_kante": [
+                {"van": van_node, "na": na_node, "kapasiteit": kap}
+                for van_node, na_node, kap in bottelnek_kante
+            ],
+            "incident_active": insident["active"],
+        }
+
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
