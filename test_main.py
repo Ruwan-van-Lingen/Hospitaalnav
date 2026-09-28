@@ -28,6 +28,7 @@ Toetsdekking
 
 from fastapi.testclient import TestClient
 from main import app, formateer_tyd
+from HospitaalGrafiek import BEREKEN_AFSTAND, BEREKEN_GEWIG
 
 
 # ---------------------------------------------------------------------------
@@ -39,6 +40,13 @@ def test_tydformaat():
     assert formateer_tyd(45)   == "45s"
     assert formateer_tyd(77)   == "1m 17s"
     assert formateer_tyd(7384) == "2h 3m 4s"
+
+
+def test_lambda_afstand_en_gewig():
+    """Die lambda-funksies moet afstand en totale reistyd korrek bereken."""
+    assert BEREKEN_AFSTAND((0, 0), (3, 4)) == 5.0
+    assert BEREKEN_GEWIG(8, 25) == 33.0
+    assert BEREKEN_GEWIG(15, 0) == 15.0
 
 
 # ---------------------------------------------------------------------------

@@ -54,6 +54,18 @@ from typing import Optional
 # terwyl dit die algoritme aanmoedig om onnodige vloerwisselings te vermy.
 VLOER_VERANDER_PENALTY_S = 20.0
 
+# Afstand/gewigsfunksies
+# ----------------------
+# Die projekvereiste vra uitdruklik dat lambda-funksies gebruik word. Hierdie
+# twee benoemde lambda's hou die formules op een plek en word deur die werklike
+# grafieklaai- en A*-kode hieronder gebruik.
+BEREKEN_AFSTAND = lambda pos_a, pos_b: math.hypot(  # noqa: E731
+    pos_a[0] - pos_b[0], pos_a[1] - pos_b[1]
+)
+BEREKEN_GEWIG = lambda basis_gewig_s, wag_penalty_s: (  # noqa: E731
+    float(basis_gewig_s) + float(wag_penalty_s)
+)
+
 
 @dataclass
 class Rand:
@@ -114,7 +126,8 @@ class HospitaalGrafiek:
             FROM rande
         """)
         for row in cur.fetchall():
-            gewig = row["basis_gewig_s"] + row["wag_penalty_s"]
+            # Gebruik die sentrale lambda-gewigsfunksie vir elke rand.
+            gewig = BEREKEN_GEWIG(row["basis_gewig_s"], row["wag_penalty_s"])
             e = Rand(row["na_node"], gewig, row["rand_tipe"], row["vloer_verander"], row["afstand_m"])
             self.adjacency[row["van_node"]].append(e)
             if row["bidirectional"]:
@@ -195,9 +208,8 @@ class HospitaalGrafiek:
         altyd 'n ondergrens is vir die werklike padlengte en die vloerstraf
         ooreenstem met die minimum moontlike vloerveranderingskoste.
         """
-        ax, ay = self.nodes[a]["pos"]
-        bx, by = self.nodes[b]["pos"]
-        planar = math.hypot(ax - bx, ay - by)
+        # Gebruik dieselfde sentrale lambda-afstandsfunksie vir die A*-skatting.
+        planar = BEREKEN_AFSTAND(self.nodes[a]["pos"], self.nodes[b]["pos"])
         vloer_delta = abs(self.nodes[a]["level"] - self.nodes[b]["level"])
         return planar + vloer_delta * VLOER_VERANDER_PENALTY_S
 
