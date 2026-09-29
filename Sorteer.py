@@ -15,8 +15,9 @@ Die twee algoritmes is goed vir verskillende situasies, en die keuse hang af
 van hoe die lys groei, nie van hoe groot dit vandag toevallig is nie:
 
   * Invoegsortering doen in die beste geval net n-1 vergelykings (wanneer die
-    lys al gesorteer is) en het geen rekursie of ekstra lyste nodig nie. 
-    Dit is die regte keuse vir lyste wat volgens hulle aard klein 
+    lys al gesorteer is) en benodig geen rekursie nie. Hierdie weergawe
+    maak wel sleutelpare en 'n afsonderlike uitvoerlys.
+    Dit is 'n geskikte keuse vir lyste wat volgens hulle aard klein
     bly - die hospitaal het byvoorbeeld net 2 geboue en 5 vloere.
 
   * Saamsmeltsortering se O(n log n) is die regte keuse vir lyste wat saam
@@ -41,8 +42,8 @@ gesorteer word. Dit kan vier vorme aanneem:
 
 """
 # Die drumpel waar saamsmeltsortering na invoegsortering oorskakel.
-# Twaalf is 'n algemene praktiese keuse; 
-# Python se eie ingeboude sorteerder gebruik 'n soortgelyke drumpel.
+# Twaalf is 'n instelbare keuse vir hierdie implementasie, nie 'n gemete
+# optimum nie. Hierdie algoritme is nie Python se ingeboude Timsort nie.
 DREMPEL = 12
 
 
@@ -53,9 +54,9 @@ DREMPEL = 12
 def _sleutelwaarde(item, sleutel):
     """
     Bereken die sorteersleutel van een item.
-    Word een keer per item aangeroep, nie een keer per vergelyking nie. 
-    Bereken sleutel binne die vergelykingslus = sou invoegsortering die sleutel 
-    tot n^2 keer bereken ipv een keer.
+    Word een keer per item aangeroep, nie een keer per vergelyking nie.
+    Sleutelberekening binne die vergelykingslus sou tot O(n²) aanroepe
+    kon verg, teenoor die O(n) aanroepe hier.
     """
     if sleutel is None:
         # Geen sleutel gegee nie: die item is sy eie sleutel.
@@ -153,9 +154,9 @@ def merge_sort(items, sleutel=None, drempel=DREMPEL):
     nuwe lysies af. Vir 'n klein lysie is daardie oorhoofse koste meer as wat
     die beter groeitempo spaar. Daarom skakel hierdie implementasie oor na
     invoegsortering sodra 'n stukkie kleiner as 'drempel' word. Dit verander
-    NIE die uitkoms nie en verander ook nie die O(n log n) nie - dit maak die
-    werklike looptyd net effens beter. Hierdie is gebasseer op Python se eie 
-    ingeboude sorteerder (Timsort). 
+    nie die uitkoms nie. Vir 'n vaste drumpel bly die slegste tydskompleksiteit
+    O(n log n); 'n drumpel groter as die hele invoer gebruik egter net
+    invoegsortering en kan O(n²) kos. 'n Spoedwins hang van die invoer af.
     """
     pare = _maak_pare(items, sleutel)
     return _pak_uit(_merge_sorteer_pare(pare, drempel))

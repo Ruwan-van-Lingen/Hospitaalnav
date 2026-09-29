@@ -1,19 +1,13 @@
-"""
-Nuwe algoritmes om by HospitaalGrafiek.py te voeg:
-1. Minimum Spanboom (Kruskal) - vind goedkoopste verbindingsnetwerk
-2. Maksimum Vloei (Edmonds-Karp) - vind bottelnekke na noodurgange
+"""Selfstandige leervoorbeelde van Kruskal en Edmonds-Karp.
 
-Pas hierdie metodes by die HospitaalGrafiek-klas in, of voeg hulle
-by as los funksies wat julle bestaande graaf-datastruktuur aanvaar.
-
-AANNAME oor datastruktuur (pas gerus aan by julle werklike struktuur -
-deel HospitaalGrafiek.py met my as die vorm anders is):
-- nodusse: 'n stel/lys van nodus-ID's
-- kante (vir MST):    lys van (nodus_a, nodus_b, gewig) tuples
-- kante (vir vloei):  lys van (nodus_a, nodus_b, kapasiteit) tuples
+Die hospitaaltoepassing gebruik die metodes in HospitaalGrafiek.py, waar
+toegangsregte, sluitings en nooduitgange ook in ag geneem word. Hierdie
+algoritmes werk op eenvoudige nodus- en randlyste, sonder hospitaalreëls.
+Voer hierdie lêer direk uit om die klein demonstrasienetwerke te toets.
 """
 
 from collections import defaultdict, deque
+import math
 
 
 # ============================================================
@@ -24,6 +18,7 @@ class UnionFind:
     """Help-klas vir Kruskal: hou by watter nodusse reeds verbind is."""
 
     def __init__(self, nodusse):
+        nodusse = list(nodusse)
         self.ouer = {n: n for n in nodusse}
         self.rang = {n: 0 for n in nodusse}
 
@@ -52,8 +47,13 @@ def bereken_min_spanboom(nodusse, kante):
     Gee terug: (mst_kante, totale_gewig)
         mst_kante is 'n lys (nodus_a, nodus_b, gewig) wat die MST vorm
     """
-    gesorteerde_kante = sorted(kante, key=lambda k: k[2])
     uf = UnionFind(nodusse)
+    gesorteerde_kante = sorted(kante, key=lambda k: k[2])
+    for a, b, gewig in gesorteerde_kante:
+        if a not in uf.ouer or b not in uf.ouer:
+            raise ValueError("Elke rand se eindpunte moet in die noduslys voorkom.")
+        if not math.isfinite(gewig):
+            raise ValueError("Randgewigte moet eindig wees.")
     mst_kante = []
     totale_gewig = 0
 
@@ -73,13 +73,22 @@ def edmonds_karp(kante, bron, put):
     """
     kante: lys van (nodus_a, nodus_b, kapasiteit) tuples (gerig)
     bron:  begin-nodus
-    put:   'n super-put wat al die noodurgange verteenwoordig -
+    put:   'n superput wat al die nooduitgange verteenwoordig -
            skep 'n kunsmatige nodus gekoppel aan elke werklike uitgang
-           met 'n groot/oneindige kapasiteit
+           met 'n voldoende groot, eindige kapasiteit
 
     Gee terug: (maks_vloei_waarde, min_snit_kante)
-        min_snit_kante is die bottelneck-kante wat die vloei beperk
+        min_snit_kante is die bottelnekrande wat die vloei beperk.
+        As bron en put dieselfde is, is geen verdere netwerkvloei nodig nie
+        en word (0, []) teruggegee.
     """
+    # Bewaar ook eenmalige iterators vir die latere minimumsnitberekening.
+    kante = list(kante)
+    for _, _, kap in kante:
+        if not math.isfinite(kap) or kap < 0:
+            raise ValueError("Kapasiteite moet eindig en nie-negatief wees.")
+    if bron == put:
+        return 0, []
     kapasiteit = defaultdict(dict)
     for a, b, kap in kante:
         kapasiteit[a][b] = kapasiteit[a].get(b, 0) + kap
@@ -134,7 +143,7 @@ def edmonds_karp(kante, bron, put):
 
 
 # ============================================================
-# 3. VOORBEELD-GEBRUIK (verwyder/pas aan sodra ingesluit in HospitaalGrafiek.py)
+# 3. SELFSTANDIGE VOORBEELDE
 # ============================================================
 
 if __name__ == "__main__":
@@ -164,4 +173,4 @@ if __name__ == "__main__":
     ]
     maks, bottelnekke = edmonds_karp(vloei_kante_toets, "Ingang", "SUPER_PUT")
     print("Maksimum vloei na uitgange:", maks)
-    print("Bottelneck-kante (min-snit):", bottelnekke)
+    print("Bottelnekrande (minimumsnit):", bottelnekke)

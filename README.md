@@ -29,6 +29,8 @@ of 'n gemete ontruimingsvermoë nie.
 | `main.py` | FastAPI-eindpunte, sessies, insidente en werkprosesbestuur |
 | `HospitaalGrafiek.py` | Grafieklaai, lambda-formules, A*, Dijkstra, spanboom en maksimum vloei |
 | `Boom24.py` | 2-4-boom en geordende bestemmingsoektog |
+| `Sorteer.py` | Stabiele invoegsortering en hibriede saamsmeltsortering |
+| `mst_en_vloei.py` | Selfstandige leervoorbeelde; die API gebruik `HospitaalGrafiek.py` |
 | `VloerPlan.py` | PNG-vloerplan met Matplotlib se nie-interaktiewe `Agg`-agterkant |
 | `Skema.sql`, `SeedData.sql` | Databasisstruktuur en demonstrasiedata |
 | `hospitaal_wayfinder.html`, `hospitaal_wayfinder.css`, `hospitaal_wayfinder.js` | Openbare navigasiekoppelvlak |
@@ -170,6 +172,13 @@ bestemmingsmetadata, of herbegin die toepassing met databasisbehoud.
 Direkte verwydering uit die boom word nie ondersteun nie.
 
 ## API-eindpunte
+
+Geboue, vloere en noodkodes word met `insertion_sort()` georden; langer
+noduslyste gebruik `merge_sort()`. Beide funksies gee 'n nuwe lys terug,
+behou gelyke sleutels se oorspronklike volgorde en aanvaar onder meer 'n
+lambda as sorteersleutel. Die admin-API en PNG-vloerplan gebruik hierdie
+handgeskrewe algoritmes. Vir 'n vaste drumpel kos saamsmeltsortering
+O(n log n); invoegsortering kos O(n²) in die slegste geval.
 
 Die eindpunte en versoekparameters is by `/docs` beskikbaar.
 
