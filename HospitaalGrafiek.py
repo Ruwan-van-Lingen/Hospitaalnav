@@ -60,7 +60,8 @@ class Rand:
 
 class HospitaalGrafiek:
     """
-    Laai die hospitaalgrafiek uit SQLite en bied roete-algoritmes aan.
+    Laai die hospitaalgrafiek uit SQLite en bied roete- en netwerkanalise-
+    algoritmes aan.
 
     Die grafiek word eenmalig by toepassingsopstart in geheue gelaai
     (via FastAPI se lifespan-hanteerder in main.py) en word dan vir alle
@@ -808,3 +809,14 @@ if __name__ == "__main__":
     if resultaat:
         pad, koste, afstand = resultaat
         print(f"Pad ({koste:.0f}s, {afstand:.0f}m): " + " → ".join(pad))
+
+    print("\n=== Minimum Spanboom (hele grafiek) ===")
+    mst_kante, mst_gewig = g.bereken_min_spanboom()
+    print(f"{len(mst_kante)} kante, totale gewig {mst_gewig:.0f}s")
+
+    print("\n=== Maksimum vloei: Nooddienste → alle nooduitgange ===")
+    resultaat = g.maks_vloei_na_uitgange("MAIN-G-ER", gebruiker_tipe="PUBLIEK")
+    if resultaat:
+        maks, bottelnekke = resultaat
+        print(f"Maksimum vloei: {maks:.1f} persone/s")
+        print(f"Bottelnekrande: {bottelnekke}")
