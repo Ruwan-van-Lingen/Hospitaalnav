@@ -6,6 +6,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     MPLCONFIGDIR=/tmp/matplotlib
 
+# Stel die werkgids binne die houer in.
 WORKDIR /app
 
 # Hou afhanklikhede in 'n aparte boulaag om Docker se kas te benut.
@@ -23,6 +24,9 @@ RUN mkdir -p /app/data \
     && chown appgebruiker:appgroep /app /app/data
 USER appgebruiker
 
+# Verklaar die poort waarop Uvicorn luister. Dit publiseer nie die poort
+# outomaties nie — dit dien as dokumentasie en word deur docker-compose.yml
+# se "ports"-afdeling gebruik.
 EXPOSE 8000
 
 # Die gesondheidstatus wys verbindingsfoute; dit herbegin nie self die houer nie.
