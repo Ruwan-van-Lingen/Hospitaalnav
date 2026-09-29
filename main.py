@@ -42,6 +42,7 @@ import sqlite3
 import time
 from contextlib import asynccontextmanager, contextmanager
 from concurrent.futures import ProcessPoolExecutor
+from multiprocessing import get_context
 from pathlib import Path
 from threading import Lock
 
@@ -264,6 +265,9 @@ def kry_dekking_pool(app: FastAPI) -> ProcessPoolExecutor:
         if app.state.dekking_pool is None:
             app.state.dekking_pool = ProcessPoolExecutor(
                 max_workers=min(4, os.cpu_count() or 1),
+                # Begin vars prosesse op elke platform. Linux se fork vanuit
+                # die bediener se werksdrade kan geërfde slotte laat vashaak.
+                mp_context=get_context("spawn"),
                 initializer=init_werker,
                 initargs=(str(DB_PAD),),
             )

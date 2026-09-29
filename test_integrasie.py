@@ -95,6 +95,7 @@ def test_parallelle_dekking_stem_ooreen_en_poel_word_hergebruik():
                 poel = main.app.state.dekking_pool
             assert main.app.state.dekking_pool is poel
         assert poel is not None
+        assert poel._mp_context.get_start_method() == "spawn"
     assert main.app.state.dekking_pool is None
 
 
