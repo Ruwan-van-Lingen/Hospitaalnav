@@ -47,3 +47,6 @@ data/
 # Vorige Git-metadata en 'n geneste plaaslike kopie
 /hospitaalnav.git/
 /heuningbye/
+# Plaaslike leerhulpmiddels en rugsteune - nie deel van die stelsel nie
+Wys_Stappe.py
+rugsteun-voor-sortering/

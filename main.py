@@ -58,6 +58,8 @@ from HospitaalGrafiek import (
     kontroleer_alle_nodusse_dekking_parallel,
 )
 from VloerPlan import teken_vloer_plan
+# sorteeralgoritmes
+from Sorteer import insertion_sort, merge_sort
 
 # ---------------------------------------------------------------------------
 # Padvariabele — alle lêerpaaie word relatief tot hierdie lêer se gids
@@ -352,8 +354,12 @@ def kry_insident() -> dict:
         if ry is None:
             return {"active": False, "blocked_node_ids": [], "ontruimings_modus": False}
         node_rye = conn.execute(
-            "SELECT node_id FROM insident_nodes WHERE insident_id = 1 ORDER BY node_id"
+            "SELECT node_id FROM insident_nodes WHERE insident_id = 1"
         ).fetchall()
+        # Saamsmeltsortering: hierdie lys groei saam met die hospitaal. By 'n
+        # Kode Pink (SLUIT_ALLES) bevat dit ELKE nodus in die gebou, dus is
+        # O(n log n) hier die regte keuse.
+        node_rye = merge_sort(node_rye, sleutel="node_id")
     return {
         "active":           True,
         "code":             ry["kode_id"],
@@ -819,36 +825,59 @@ def admin_kaart(_: str = Depends(vereis_admin)):
     noodkodes vir die keuselys, en die huidige aktiewe insident.
     """
     with db_verbinding() as conn:
-        geboue = conn.execute(
-            "SELECT gebou_id, naam FROM geboue ORDER BY naam"
-        ).fetchall()
+        # Invoegsortering: die hospitaal het 'n handvol geboue (tans twee) en
+        # hierdie lys sal volgens sy aard nooit groot word nie.
+        geboue = insertion_sort(
+            conn.execute("SELECT gebou_id, naam FROM geboue").fetchall(),
+            sleutel="naam",
+        )
         resultaat = []
         for gebou in geboue:
-            vloere = conn.execute(
-                """SELECT vloer_id, naam, level_nommer FROM vloere
-                   WHERE gebou_id = ? ORDER BY level_nommer""",
-                (gebou["gebou_id"],),
-            ).fetchall()
+            # Invoegsortering: vloere per gebou is 'n klein lys (tans 3 en 2).
+            vloere = insertion_sort(
+                conn.execute(
+                    """SELECT vloer_id, naam, level_nommer FROM vloere
+                       WHERE gebou_id = ?""",
+                    (gebou["gebou_id"],),
+                ).fetchall(),
+                sleutel="level_nommer",
+            )
             vloer_data = []
             for vloer in vloere:
-                nodes = conn.execute(
-                    """SELECT node_id, etiket, tipe_kode, is_nooduitgang FROM nodes
-                       WHERE vloer_id = ? ORDER BY etiket""",
-                    (vloer["vloer_id"],),
-                ).fetchall()
+                # Saamsmeltsortering: nodusse per vloer is die lys wat die
+                # meeste groei. Die demodata het 3 tot 7 per vloer, maar 'n
+                # werklike hospitaalvloer het maklik 'n paar honderd
+                # besluitspunte, dus is O(n log n) hier die veilige keuse.
+                nodes = merge_sort(
+                    conn.execute(
+                        """SELECT node_id, etiket, tipe_kode, is_nooduitgang FROM nodes
+                           WHERE vloer_id = ?""",
+                        (vloer["vloer_id"],),
+                    ).fetchall(),
+                    sleutel="etiket",
+                )
                 vloer_data.append({**dict(vloer), "nodes": [dict(n) for n in nodes]})
             resultaat.append({**dict(gebou), "vloere": vloer_data})
-        kodes = [dict(ry) for ry in conn.execute(
-            "SELECT kode_id, naam, outomaties_modus FROM noodkodes ORDER BY naam"
-        ).fetchall()]
+
+        # Invoegsortering: daar is vier noodkodes en dit is 'n vaste lys.
+        kodes = [dict(ry) for ry in insertion_sort(
+            conn.execute(
+                "SELECT kode_id, naam, outomaties_modus FROM noodkodes"
+            ).fetchall(),
+            sleutel="naam",
+        )]
         for kode in kodes:
+            # Invoegsortering: hoogstens 'n paar voorafgekose nodusse per kode.
             kode["vooraf_node_ids"] = [
                 ry["node_id"]
-                for ry in conn.execute(
-                    """SELECT node_id FROM noodkode_vooraf_nodes
-                       WHERE kode_id = ? ORDER BY node_id""",
-                    (kode["kode_id"],),
-                ).fetchall()
+                for ry in insertion_sort(
+                    conn.execute(
+                        """SELECT node_id FROM noodkode_vooraf_nodes
+                           WHERE kode_id = ?""",
+                        (kode["kode_id"],),
+                    ).fetchall(),
+                    sleutel="node_id",
+                )
             ]
     return {"geboue": resultaat, "noodkodes": kodes, "incident": kry_insident()}
 
@@ -906,7 +935,9 @@ def aktiveer_insident(invoer: InsidentInvoer, _: str = Depends(vereis_admin)):
                     f"SELECT node_id FROM nodes WHERE node_id IN ({plekhouers})", node_ids
                 ).fetchall()
             }
-            ontbreek = sorted(set(node_ids) - gevind)
+            # Invoegsortering: hierdie lys is die inhoud van 'n foutboodskap
+            # en is byna altyd leeg of net 'n paar items lank.
+            ontbreek = insertion_sort(set(node_ids) - gevind)
             if ontbreek:
                 raise HTTPException(
                     status_code=400,

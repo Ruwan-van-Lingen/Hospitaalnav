@@ -33,6 +33,9 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from matplotlib.lines import Line2D
 
+# Handgeskrewe sorteeralgoritme, in plaas van SQL se ORDER BY.
+from Sorteer import insertion_sort
+
 # Kleurpalet vir nodustipes — ooreenstemmend met die webkoppelvlak se CSS-veranderlikes.
 NODE_KLEURE = {
     "AANSLUITING":   "#8899a6",  # Grys  — gang-aansluitingspunte
@@ -72,8 +75,11 @@ def teken_vloer_plan(db_pad: str, uit_pad: str, verlig_pad: list[str] | None = N
     conn.row_factory = sqlite3.Row
     cur = conn.cursor()
 
-    cur.execute("SELECT vloer_id, gebou_id, level_nommer, naam FROM vloere ORDER BY gebou_id, level_nommer")
-    vloere = cur.fetchall()
+    cur.execute("SELECT vloer_id, gebou_id, level_nommer, naam FROM vloere")
+    # Invoegsortering op TWEE velde. Die tuple-sleutel gee presies dieselfde
+    # volgorde as 'ORDER BY gebou_id, level_nommer': eers al die vloere van
+    # die een gebou van onder na bo, dan die van die volgende gebou.
+    vloere = insertion_sort(cur.fetchall(), sleutel=("gebou_id", "level_nommer"))
 
     cur.execute("SELECT node_id, vloer_id, tipe_kode, etiket, pos_x, pos_y, beperkte_groep FROM nodes")
     nodes = {r["node_id"]: dict(r) for r in cur.fetchall()}
