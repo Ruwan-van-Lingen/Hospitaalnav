@@ -1,22 +1,22 @@
 <!--==================================================================================
   hospitaal_wayfinder.html
   =========================
-  Interaktiewe webkoppelvlak vir die Hospitaal Navigasiestelsel (/ui).
+  Interaktiewe webkoppelvlak vir die hospitaalnavigasiestelsel (/ui).
 
   Hierdie bladsy stel besoekers en personeel in staat om:
     • 'n Beginpunt en bestemming volgens naam of node-ID te soek.
     • 'n Gebruikerstipe te kies (Publiek, Personeel, Pasiëntvervoer, Noodgeval).
-    • Die tyd-optimale toegelate roete te berekening via die FastAPI-agterkant.
+    • Die tydoptimale toegelate roete te bereken via die FastAPI-agterkant.
     • Die roete op 'n interaktiewe SVG-vloerplan te sien, met vloer-oortjies.
     • Vloere te wissel via die hysbakstyl-vloerindikator in die sykantpaneel.
-    • Stap-vir-stap-instruksies en beraamde reistyd/-afstand te lees.
+    • Roetepunte in volgorde en die beraamde reistyd en afstand te lees.
 
   Wanneer 'n aktiewe sluiting of ontruimingsmodus op die bediener bestaan,
   verskyn 'n rooi insidentbanier bo-aan die bladsy en word geslote nodusse
   in die seleksielys onaktief gemaak. In ontruimingsmodus word die bestemming
   geïgnoreer en word die naaste nooduitgang outomaties bepaal.
 
-  Alle roeteberekening word bediener-kant uitgevoer.
+  Alle roeteberekening word op die bediener uitgevoer.
   Die webkoppelvlak stuur slegs die versoek en vertoon die resultaat — die
   SVG-vloerplan self word kliëntkant geteken deur hospitaal_wayfinder.js.
 -->
@@ -25,7 +25,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Hospitaal Navigasie</title>
+    <title>Hospitaalnavigasie</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link
       href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap"
@@ -36,15 +36,15 @@
   <body>
     <header>
       <div>
-        <h1>Hospitaal Navigasie</h1>
+        <h1>Hospitaalnavigasie</h1>
         <p id="apiStatusLine">
-          Roete enjin vir hospitaal besoekers en personeel. Kies 'n beginpunt en bestemming, dan klik "Vind Roete".
+          Roetebeplanning vir hospitaalbesoekers en personeel. Kies 'n beginpunt en bestemming en klik "Vind Roete".
         </p>
       </div>
       <a class="admin-link" href="/admin">Adminaanmelding</a>
     </header>
 
-    <div id="incidentBanner" class="incident-banner" hidden>
+    <div id="incidentBanner" class="incident-banner" role="status" hidden>
       <strong id="incidentTitle"></strong>
       <span id="incidentDescription"></span>
     </div>
@@ -53,15 +53,15 @@
       <div class="main-col">
         <div class="controls">
           <div class="field">
-            <label for="apiUrl">API basis-URL</label>
+            <label for="apiUrl">Bedieneradres</label>
             <input
               type="text"
               id="apiUrl"
-              value="http://localhost:8000"
+              placeholder="Gebruik hierdie blad se bediener"
             />
           </div>
           <div class="field">
-            <label for="gebruikerTipe">Gebruiker tipe</label>
+            <label for="gebruikerTipe">Gebruikerstipe</label>
             <select id="gebruikerTipe"></select>
           </div>
           <div class="field">
@@ -78,12 +78,12 @@
           <button class="ghost" id="clearBtn">Herstel</button>
         </div>
 
-        <div class="status" id="status"></div>
+        <div class="status" id="status" role="status"></div>
 
         <div class="tabs" id="tabs"></div>
 
         <div class="plan-wrap">
-          <svg id="plan" viewBox="0 0 780 560"></svg>
+          <svg id="plan" viewBox="0 0 780 560" role="img" aria-label="Hospitaalvloerplan met nodusse en roetes"></svg>
         </div>
 
         <div class="legend" id="legend"></div>
@@ -91,7 +91,7 @@
 
       <div class="side">
         <div class="panel">
-          <h2>Vloer / Hysbak Aanwyser</h2>
+          <h2>Vloer- en hysbakaanwyser</h2>
           <div class="indicator" id="indicator"></div>
         </div>
         <div class="panel">

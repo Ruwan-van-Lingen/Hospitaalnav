@@ -1,10 +1,12 @@
-# Python cache en saamgestelde bytekode
+# Python-kas en saamgestelde bytekode
 __pycache__/
 *.py[cod]
 *$py.class
 
 # Toets- en dekkinguitsette
 .pytest_cache/
+.pytest_tmp*/
+pytest-tmp*/
 .coverage
 htmlcov/
 
@@ -33,5 +35,15 @@ Thumbs.db
 # Loglêers
 *.log
 
-# PowerPoints
-.pptx
+# Plaaslike aanbiedings
+*.pptx
+
+# Omgewingsgeheime en plaaslike databerging
+.env
+.env.*
+!.env.example
+data/
+
+# Vorige Git-metadata en 'n geneste plaaslike kopie
+/hospitaalnav.git/
+/heuningbye/

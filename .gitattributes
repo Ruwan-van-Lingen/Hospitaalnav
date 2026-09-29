@@ -1,0 +1,16 @@
+# Gebruik konsekwente reëleindes vir bronkode op Windows en Linux.
+* text=auto
+*.py text eol=lf
+*.js text eol=lf
+*.mjs text eol=lf
+*.css text eol=lf
+*.html text eol=lf
+*.sql text eol=lf
+*.md text eol=lf
+*.yml text eol=lf
+Dockerfile text eol=lf
+.gitignore text eol=lf
+.dockerignore text eol=lf
+.gitattributes text eol=lf
+*.pptx binary
+*.png binary

@@ -9,16 +9,21 @@ from dataclasses import dataclass, field
 
 @dataclass
 class BoomNodus:
+    """Bewaar 'n nodus se sleutels, ooreenstemmende waardes en kinders."""
+
     sleutels: list = field(default_factory=list)
     waardes: list = field(default_factory=list)
     kinders: list = field(default_factory=list)
 
 
 class Boom24:
+    """Selfbalanserende 2-4-boom met geordende sleutels en gekoppelde waardes."""
+
     def __init__(self):
         self.wortel = BoomNodus()
 
     def soek(self, sleutel):
+        """Gee die sleutel se waarde terug, of None wanneer dit ontbreek."""
         nodus = self.wortel
 
         while True:
@@ -46,6 +51,7 @@ class Boom24:
             nodus = nodus.kinders[i]
 
     def verdeel_kind(self, ouer, indeks):
+        """Verdeel 'n vol kind en skuif sy middelste sleutel na die ouer."""
         vol_kind = ouer.kinders[indeks]
 
         # Die kind moet vol wees en die ouer moet plek hê.

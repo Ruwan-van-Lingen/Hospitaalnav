@@ -1,26 +1,6 @@
-# ==========================================================================================
-# docker-compose.yml
-# ===================
-# Orkestreer die Hospitaal Navigasiestelsel as 'n enkele Docker-diens.
-#
-# Gebruik:
-# -------
-#   docker compose up --build -d    # Bou en begin in die agtergrond (eerste keer)
-#   docker compose up --build       # Bou en begin met logs in die voorgrond
-#   docker compose logs -f          # Volg logs van 'n lopende diens
-#   docker compose down             # Stop en verwyder die diens
-#
-# URL's (nadat die diens begin het)
-# ----------------------------------
-#   http://localhost:8000/ui       — Interaktiewe webkoppelvlak (publiek)
-#   http://localhost:8000/admin    — Sluitingsadministrasie (admin-aanmelding benodig)
-#   http://localhost:8000/docs     — Swagger API-dokumentasie
-#
-# Sekuriteit
-# -----------
-# Verander die omgewings veranderlikes hier onder voordat die diens in
-# produksie ontplooi word. Moenie die verstekwaardes gebruik nie.
-
+# Begin met: docker compose up --build -d
+# Webkoppelvlak: http://localhost:8000/ui
+# Administrasie: http://localhost:8000/admin
 services:
   hospitaalnav:
     build:
@@ -31,12 +11,17 @@ services:
     ports:
       - "8000:8000"
     environment:
-      # Stel op "false" om die databasis ná die eerste opstart te behou.
-      # Nuttig in produksie sodat aktiewe insidente nie by herbegin verlore gaan nie.
+      # Bewaar die databasis wanneer die houer herbegin of herskep word.
       AUTO_HERBOU_DB: "false"
-
-      # VERANDER hierdie waardes vir enige nie-ontwikkelingsomgewing!
-      ADMIN_GEBRUIKERSNAAM: "admin"
-      ADMIN_WAGWOORD: "heuningbye123!"
-      SESSIE_GEHEIM: "vervang-met-n-lang-willekeurige-geheim"
+      DB_PAD: "/app/data/hospitaal.db"
+      # Stel eie waardes via die omgewing of 'n plaaslike .env-lêer.
+      # Die terugvalwaardes is slegs vir plaaslike demonstrasies.
+      ADMIN_GEBRUIKERSNAAM: "${ADMIN_GEBRUIKERSNAAM:-admin}"
+      ADMIN_WAGWOORD: "${ADMIN_WAGWOORD:-admin}"
+      SESSIE_GEHEIM: "${SESSIE_GEHEIM:-verander-hierdie-ontwikkelingsgeheim}"
+    volumes:
+      - hospitaaldata:/app/data
     restart: unless-stopped
+
+volumes:
+  hospitaaldata:

@@ -1,354 +1,281 @@
 # Hospitaal Binnenshuise Navigasie
 
-Hierdie projek is 'n binnenshuise navigasiestelsel vir 'n hospitaal. Dit gebruik 'n topologiese grafiek en die A*-algoritme om die vinnigste toegelate roete tussen twee plekke te bereken. Die stelsel neem vloere, hysbakwagtyd, trappe, gebouverbindings en gebruikerstoegang in ag.
+'n Akademiese demonstrasie van binnenshuise hospitaalnavigasie met Python,
+FastAPI, SQLite en 'n webkoppelvlak. Die hospitaal word as 'n geweegde grafiek
+voorgestel: nodusse is bestemmings of keusepunte en rande is verbindings met
+reistye, afstande en toegangsbeperkings.
 
-Die sluitings-MVP voeg 'n beskermde adminblad by waarmee een aktiewe
-onderhouds-, skoonmaak- of veiligheidsinsident se nodusse gesluit kan word.
-A* bereken openbare roetes outomaties rondom die geslote nodusse.
+## Funksies
 
-## Hooffunksies
+- Soek bestemmings volgens naam, nodus-ID, nodustipe, gebou of vloer met 'n
+  2-4-boom in geheue.
+- Bereken toegelate roetes met A*, met wagtyd by die basisreistyd ingesluit.
+- Vind die naaste bereikbare nooduitgang met multibron-Dijkstra; hysbakke word
+  by ontruiming uitgesluit.
+- Wys roetes en sluitings op 'n interaktiewe SVG-kaart of laai 'n PNG-kaart af.
+- Bestuur een aktiewe insident deur die beskermde administrasieblad.
+- Kontroleer ontruimingsdekking per nodus met parallelle werkprosesse.
+- Bereken 'n minimum spanboom of spanwoud met Kruskal.
+- Bereken gemodelleerde maksimum vloei na nooduitgange met Edmonds–Karp.
 
-- Soek bestemmings volgens naam, node-ID, nodetipe, gebou of vloer.
-- Bereken die vinnigste roete tussen twee nodes.
-- Beperk roetes volgens die gebruiker se toegangsregte.
-- Wys die roete, node-telling en beraamde reistyd as JSON.
-- Genereer 'n PNG-vloerplan waarop die roete uitgelig is.
-- Wys 'n interaktiewe webkoppelvlak met vloer-oortjies en roetestappe.
-- Bestuur een aktiewe sluiting by `/admin` en wys dit op die openbare kaart.
-
-## Sluitingsadministrasie
-
-Open `http://localhost:8000/admin`. Stel die adminrekening en sessiegeheim met
-omgewingsveranderlikes:
-
-```powershell
-$env:ADMIN_GEBRUIKERSNAAM="admin"
-$env:ADMIN_WAGWOORD="kies-'n-sterk-wagwoord"
-$env:SESSIE_GEHEIM="kies-'n-lang-willekeurige-geheim"
-$env:AUTO_HERBOU_DB="false"
-```
-
-Wanneer `AUTO_HERBOU_DB=false` is, bly 'n aktiewe insident behoue ná 'n
-toepassingsherbegin. As die databasis nog nie bestaan nie, word dit steeds
-eenmalig uit `Skema.sql` en `SeedData.sql` geskep.
-- Bedien die webkoppelvlak direk vanaf die API by `/ui`.
-- Verwerp onbekende gebruikerstipes met 'n duidelike foutboodskap.
-
-Die ondersteunde gebruikerstipes is:
-
-| Gebruikerstipe | Toegang |
-|---|---|
-| `PUBLIEK` | Openbare areas |
-| `PERSONEEL` | Openbare, personeel- en ICU-areas |
-| `PASIENT_VERVOER` | Openbare en personeelareas |
-| `NOODGEVAL` | Alle gedefinieerde areas |
-
-## Tegnologie
-
-- Python 3.10 of nuwer
-- FastAPI en Uvicorn
-- SQLite
-- Matplotlib
-- HTML, CSS, JavaScript en SVG
-- Pytest
-
-Matplotlib gebruik die nie-interaktiewe `Agg`-agterkant, sodat roeteprente veilig binne FastAPI en bedieneromgewings gegenereer kan word.
+Die voorbeelddata en randkapasiteite is vir demonstrasie. 'n Berekende
+ontruimingsroete of vloeisyfer is nie 'n gevalideerde hospitaalveiligheidsplan
+of 'n gemete ontruimingsvermoë nie.
 
 ## Projekstruktuur
 
 | Lêer | Doel |
 |---|---|
-| `main.py` | FastAPI-toepassing en HTTP-eindpunte |
-| `HospitaalGrafiek.py` | Databasislaaier, bestemmingsoektog en A*-roetebepaling |
-| `Boom24.py` | Selfbalanserende 2-4-boom met metadata-soektog vir bestemmings |
-| `VloerPlan.py` | Matplotlib-vloerplan en roeteprent |
-| `Skema.sql` | SQLite-databasisskema |
-| `SeedData.sql` | Voorbeeldgeboue, vloere, nodes en rande |
-| `hospitaal_wayfinder.html` | Interaktiewe webkoppelvlak |
-| `test_main.py` | Geoutomatiseerde API-toetse |
-| `test_boom24.py`, `test_bestemmingsindeks.py` | Boomreëls, invoeging en indeksintegrasie |
-| `conftest.py` | Afsonderlike tydelike databasis per toets |
-| `.gitignore` | Verhoed dat gegenereerde lêers na Git gestoot word |
+| `main.py` | FastAPI-eindpunte, sessies, insidente en werkprosesbestuur |
+| `HospitaalGrafiek.py` | Grafieklaai, lambda-formules, A*, Dijkstra, spanboom en maksimum vloei |
+| `Boom24.py` | 2-4-boom en geordende bestemmingsoektog |
+| `VloerPlan.py` | PNG-vloerplan met Matplotlib se nie-interaktiewe `Agg`-agterkant |
+| `Skema.sql`, `SeedData.sql` | Databasisstruktuur en demonstrasiedata |
+| `hospitaal_wayfinder.html`, `hospitaal_wayfinder.css`, `hospitaal_wayfinder.js` | Openbare navigasiekoppelvlak |
+| `admin.html`, `admin.css`, `admin.js` | Administrasiekoppelvlak |
+| `test_*.py`, `conftest.py` | Toetse met afsonderlike tydelike databasisse |
+| `Dockerfile`, `docker-compose.yml` | Houerbou en blywende databerging |
 
-## Installasie
+## Installasie en opstart
 
-### Docker Desktop (vereiste metode)
-
-Maak Docker Desktop oop en wag totdat die Linux-container-enjin gereed is. Bou en begin daarna die volledige toepassing vanuit die projekgids:
+Die projek gebruik Python 3.10 of nuwer; die Docker-beeld gebruik Python 3.12.
+Git-toegang tot die Akademia-bediener en 'n geregistreerde SSH-sleutel is
+nodig om die bewaarplek te kloon.
 
 ```powershell
-docker compose up --build -d
+git clone ssh://git@gitlab.akademia.ac.za:2222/rkw/ngpro262/2026/heuningbye.git
+cd heuningbye
 ```
 
-Kontroleer die container se status en logs:
-
-```powershell
-docker compose ps
-docker compose logs -f hospitaalnav
-```
-
-Die toepassing is beskikbaar by:
-
-- Webkoppelvlak: `http://localhost:8000/ui`
-- Swagger-dokumentasie: `http://localhost:8000/docs`
-- API: `http://localhost:8000`
-
-Stop en verwyder die container met:
-
-```powershell
-docker compose down
-```
-
-Die SQLite-demodatabasis word by elke container-start uit `Skema.sql` en `SeedData.sql` herbou. Die bronkode en plaaslike gegenereerde databasisse word nie in die Docker-image ingesluit nie.
-
-### Plaaslike Python-ontwikkeling
-
-Clone die repository en beweeg na die projekgids:
-
-```powershell
-git clone ssh://git@gitlab.akademia.ac.za:2222/ngpro262/hospitaalnav.git
-cd hospitaalnav
-```
-
-Skep en aktiveer 'n virtuele omgewing:
+### Plaaslike Python-omgewing
 
 ```powershell
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
-```
-
-Installeer die afhanklikhede:
-
-```powershell
-python -m pip install --upgrade pip
 python -m pip install -r requirements.txt
 ```
 
-## Begin die API
-
-Begin FastAPI vanuit die projekgids:
+Stel die omgewing en begin die toepassing:
 
 ```powershell
+$env:ADMIN_GEBRUIKERSNAAM = "admin"
+$env:ADMIN_WAGWOORD = "kies-'n-sterk-wagwoord"
+$env:SESSIE_GEHEIM = "kies-'n-lang-willekeurige-geheim"
+$env:AUTO_HERBOU_DB = "false"
 python -m uvicorn main:app --reload
 ```
 
-Die volgende adresse is dan beskikbaar:
+| Adres | Doel |
+|---|---|
+| `http://127.0.0.1:8000/ui` | Navigasiekoppelvlak |
+| `http://127.0.0.1:8000/admin` | Sluitingsadministrasie |
+| `http://127.0.0.1:8000/docs` | Interaktiewe API-dokumentasie |
+| `http://127.0.0.1:8000/openapi.json` | OpenAPI-skema |
 
-- API: `http://127.0.0.1:8000`
-- Webkoppelvlak: `http://127.0.0.1:8000/ui`
-- Swagger-dokumentasie: `http://127.0.0.1:8000/docs`
-- OpenAPI-skema: `http://127.0.0.1:8000/openapi.json`
+Die HTML-, CSS- en JavaScript-lêers word deur dieselfde toepassing bedien;
+'n tweede webbediener is nie nodig nie.
 
-Die databasis word standaard uit `Skema.sql` en `SeedData.sql` herbou wanneer die API begin. Stel die volgende omgewingsveranderlike om dit af te skakel:
+### Docker
 
-```powershell
-$env:AUTO_HERBOU_DB="false"
-python -m uvicorn main:app --reload
-```
-
-## Begin die webkoppelvlak
-
-Die eenvoudigste metode is om die webkoppelvlak direk vanaf FastAPI oop te maak:
-
-```text
-http://127.0.0.1:8000/ui
-```
-
-Alternatiewelik kan dit met 'n aparte plaaslike webbediener bedien word. Hou die API aan die gang en open 'n tweede PowerShell-venster in die projekgids:
-
-Hou die API aan die gang en open 'n tweede PowerShell-venster in die projekgids:
+Maak Docker Desktop oop en wag tot die Linux-houerenjin gereed is. Stel
+dieselfde administrasieveranderlikes as hier bo en voer uit:
 
 ```powershell
-python -m http.server 5500
+docker compose up --build -d
+docker compose ps
+docker compose logs -f hospitaalnav
 ```
 
-Open daarna:
+Compose stoor SQLite in die benoemde volume `hospitaaldata` by
+`/app/data/hospitaal.db`. Die volume bly behoue wanneer die houer herbegin
+of herskep word. Die bronkode en afhanklikhede word in die beeld ingesluit;
+plaaslike databasisse, geheime, Git-metadata en kaslêers word uitgesluit.
 
-```text
-http://127.0.0.1:5500/hospitaal_wayfinder.html
+Stop die diens met `docker compose down`. Hierdie opdrag behou die volume.
+`docker compose down -v` verwyder ook die volume en dus die databasis;
+gebruik dit slegs wanneer jy die data doelbewus wil verwyder.
+
+## Instellings en databerging
+
+| Omgewingsveranderlike | Betekenis |
+|---|---|
+| `DB_PAD` | Databasispad; verstek is `hospitaal.db` langs `main.py`. Relatiewe paaie word vanaf die projekgids bereken. |
+| `AUTO_HERBOU_DB` | `true` herskep die databasis by opstart; `false` behou bestaande data. Plaaslike verstek is `true`; Compose stel `false`. |
+| `ADMIN_GEBRUIKERSNAAM` | Administrateur se gebruikersnaam; ontwikkelingsverstek is `admin`. |
+| `ADMIN_WAGWOORD` | Administrateur se wagwoord; ontwikkelingsverstek is `admin`. |
+| `SESSIE_GEHEIM` | Geheim waarmee die administrasiesessie onderteken word. |
+
+'n Ontbrekende databasis word uit die SQL-lêers geskep, ongeag
+`AUTO_HERBOU_DB`. Met `true` gaan bestaande insidente en ander
+databasisveranderinge by opstart verlore. Gebruik `false` om dit te behou.
+Veranderinge aan `SeedData.sql` verander nie outomaties etikette in 'n
+bestaande databasis nie.
+
+Vervang die ontwikkelingsbewyse en sessiegeheim vir enige gedeelde ontplooiing.
+'n Werklike ontplooiing vereis ook gepaste HTTPS- en toegangsbeheeropstelling.
+
+## Roetes, afstand en gewigte
+
+Die projek gebruik twee benoemde lambda-funksies in die werklike berekeninge:
+
+```python
+BEREKEN_AFSTAND = lambda pos_a, pos_b: math.hypot(
+    pos_a[0] - pos_b[0], pos_a[1] - pos_b[1]
+)
+BEREKEN_GEWIG = lambda basis_gewig_s, wag_penalty_s: (
+    float(basis_gewig_s) + float(wag_penalty_s)
+)
 ```
 
-Die API-basis-URL in die webkoppelvlak moet `http://localhost:8000` wees. Gebruik die soekvelde om die beskikbare beginpunte en bestemmings te filtreer, kies 'n opsie uit elke keuselys en klik **Vind Roete**.
+`BEREKEN_AFSTAND` bereken die reguitlynafstand tussen twee koördinaatpare.
+`BEREKEN_GEWIG` tel basisreistyd en wagtyd in sekondes bymekaar. Roetes
+minimaliseer reistyd; afstand in meter word apart langs die gekose roete
+opgetel. Die vinnigste roete is dus nie noodwendig die kortste roete in meter nie.
+
+A* gebruik die metriek `afstand(a, b) + 20 × vloerverskil(a, b)`.
+Die waarde 20 is hier 'n metriekfaktor, nie 'n beweerde reistyd per vloer nie.
+Die skaal is die kleinste verhouding `randgewig / randmetriek` oor alle
+rande met 'n positiewe metriek; sonder sulke rande is die skaal nul.
+Die heuristiek is `h(n) = skaal × metriek(n, doel)`. Só is elke randkoste
+minstens die geskaalde metriek oor daardie rand, wat saam met die
+driehoeksongelykheid 'n konsekwente ondergrens vir die gelaaide grafiek gee.
+Toetse vergelyk A* se koste met 'n Dijkstra-verwysing.
+
+Ontruiming respekteer randrigtings, toegangsbeperkings en geslote nodusse.
+
+| Gebruikerstipe | Toegang |
+|---|---|
+| `PUBLIEK` | Openbare gebiede |
+| `PERSONEEL` | Openbare, personeel- en intensiewesorggebiede |
+| `PASIENT_VERVOER` | Openbare en personeelgebiede |
+| `NOODGEVAL` | Alle gedefinieerde toegangsgroepe |
+
+## Bestemmingsindeks
+
+`Boom24` hou hoogstens drie sleutels per nodus en alle blare op dieselfde
+diepte. Invoeging verdeel vol nodusse van bo na onder. Die sleutel
+`(genormaliseerde_naam, node_id)` onderskei bestemmings met dieselfde naam.
+
+Presiese soek en invoeging verg O(log n) sleutelvergelykings.
+`in_volgorde()` lewer geordende sleutel/waarde-pare in O(n).
+`soek_metadata()` ondersoek hoogstens alle bestemmings en kos dus O(n)
+vir 'n vaste hoeveelheid teks per bestemming. Die boom maak hierdie
+gedeeltelike tekssoektog nie logaritmies nie.
+
+Soekterme word met `strip().casefold()` genormaliseer. Naamtreffers kom
+eerste; ander metadata-treffers volg. `%` en `_` is letterlike karakters.
+SQLite bly die permanente databron. Roep
+`grafiek.herbou_bestemmingsindeks()` aan ná veranderinge aan
+bestemmingsmetadata, of herbegin die toepassing met databasisbehoud.
+Direkte verwydering uit die boom word nie ondersteun nie.
 
 ## API-eindpunte
 
-### `GET /`
+Die eindpunte en versoekparameters is by `/docs` beskikbaar.
 
-Gee 'n verwelkomingsboodskap terug.
+| Metode en pad | Doel | Aanmelding |
+|---|---|---|
+| `GET /` | Verwelkomingsboodskap | Nee |
+| `GET /ui` | Navigasiekoppelvlak | Nee |
+| `GET /destinations?q=&limiet=20` | Soek bestemmings; limiet tussen 1 en 100 | Nee |
+| `GET /route?begin=&doel=&gebruiker_tipe=PUBLIEK` | Gewone roeteberekening | Nee |
+| `GET /route/ontruim?begin=&gebruiker_tipe=PUBLIEK` | Roete na 'n bereikbare nooduitgang | Nee |
+| `GET /route/image?begin=&doel=&gebruiker_tipe=PUBLIEK` | Aflaaibare PNG-roetekaart | Nee |
+| `GET /incident` | Huidige insident en geblokkeerde nodusse | Nee |
+| `GET /admin` | Administrasieblad met aanmeldvorm | Nee |
+| `POST /admin/login` | Skep 'n ondertekende sessiekoekie | Aanmeldbewyse |
+| `POST /admin/logout` | Verwyder die sessiekoekie | Nee |
+| `GET /admin/map` | Geboue, vloere, nodusse en noodkodes | Ja |
+| `POST /admin/incident` | Aktiveer of vervang die huidige insident | Ja |
+| `DELETE /admin/incident` | Kanselleer die huidige insident | Ja |
+| `GET /admin/dekking-kontrole?gebruiker_tipe=PUBLIEK` | Ontruimingsdekking per nodus | Ja |
+| `GET /analise/spanboom` | Minimum spanboom of spanwoud | Ja |
+| `GET /analise/maks_vloei?bron=&gebruiker_tipe=PUBLIEK` | Gemodelleerde vloei na nooduitgange | Ja |
 
-### `GET /ui`
-
-Bedien `hospitaal_wayfinder.html` as die interaktiewe webkoppelvlak. Dit gee `404` terug indien die HTML-lêer nie beskikbaar is nie.
-
-### `GET /destinations`
-
-Soek mensleesbare bestemmings.
-
-| Parameter | Vereis | Beskrywing |
-|---|---:|---|
-| `q` | Nee | Naam, node-ID, tipe, gebou of vloer |
-| `limiet` | Nee | Maksimum resultate, tussen 1 en 100; verstek is 20 |
-
-Voorbeeld:
-
-```text
-GET http://127.0.0.1:8000/destinations?q=Radiologie
-```
-
-Die beginpunt- en bestemmingslyste op `/ui` gebruik een metadata-soektog
-deur die 2-4-boom. Tik byvoorbeeld `diologie` om `Radiologie` te vind:
+Voorbeelde:
 
 ```text
-GET http://127.0.0.1:8000/destinations?q=diologie&limiet=20
+GET /destinations?q=Radiologie
+GET /route?begin=MAIN-G-ENT&doel=SYGEBOU-1-RAD&gebruiker_tipe=PUBLIEK
+GET /route/ontruim?begin=MAIN-1-WARDA&gebruiker_tipe=PUBLIEK
 ```
 
-Die soekterm word met `strip().casefold()` genormaliseer en as letterlike teks
-enige plek in die naam, node-ID, nodustipe, gebounaam of vloernaam gesoek.
-Naamtreffers kom eerste, gevolg deur ander metadata-treffers; elke groep is
-in genormaliseerde naamvolgorde met node-ID as gelykopbreker. 'n Leë soekterm
-lewer die eerste bestemmings in boomvolgorde. `%` en `_` is gewone karakters,
-nie SQL-wildcards nie. Geen moduskeuse of SQL-soeknavraag word gebruik nie.
+Die `?` begin die navraagparameters en `&` skei die parameters.
 
-### Fase 2: die 2-4-bestemmingsindeks
+### Insidente en analise
 
-`Boom24` stoor 1–3 sleutels per nieleë nodus en hou alle blare ewe diep.
-`voeg_in()` verdeel vol nodusse van bo na onder met `verdeel_kind()`;
-'n bestaande sleutel se waarde word opgedateer. Die sleutel is
-`(genormaliseerde_naam, node_id)`, sodat gelyknamige bestemmings apart bly.
-Die ooreenstemmende waarde bevat die volledige bestemmingsmetadata.
+Gewone insidente sluit die gekose nodusse. Kode Rooi aktiveer ontruiming
+vir almal; Kode Pink sluit alle nodusse. Aktivering vervang die enkele
+bestaande insident.
 
-Presiese soek en invoeging neem O(log n) sleutelvergelykings. `in_volgorde()`
-lewer sleutel/waarde-pare as 'n iterator; 'n volledige deurloop kos O(n).
-`soek_metadata()` ondersoek hoogstens elke bestemming en toets die vyf velde
-afsonderlik met Python se `in`. Dit kos O(n) vir 'n vaste hoeveelheid teks per
-bestemming; die koste van teksvergelykings moet andersins ook verreken word.
-Die boom verskaf die geordende deurloop sonder 'n bykomende sorteerstap.
-Naam- en ander treffers word elk tot die aangevraagde limiet versamel, waarna
-die finale lys beperk word. Dit voorkom dat vroeë geboutreffers latere
-naamtreffers verdring. Die resultaatbuffers gebruik O(limiet) geheue.
-`valideer()` kontroleer sleutelvolgorde, intervalle, kindtellings, waardes,
-hergebruikte nodusse en blaardieptes in O(n).
+Dekkingskontrole gebruik afsonderlike werkprosesse om nodusse te ondersoek
+en kombineer hul resultate. Prosesopstart en dataoordrag het koste;
+parallelle uitvoering waarborg nie 'n spoedwins vir hierdie klein grafiek nie.
 
-SQLite bly die permanente databron. Die indeks word tydens opstart in
-O(n log n) gebou en gebruik O(n) geheue. Metadata-soektogte maak geen nuwe
-SQL-verbinding nie. Ná databasisveranderinge aan bestemmingsname of metadata
-moet `grafiek.herbou_bestemmingsindeks()` aangeroep of die toepassing herbegin
-word. Die metode bou eers 'n nuwe boom voordat die indeksverwysing vervang word.
-Sluitings word steeds deur die bestaande sluitings- en roetelogika hanteer.
-Verwydering uit die boom is nog nie geïmplementeer nie; herbou die indeks ná
-verwyderings in SQLite. Geen spoedwins bo SQLite word sonder metings beweer nie.
+Die spanboomanalise behandel die grafiek as 'n ongerigte verbindingsmodel.
+Dit is 'n netwerkontwerpberekening, nie 'n roete-instruksie of ontruimingsplan
+nie. Vir 'n onsamehangende grafiek word 'n spanwoud teruggegee; die antwoord
+meld `is_verbind` en `aantal_komponente`.
 
-```python
-from Boom24 import Boom24
+Maksimum vloei gebruik randkapasiteite en 'n gesamentlike uitvloei na
+nooduitgange. Kapasiteit is 'n ander grootheid as reistyd: 'n vinniger
+rand beteken nie outomaties 'n groter kapasiteit nie. Die
+demonstrasiekapasiteite stel persone per sekonde voor, maar is nie
+gekalibreerde metings nie.
+Wanneer die bron reeds 'n uitgang is, dui `reeds_by_uitgang` dit aan.
 
-boom = Boom24()
-for sleutel in (10, 20, 30, 40):
-    boom.voeg_in(sleutel, f"Bestemming {sleutel}")
-assert boom.soek(30) == "Bestemming 30"
-assert boom.valideer()
-print(list(boom.in_volgorde()))
-```
-
-### `GET /route`
-
-Bereken 'n toegelate roete.
-
-| Parameter | Vereis | Beskrywing |
-|---|---:|---|
-| `begin` | Ja | Beginnode se ID |
-| `doel` | Ja | Eindnode se ID |
-| `gebruiker_tipe` | Nee | Verstek is `PUBLIEK` |
-
-Voorbeeld:
-
-```text
-GET http://127.0.0.1:8000/route?begin=MAIN-G-ENT&doel=SYGEBOU-1-RAD&gebruiker_tipe=PUBLIEK
-```
-
-Voorbeeldantwoord:
-
-```json
-{
-  "begin_node": "MAIN-G-ENT",
-  "doel_node": "SYGEBOU-1-RAD",
-  "gebruiker_tipe": "PUBLIEK",
-  "geskatte_tyd_sekondes": 83.0,
-  "geskatte_tyd": "1m 23s",
-  "geskatte_afstand_m": 83.0,
-  "geskatte_afstand": "83m",
-  "node_telling": 9,
-  "pad": [
-    "MAIN-G-ENT",
-    "MAIN-G-J01",
-    "MAIN-G-STA",
-    "MAIN-1-STA",
-    "MAIN-1-J01",
-    "MAIN-1-BRIDGE",
-    "SYGEBOU-1-BRIDGE",
-    "SYGEBOU-1-ELV",
-    "SYGEBOU-1-RAD"
-  ]
-}
-```
-
-### `GET /route/image`
-
-Bereken die roete en lewer 'n PNG-vloerplan waarop dit uitgelig is.
-
-```text
-GET http://127.0.0.1:8000/route/image?begin=MAIN-G-ENT&doel=SYGEBOU-1-RAD&gebruiker_tipe=PUBLIEK
-```
-
-## Algemene HTTP-antwoorde
+### HTTP-statuskodes
 
 | Status | Betekenis |
-|---:|---|
-| `200` | Versoek was suksesvol |
-| `400` | Begin- of eindnode bestaan nie, of die gebruikerstipe is ongeldig |
-| `403` | Geen toegelate roete bestaan vir die gebruikerstipe nie |
-| `422` | Vereiste parameters ontbreek of is ongeldig |
+|---|---|
+| `200` | Suksesvolle versoek |
+| `400` | Onbekende nodus, gebruikerstipe of ongeldige invoer |
+| `401` | Aanmelding ontbreek of is ongeldig |
+| `403` | Geen toegelate roete vir die gebruiker nie |
+| `404` | 'n Gevraagde hulpbron ontbreek |
+| `409` | 'n Aktiewe sluiting verhoed die versoek, of geen toegelate ontruimingsvloei is moontlik nie |
+| `422` | Vereiste parameters ontbreek of misluk invoervalidering |
 
 ## Toetse
 
-Voer die toetsstel uit met:
+Voer die hele toetsstel vanuit die projekgids uit:
 
 ```powershell
 python -m pytest -q
 ```
 
-Die toetsstel gebruik tydelike databasisse sodat plaaslike insidente behoue bly,
-en bevestig onder meer dat:
+Gebruik `python -m pytest --collect-only -q` om die huidige aantal toetse
+te sien. `conftest.py` laat API-toetse hul eie tydelike databasisse gebruik;
+dit herskep nie die plaaslike werkdatabasis nie. Die toetse dek onder meer
+die 2-4-boom, lambda-formules, toegang, A*, eenrigting-ontruiming,
+insidente, grafiekanalise, parallelle dekking en PNG-uitvoer.
 
-- Radiologie volgens naam gevind word.
-- Soektogte nie hooflettersensitief is nie.
-- Nooddienste as `MAIN-G-ER` beskikbaar is.
-- 'n gevonde bestemming in 'n roeteversoek gebruik kan word.
-- `PERSONEEL` die ICU kan bereik.
-- 'n onbekende gebruikerstipe met status `400` verwerp word.
-- `/ui` 'n HTML-webkoppelvlak bedien.
-- `/route/image` 'n geldige PNG-lêer lewer.
+Voer die JavaScript-regressietoetse met Node.js uit:
 
-- Admin-eindpunte aanmelding vereis en admins sluitings kan aktiveer en kanselleer.
-- A* om aktiewe sluitings roeteer en geblokkeerde bestemmings korrek verwerp word.
-- Ontruimingsroetes 'n veilige uitgang vind sonder om hysbakke te gebruik.
-- Kode Rooi almal outomaties ontruim en Kode Pink die hele hospitaal sluit.
-- Gewone noodkodes minstens een nodus vereis en noodkodemetadata beskikbaar is.
-- Die admin-dropdown die korrekte voorafgekose nodusse per insidenttipe ontvang.
+```powershell
+node --test test_frontend.mjs
+```
 
-## Databasismodel
+Hierdie toetse gebruik 'n nagebootste blaaieromgewing en vervang nie 'n
+visuele blaaierkontrole nie. Die ontledingsfunksies is tans API-eindpunte;
+die adminblad self bestuur aanmelding en sluitings.
 
-Die hospitaal word as 'n grafiek gestoor:
+## Git-werkvloei
 
-- `geboue`: hospitaalgeboue.
-- `vloere`: vloere wat aan geboue behoort.
-- `node_tipes`: ingange, departemente, gange, hysbakke en ander tipes.
-- `nodes`: keusepunte en bestemmings met vloerplankoördinate.
-- `rande`: geweegde verbindings tussen nodes.
-- `gebruiker_tipes`: ondersteunde gebruikersrolle.
-- `toegang_toestemmings`: beperkte groepe wat elke rol mag betree.
+Haal nuwe takke op en bekyk hulle:
 
-'n Rand se roetekoste is die basisreistyd plus enige wagtyd. Die A*-heuristiek gebruik die afstand tussen koördinate en 'n vaste strafwaarde vir vloerveranderings.
+```powershell
+git fetch origin
+git branch -r
+```
 
-## Toepassingslewensiklus
+Gebruik die projek se boodskapformaat wanneer veranderinge vasgelê word:
 
-FastAPI gebruik 'n lifespan-hanteerder om die databasis by ontwikkelingstart te herbou en die hospitaalgrafiek een keer in geheue te laai. Dit vervang die verouderde `startup`-gebeurtenis en verseker dat die grafiek gereed is voordat versoeke verwerk word.
+```text
+# 2025050627 | Function | Beskryf die verandering in Afrikaans
+```
+
+Gegenereerde databasisse, tydelike toetslêers, virtuele omgewings en
+plaaslike Git-kopieë word deur `.gitignore` uitgesluit. Die openbare
+identifiseerders, biblioteekname en bestaande API-velde bly stabiel;
+kommentaar en mensleesbare verduidelikings is Afrikaans.

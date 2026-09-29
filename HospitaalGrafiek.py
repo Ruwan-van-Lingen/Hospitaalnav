@@ -1,59 +1,43 @@
-"""============================================================================
-HospitaalGrafiek.py
-====================
-Grafiek-laaier en roete-algoritmes vir die Hospitaal Navigasiestelsel.
+"""Grafieklaaier en netwerkalgoritmes vir die hospitaalnavigasiestelsel.
 
-Hierdie module laai die topologiese grafiek (nodusse en rande) uit die
-SQLite-databasis en bied twee roete-algoritmes aan:
+A* vind die tyd-optimale toegelate pad. Die heuristiek is 'n metriek van
+koördinate en vloervlakke, geskaal volgens die kleinste verhouding tussen
+randtyd en randmetriek. Só bly die skatting 'n geldige onderste tydgrens;
+'n vaste vloerstraf sonder dié skaling sou nie korrektheid waarborg nie.
 
-  1. astar()              — A* vir normale navigasie tussen twee nodusse.
-  2. naaste_veilige_uitgang() — Multi-bron Dijkstra vir ontruimingsmodus.
-
-Waarom A* vir normale navigasie?
----------------------------------
-A* is 'n ingeligte soekalgoritme wat 'n heuristiek gebruik om die soekruimte
-te sny. Die heuristiek (reguitlynafstand + vloerveranderingstraf) is toelaatbaar
-(dit oorskat nooit die werklike koste nie), sodat A* gewaarborg is om die
-optimale pad te vind. In 'n klein hospitaalgrafiek (<100 nodusse) is A* meer
-as voldoende en bied dit ook 'n verstaanbare uitbreipunt vir toekomstige
-uitbreidings soos dinamiese verkeerslading.
-
-Waarom Multi-bron Dijkstra vir ontruimingsmodus?
--------------------------------------------------
-Tydens 'n noodsituasie is ons doel NIE om na 'n spesifieke bestemming te
-navigeer nie — ons wil die NAASTE veilige nooduitgang vind uit ENIGE van die
-moontlike uitgange. Hierdie probleem het "single-source, multiple-target
-shortest path" en word doeltreffend opgelos deur omgekeerde multi-bron
-Dijkstra:
-
-  • Alle nooduitgange word gelyktydig as beginpunte in die hoop gelaai
-    (elk met koste 0).
-  • Dijkstra brei omgekeerd uit (deur die omgekeerde aangrensingsstruktuur)
-    totdat dit die gebruiker se beginpunt bereik.
-  • Die eerste keer dat die beginpunt bereik word, is dit gewaarborg die
-    goedkoopste (tyd-optimale) pad na die naaste uitgang.
-
-Dit is wiskundig ekwivalent aan n enkele voorwaartse soektog na 'n
-versameling teikens, maar is dikwels vinniger omdat die soektog stop sodra
-een uitgang gevind word. 'n Heuristiek soos in A* sou hier ook kon werk,
-maar sou 'n skenking verg na ELKE moontlike uitgang — Dijkstra sonder
-heuristiek is hier eenvoudiger en onfeilbaar korrek.
-
-Brandveiligheidsreël: Hysbakrande word outomaties uitgelaat tydens
-ontruiming — slegs trappe, lugbrûe en tonnels word toegelaat.
+Ontruiming gebruik omgekeerde multibron-Dijkstra vanaf alle toegelate
+nooduitgange. Slegs werklike randrigtings word gevolg en hysbakke word
+uitgesluit. Kruskal ontleed die ongerigte infrastruktuur; Edmonds-Karp
+bereken gemodelleerde maksimum vloei. Geen van hierdie demonstrasies
+vervang 'n professioneel goedgekeurde ontruimingsplan nie.
 """
 
 import sqlite3
 import math
 import heapq
-from dataclasses import dataclass, field
+from collections import defaultdict, deque
+from concurrent.futures import ProcessPoolExecutor
+from contextlib import closing
+from dataclasses import dataclass
 from typing import Optional
 from Boom24 import Boom24
 
-# Straftyd (sekondes) wat bygevoeg word vir elke vloerverandering in die
-# A*-heuristiek. Hierdie waarde verseker dat die heuristiek toelaatbaar bly
-# terwyl dit die algoritme aanmoedig om onnodige vloerwisselings te vermy.
+# Skaal vir vloerverskille in die meetkundige metriek. Die metriek word
+# daarna volgens werklike randtye geskaal; 20 is dus nie 'n reistydwaarborg nie.
 VLOER_VERANDER_PENALTY_S = 20.0
+VERSTEK_KAPASITEIT = 4.0  # Demonstrasiewaarde in persone per sekonde.
+
+# Afstand/gewigsfunksies
+# ----------------------
+# Die projekvereiste vra uitdruklik dat lambda-funksies gebruik word. Hierdie
+# twee benoemde lambda's hou die formules op een plek en word deur die werklike
+# grafieklaai- en A*-kode hieronder gebruik.
+BEREKEN_AFSTAND = lambda pos_a, pos_b: math.hypot(  # noqa: E731
+    pos_a[0] - pos_b[0], pos_a[1] - pos_b[1]
+)
+BEREKEN_GEWIG = lambda basis_gewig_s, wag_penalty_s: (  # noqa: E731
+    float(basis_gewig_s) + float(wag_penalty_s)
+)
 
 
 @dataclass
@@ -64,6 +48,14 @@ class Rand:
     rand_tipe: str      # Byvoorbeeld 'GANG', 'HUISBAK', 'TRAPPE', 'LUGBRUG', 'TONNEL'.
     vloer_verander: int # Aantal vloere wat hierdie rand oorsteek (0 vir horisontale rande).
     afstand_m: float    # Fisiese loopafstand in meter; 0 vir hysbakbewegings.
+    kapasiteit: float = VERSTEK_KAPASITEIT
+
+    def __post_init__(self):
+        """Roete- en vloei-algoritmes vereis eindige, nie-negatiewe waardes."""
+        for naam in ("gewig_s", "afstand_m", "kapasiteit"):
+            waarde = getattr(self, naam)
+            if not math.isfinite(waarde) or waarde < 0:
+                raise ValueError(f"{naam} moet eindig en nie-negatief wees.")
 
 
 class HospitaalGrafiek:
@@ -72,7 +64,7 @@ class HospitaalGrafiek:
 
     Die grafiek word eenmalig by toepassingsopstart in geheue gelaai
     (via FastAPI se lifespan-hanteerder in main.py) en word dan vir alle
-    versoeke hergebruik — geen herhaalde databasistoegange tydens roetebepaling.
+    versoeke hergebruik. Toegangsregte word steeds uit SQLite gelees.
     """
 
     def __init__(self, db_pad: str):
@@ -82,47 +74,56 @@ class HospitaalGrafiek:
         # Aangrensingsstruktuur: elke node-ID word gekoppel aan sy lys uitgaande rande.
         self.adjacency: dict[str, list[Rand]] = {}
         self._load()
+        self._skaal_heuristiek()
 
     def _load(self):
         """Laai alle nodusse en rande uit die SQLite-databasis in geheue."""
-        conn = sqlite3.connect(self.db_pad)
-        conn.row_factory = sqlite3.Row
-        cur = conn.cursor()
+        with closing(sqlite3.connect(self.db_pad)) as conn:
+            conn.row_factory = sqlite3.Row
+            cur = conn.cursor()
 
-        # Laai elke nodus saam met sy vloer- en geboumeta-inligting.
-        cur.execute("""
-            SELECT n.node_id, n.vloer_id, n.pos_x, n.pos_y,
-                   n.beperkte_groep, n.is_nooduitgang,
-                   f.level_nommer, f.gebou_id
-            FROM nodes n JOIN vloere f ON n.vloer_id = f.vloer_id
-        """)
-        for row in cur.fetchall():
-            self.nodes[row["node_id"]] = {
-                "vloer_id":       row["vloer_id"],
-                "pos":            (row["pos_x"], row["pos_y"]),
-                "level":          row["level_nommer"],
-                "gebou_id":       row["gebou_id"],
-                "beperkte_groep": row["beperkte_groep"],
-                # Sien Skema.sql: is_nooduitgang=1 vir ingange/versamelpunte buite die gebou.
-                "is_nooduitgang": bool(row["is_nooduitgang"]),
+            # Laai elke nodus saam met sy vloer- en geboumeta-inligting.
+            cur.execute("""
+                SELECT n.node_id, n.vloer_id, n.pos_x, n.pos_y,
+                       n.beperkte_groep, n.is_nooduitgang,
+                       f.level_nommer, f.gebou_id
+                FROM nodes n JOIN vloere f ON n.vloer_id = f.vloer_id
+            """)
+            for row in cur.fetchall():
+                self.nodes[row["node_id"]] = {
+                    "vloer_id":       row["vloer_id"],
+                    "pos":            (row["pos_x"], row["pos_y"]),
+                    "level":          row["level_nommer"],
+                    "gebou_id":       row["gebou_id"],
+                    "beperkte_groep": row["beperkte_groep"],
+                    # Sien Skema.sql: is_nooduitgang=1 vir ingange/versamelpunte buite die gebou.
+                    "is_nooduitgang": bool(row["is_nooduitgang"]),
+                }
+                self.adjacency[row["node_id"]] = []
+
+            # Laai alle rande en voeg ook omgekeerde rande by vir tweerigtingverbindings.
+            kapasiteit_kolom = "kapasiteit" in {
+                ry[1] for ry in cur.execute("PRAGMA table_info(rande)")
             }
-            self.adjacency[row["node_id"]] = []
+            kapasiteit_sql = "kapasiteit" if kapasiteit_kolom else "NULL AS kapasiteit"
+            cur.execute(f"""
+                SELECT van_node, na_node, rand_tipe, afstand_m,
+                       basis_gewig_s, wag_penalty_s, vloer_verander, bidirectional,
+                       {kapasiteit_sql}
+                FROM rande
+            """)
+            for row in cur.fetchall():
+                # Gebruik die sentrale lambda-gewigsfunksie vir elke rand.
+                gewig = BEREKEN_GEWIG(row["basis_gewig_s"], row["wag_penalty_s"])
+                kapasiteit = row["kapasiteit"]
+                if kapasiteit is None:
+                    kapasiteit = VERSTEK_KAPASITEIT
+                e = Rand(row["na_node"], gewig, row["rand_tipe"], row["vloer_verander"], row["afstand_m"], kapasiteit)
+                self.adjacency[row["van_node"]].append(e)
+                if row["bidirectional"]:
+                    e_rev = Rand(row["van_node"], gewig, row["rand_tipe"], row["vloer_verander"], row["afstand_m"], kapasiteit)
+                    self.adjacency[row["na_node"]].append(e_rev)
 
-        # Laai alle rande en voeg ook omgekeerde rande by vir bidirectionele verbindings.
-        cur.execute("""
-            SELECT van_node, na_node, rand_tipe, afstand_m,
-                   basis_gewig_s, wag_penalty_s, vloer_verander, bidirectional
-            FROM rande
-        """)
-        for row in cur.fetchall():
-            gewig = row["basis_gewig_s"] + row["wag_penalty_s"]
-            e = Rand(row["na_node"], gewig, row["rand_tipe"], row["vloer_verander"], row["afstand_m"])
-            self.adjacency[row["van_node"]].append(e)
-            if row["bidirectional"]:
-                e_rev = Rand(row["van_node"], gewig, row["rand_tipe"], row["vloer_verander"], row["afstand_m"])
-                self.adjacency[row["na_node"]].append(e_rev)
-
-        conn.close()
 
         # Geordende bestemmingsmetadata vir die boomsoektog.
         self.herbou_bestemmingsindeks()
@@ -185,27 +186,37 @@ class HospitaalGrafiek:
 
         Gebruik deur die /destinations eindpunt in main.py sodat die webkoppelvlak
         mensleesbare etikette (met gebou- en vloerinligting) kan vertoon sonder
-        dat die gebruiker raw node-ID's hoef te ken.
+        dat die gebruiker rou node-ID's hoef te ken.
         """
         # Kopieë beskerm die indeks se metadata teen verandering deur 'n leser.
         return [dict(item) for item in
                 self.bestemmingsindeks.soek_metadata(soekterm, limiet)]
 
-    def _heuristic(self, a: str, b: str) -> float:
-        """
-        Skat die oorblywende tydkoste tussen twee nodusse vir A*.
-
-        Gebruik Euklidiese afstand in die vloerplan-koördinatestelsel plus 'n
-        vaste straf vir elke vloerverskil. Die heuristiek is toelaatbaar
-        (onderskat nooit die werklike koste nie) omdat die Euklidiese afstand
-        altyd 'n ondergrens is vir die werklike padlengte en die vloerstraf
-        ooreenstem met die minimum moontlike vloerveranderingskoste.
-        """
-        ax, ay = self.nodes[a]["pos"]
-        bx, by = self.nodes[b]["pos"]
-        planar = math.hypot(ax - bx, ay - by)
+    def _metriek(self, a: str, b: str) -> float:
+        """Meet koördinaatafstand en vloerverskil in dieselfde metriek."""
+        planar = BEREKEN_AFSTAND(self.nodes[a]["pos"], self.nodes[b]["pos"])
         vloer_delta = abs(self.nodes[a]["level"] - self.nodes[b]["level"])
         return planar + vloer_delta * VLOER_VERANDER_PENALTY_S
+
+    def _skaal_heuristiek(self) -> None:
+        """Kies die kleinste verhouding tussen randtyd en metrieke afstand.
+
+        Vir elke rand u→v geld skaal*d(u,v) <= reistyd(u,v). Saam met
+        die driehoeksongelykheid maak dit h(n)=skaal*d(n,doel) konsekwent
+        en toelaatbaar. 'n Kostelose rand kan die skaal tot nul verlaag;
+        A* werk dan soos Dijkstra. Geen meter word direk by sekondes getel nie.
+        """
+        verhoudings = []
+        for van, rande in self.adjacency.items():
+            for rand in rande:
+                afstand = self._metriek(van, rand.na_node)
+                if afstand > 0:
+                    verhoudings.append(rand.gewig_s / afstand)
+        self.heuristiek_skaal = min(verhoudings, default=0.0)
+
+    def _heuristic(self, a: str, b: str) -> float:
+        """Gee 'n onderste grens vir oorblywende reistyd in sekondes."""
+        return self.heuristiek_skaal * self._metriek(a, b)
 
     def astar(
         self,
@@ -235,7 +246,7 @@ class HospitaalGrafiek:
         fisiese loopafstand verteenwoordig nie.
         """
         if begin not in self.nodes or doel not in self.nodes:
-            raise ValueError("begin/doel node nie gevind in grafiek nie.")
+            raise ValueError("Begin- of doelnodus nie in die grafiek gevind nie.")
 
         toegelaat = self.toegelate_groepe(gebruiker_tipe)
         geblokkeer = geblokkeerde_nodes or set()
@@ -307,14 +318,11 @@ class HospitaalGrafiek:
           3. Die eerste keer dat 'begin' uitgehaal word uit die hoop is dit
              gewaarborg die goedkoopste pad na die naaste uitgang.
 
-        Die omgekeerde aangrensingsstruktuur verseker dat die herstel-stap
-        ('_reconstruct') 'n pad van 'begin' → uitgang produseer.
+        Die omgekeerde aangrensingsstruktuur en omgekeerde herstelpad
+        lewer 'n roete van begin tot uitgang in die oorspronklike randrigting.
 
-        Brandveiligheidsreël
-        ---------------------
-        Hysbakrande (rand_tipe='HUISBAK') word uitgelaat — slegs trappe,
-        lugbrûe en tonnels is tydens ontruiming toegelaat. Dit weerspieël
-        standaard brandveiligheidsprotokol (SANS 10400-T).
+        Hysbakrande (rand_tipe='HUISBAK') word in hierdie model uitgelaat;
+        gewone gange, trappe, lugbrûe en tonnels bly beskikbaar.
 
         Gee None terug as geen bereikbare nooduitgang bestaan nie.
         """
@@ -346,21 +354,8 @@ class HospitaalGrafiek:
                 omgekeerde[rand.na_node].append(
                     Rand(van_node, rand.gewig_s, rand.rand_tipe, rand.vloer_verander, rand.afstand_m)
                 )
-                # Bidirectionele rande: voeg ook die direkte rigting by as omgekeerde kant.
-                omgekeerde[van_node].append(
-                    Rand(rand.na_node, rand.gewig_s, rand.rand_tipe, rand.vloer_verander, rand.afstand_m)
-                )
-
-        # Verwyder duplikate wat ontstaan het deurdat tweerigting rande twee keer verwerk is.
-        for nid in omgekeerde:
-            gesien: set[tuple] = set()
-            uniek: list[Rand] = []
-            for rand in omgekeerde[nid]:
-                sleutel = (rand.na_node, rand.rand_tipe)
-                if sleutel not in gesien:
-                    gesien.add(sleutel)
-                    uniek.append(rand)
-            omgekeerde[nid] = uniek
+                # Tweerigtingverbindings is reeds afsonderlike rande in
+                # adjacency. Voeg hier slegs die omgekeerde van elke rand by.
 
         # --- Multibron Dijkstra ---
         # Laai alle bereikbare nooduitgange as beginpunte met koste 0.
@@ -408,6 +403,203 @@ class HospitaalGrafiek:
 
         return None  # Geen bereikbare nooduitgang gevind nie.
 
+    def bereken_min_spanboom(self) -> tuple[list[tuple[str, str, float]], float]:
+        """
+        Bereken die minimum spanboom (MST) van die hele hospitaalgrafiek met
+        Kruskal se algoritme, met gewig_s (dieselfde koste-eenheid as A*) as
+        randgewig. Eenrigtingrande word vir hierdie ontleding as ongerig
+        behandel; 'n ontkoppelde grafiek lewer 'n minimum spanwoud.
+
+        LET WEL: dit is 'n ANDER vraag as astar()/naaste_veilige_uitgang().
+        Dit vind NIE die kortste pad tussen twee spesifieke punte nie — dit
+        vind die goedkoopste stel korridors wat AL die nodusse in die
+        hospitaal aan mekaar verbind, sonder oortollige verbindings. Nuttig
+        vir infrastruktuur-analise (bv. "wat is die minimum netwerk wat die
+        hele gebou bereikbaar hou?"), nie vir gebruikersnavigasie nie.
+
+        Gee (mst_kante, totale_gewig) terug, waar mst_kante 'n lys
+        (van_node, na_node, gewig_s) tuples is wat die MST vorm.
+        """
+        # Ontleed die ongerigte infrastruktuur; behou die goedkoopste rand
+        # per noduspaar, ook wanneer teenoorgestelde rigtings verskil.
+        kante_per_paar = {}
+        for van_node, rande in self.adjacency.items():
+            for rand in rande:
+                if van_node == rand.na_node:
+                    continue
+                sleutel = tuple(sorted((van_node, rand.na_node)))
+                kante_per_paar[sleutel] = min(
+                    kante_per_paar.get(sleutel, math.inf), rand.gewig_s
+                )
+        kante = [(a, b, gewig) for (a, b), gewig in kante_per_paar.items()]
+
+        gesorteerde_kante = sorted(kante, key=lambda k: k[2])
+
+        # Disjunkte-stelle-struktuur (Union-Find, met padkompressie en rangunie) om siklusse te vermy.
+        ouer: dict[str, str] = {n: n for n in self.nodes}
+        rang: dict[str, int] = {n: 0 for n in self.nodes}
+
+        def vind(x: str) -> str:
+            while ouer[x] != x:
+                ouer[x] = ouer[ouer[x]]  # pad-kompressie
+                x = ouer[x]
+            return x
+
+        def unie(x: str, y: str) -> bool:
+            wortel_x, wortel_y = vind(x), vind(y)
+            if wortel_x == wortel_y:
+                return False  # sou 'n siklus vorm — moet nie by MST kom nie
+            if rang[wortel_x] < rang[wortel_y]:
+                wortel_x, wortel_y = wortel_y, wortel_x
+            ouer[wortel_y] = wortel_x
+            if rang[wortel_x] == rang[wortel_y]:
+                rang[wortel_x] += 1
+            return True
+
+        mst_kante: list[tuple[str, str, float]] = []
+        totale_gewig = 0.0
+        for van_node, na_node, gewig in gesorteerde_kante:
+            if unie(van_node, na_node):
+                mst_kante.append((van_node, na_node, gewig))
+                totale_gewig += gewig
+
+        return mst_kante, totale_gewig
+
+    def maks_vloei_na_uitgange(
+        self,
+        bron: str,
+        gebruiker_tipe: str = "PUBLIEK",
+        geblokkeerde_nodes: Optional[set[str]] = None,
+    ) -> Optional[tuple[float, list[tuple[str, str, float]]]]:
+        """
+        Bereken die maksimum deurvloei van 'bron' na AL die nooduitgange
+        gelyktydig, met Edmonds-Karp (BFS-gebaseerde Ford-Fulkerson).
+
+        In teenstelling met naaste_veilige_uitgang() (kortste TYD na een
+        uitgang), beantwoord hierdie metode: "as almal gelyktydig ontruim,
+        hoeveel mense per sekonde kan volgens die model deur die netwerk beweeg voordat
+        'n korridor se kapasiteit (Rand.kapasiteit) die beperkende faktor
+        word?" Dit vereis kapasiteit per rand eerder as net reistyd.
+
+        'n Kunsmatige put word met 'n voldoende groot, eindige kapasiteit
+        aan elke toegelate uitgang gekoppel. Sonder gemete databasiswaardes
+        gebruik elke rand VERSTEK_KAPASITEIT; dit is slegs 'n demonstrasie,
+        nie 'n voorspelling van werklike skarebeweging nie.
+
+        Brandveiligheidsreël: soos in naaste_veilige_uitgang(), word
+        hysbakrande (rand_tipe='HUISBAK') uitgesluit.
+
+        Gee (maks_vloei, bottelnek_kante) terug, waar bottelnek_kante die
+        min-snit-rande is wat die deurvloei beperk (elk 'n (van_node,
+        na_node, kapasiteit) tuple). Gee None terug as die bronpunt self
+        ontoeganklik is of geen positiewe vloei moontlik is nie. 'n Bron
+        wat reeds 'n toegelate uitgang is, lewer (0.0, []).
+        """
+        if bron not in self.nodes:
+            raise ValueError(f"Bronpunt '{bron}' nie gevind in grafiek nie.")
+
+        toegelaat = self.toegelate_groepe(gebruiker_tipe)
+        geblokkeer = geblokkeerde_nodes or set()
+
+        def is_bruikbaar(node_id: str) -> bool:
+            if node_id in geblokkeer:
+                return False
+            groep = self.nodes[node_id]["beperkte_groep"]
+            return groep is None or groep in toegelaat
+
+        if not is_bruikbaar(bron):
+            return None
+
+        # Geen netwerkvloei is nodig as die persoon reeds by 'n uitgang is.
+        # Dit voorkom oneindige vloei en 'n ongeldige JSON-antwoord.
+        if self.nodes[bron]["is_nooduitgang"]:
+            return 0.0, []
+        SUPERPUT = object()  # Kan nooit met 'n databasis-node-ID bots nie.
+
+        # Residuele kapasiteit as 'n geneste woordeboek:
+        # kapasiteit[a][b] = beskikbare kapasiteit van a na b.
+        kapasiteit: dict[object, dict[object, float]] = defaultdict(dict)
+
+        for van_node, rande in self.adjacency.items():
+            if not is_bruikbaar(van_node):
+                continue
+            for rand in rande:
+                if rand.rand_tipe == "HUISBAK":
+                    continue  # Brandveiligheidsreël: geen hysbakke tydens ontruiming.
+                if not is_bruikbaar(rand.na_node):
+                    continue
+                kapasiteit[van_node][rand.na_node] = (
+                    kapasiteit[van_node].get(rand.na_node, 0.0) + rand.kapasiteit
+                )
+                kapasiteit[rand.na_node].setdefault(van_node, 0.0)  # residuele kant
+
+        # 'n Eindige boonste grens voorkom berekeninge met oneindigheid.
+        maksimum_kapasiteit = sum(sum(r.values()) for r in kapasiteit.values())
+        # Koppel elke toegelate nooduitgang aan die kunsmatige put.
+        het_uitgang = False
+        for node_id, data in self.nodes.items():
+            if data["is_nooduitgang"] and is_bruikbaar(node_id):
+                kapasiteit[node_id][SUPERPUT] = maksimum_kapasiteit
+                kapasiteit[SUPERPUT].setdefault(node_id, 0.0)
+                het_uitgang = True
+
+        if not het_uitgang:
+            return None  # Geen nooduitgang beskikbaar of almal geblokkeer.
+
+        def bfs_vind_pad() -> Optional[list[tuple[object, object]]]:
+            """Vind 'n pad van bron na SUPERPUT met beskikbare kapasiteit (BFS)."""
+            voorganger: dict[object, Optional[object]] = {bron: None}
+            wagry = deque([bron])
+            while wagry:
+                huidig = wagry.popleft()
+                if huidig == SUPERPUT:
+                    pad = []
+                    node = SUPERPUT
+                    while voorganger[node] is not None:
+                        vorige = voorganger[node]
+                        pad.append((vorige, node))
+                        node = vorige
+                    return list(reversed(pad))
+                for buur, beskikbaar in kapasiteit[huidig].items():
+                    if beskikbaar > 0 and buur not in voorganger:
+                        voorganger[buur] = huidig
+                        wagry.append(buur)
+            return None
+
+        maks_vloei = 0.0
+        while True:
+            pad = bfs_vind_pad()
+            if pad is None:
+                break
+            vloei_langs_pad = min(kapasiteit[a][b] for a, b in pad)
+            for a, b in pad:
+                kapasiteit[a][b] -= vloei_langs_pad
+                kapasiteit[b][a] += vloei_langs_pad
+            maks_vloei += vloei_langs_pad
+
+        if maks_vloei == 0:
+            return None
+
+        # Min-snit: nodusse steeds bereikbaar vanaf bron in die finale residuele graaf.
+        bereikbaar = {bron}
+        wagry = deque([bron])
+        while wagry:
+            huidig = wagry.popleft()
+            for buur, beskikbaar in kapasiteit[huidig].items():
+                if beskikbaar > 0 and buur not in bereikbaar:
+                    bereikbaar.add(buur)
+                    wagry.append(buur)
+
+        bottelnek_kante: list[tuple[str, str, float]] = []
+        for van_node in sorted(bereikbaar - {SUPERPUT}):
+            for rand in self.adjacency.get(van_node, []):
+                if rand.rand_tipe == "HUISBAK" or not is_bruikbaar(rand.na_node):
+                    continue
+                if rand.na_node not in bereikbaar:
+                    bottelnek_kante.append((van_node, rand.na_node, rand.kapasiteit))
+
+        return maks_vloei, sorted(bottelnek_kante)
+
     @staticmethod
     def _reconstruct(kom_van: dict[str, str], huidig: str) -> list[str]:
         """
@@ -424,6 +616,154 @@ class HospitaalGrafiek:
         return pad
 
 
+# ---------------------------------------------------------------------------
+# Ontruimingsdekking-kontrole (parallelle verwerking Fase 4)
+# ---------------------------------------------------------------------------
+# Modulevlak-funksies kan deur aparte werkprosesse gebruik word. Elke proses
+# laai sy eie grafiek eenmalig; die hooftoepassing stuur slegs nodus-ID's,
+# gebruikerstipe en die huidige stel geblokkeerde nodusse saam.
+
+def kontroleer_nodus_dekking(
+    graf: HospitaalGrafiek,
+    node_id: str,
+    gebruiker_tipe: str,
+    geblokkeerde_nodes: set[str],
+) -> dict:
+    """
+    Kontroleer of 'n veilige ontruimingsroete van 'n gegewe nodus af steeds
+    bestaan, gegewe die huidige stel geblokkeerde nodusse (bv. weens 'n
+    aktiewe insident).
+
+    Gee altyd 'n woordeboek terug met minstens 'node_id' en 'bereikbaar'.
+    By sukses word uitgangsinligting bygevoeg; by mislukking 'n 'rede'-veld
+    sodat die admin-koppelvlak kan onderskei TUSSEN "hierdie nodus is self
+    geblokkeer" en "hierdie nodus is afgesny van alle uitgange" — dis nie
+    dieselfde probleem vir 'n admin om te evalueer nie.
+    """
+    # Geval 1: die nodus self is geblokkeer. 'n Ander situasie as "geen
+    # uitgang gevind nie" — ons kan nie eers 'n roete hiervandaan begin
+    # bereken nie, dus moet ons dit vroeg en eksplisiet uitsonder.
+    if node_id in geblokkeerde_nodes:
+        return {
+            "node_id": node_id,
+            "bereikbaar": False,
+            "rede": "nodus_geblokkeer",
+        }
+
+    resultaat = graf.naaste_veilige_uitgang(
+        node_id,
+        gebruiker_tipe=gebruiker_tipe,
+        geblokkeerde_nodes=geblokkeerde_nodes,
+    )
+
+    # Geval 2: geen bereikbare nooduitgang nie — bv. die nodus is deur die
+    # geblokkeerde nodusse van alle uitgange afgesny, of elke uitgang is
+    # self geblokkeer.
+    if resultaat is None:
+        return {
+            "node_id": node_id,
+            "bereikbaar": False,
+            "rede": "geen_bereikbare_uitgang",
+        }
+
+    # Geval 3: 'n veilige roete is gevind — pak die relevante velde uit.
+    pad, tyd_sekondes, afstand_m = resultaat
+    return {
+        "node_id": node_id,
+        "bereikbaar": True,
+        "uitgang_node": pad[-1],  # Laaste nodus in die pad is die bereikte uitgang.
+        "tyd_sekondes": round(tyd_sekondes, 1),
+        "afstand_m": round(afstand_m, 1),
+        "node_telling": len(pad),
+    }
+
+
+def kontroleer_alle_nodusse_dekking(
+    graf: HospitaalGrafiek,
+    gebruiker_tipe: str,
+    geblokkeerde_nodes: set[str],
+) -> list[dict]:
+    """
+    Sekwensiële basislyn: loop deur ELKE nodus in die grafiek en kontroleer
+    of 'n veilige ontruimingsroete daarvandaan steeds bestaan.
+
+    Loop doelbewus sekwensieel (geen veelprosesverwerking hier nie) — dit is die
+    korrektheids- EN spoedbasislyn waarteen die parallelle weergawe hier
+    onder vergelyk word.
+    """
+    return [
+        kontroleer_nodus_dekking(graf, node_id, gebruiker_tipe, geblokkeerde_nodes)
+        for node_id in graf.nodes
+    ]
+
+
+# Proses-plaaslike veranderlike: bestaan net binne-in 'n werkproses se eie
+# geheue, word NOOIT gedeel met die hoofproses of ander werkprosesse nie.
+# Bly doelbewus 'n modulevlak-privaat naam (voorloop-onderstreep) — dit
+# word nooit buite hierdie lêer ingevoer of direk gebruik nie.
+_WERKER_GRAF: Optional[HospitaalGrafiek] = None
+
+
+def init_werker(db_pad: str) -> None:
+    """
+    Werkproses-inisialiseerder: word EEN KEER per werkproses aangeroep
+    wanneer die ProcessPoolExecutor-poel geskep word (sien kry_dekking_pool()
+    in main.py), NIE een keer per taak nie. Laai die grafiek in 'n
+    proses-plaaslike globale veranderlike sodat elke daaropvolgende taak
+    in dieselfde proses dit sonder herlaai kan hergebruik.
+
+    Word oor die prosesgrens heen aan die poel deurgegee as die
+    'initializer'-argument — moet dus 'n gewone, module-vlak funksie wees
+    (piekelbaar), nie 'n lambda of geneste funksie nie.
+    """
+    global _WERKER_GRAF
+    _WERKER_GRAF = HospitaalGrafiek(db_pad)
+
+
+def _kontroleer_nodus_dekking_taak(
+    node_id: str,
+    gebruiker_tipe: str,
+    geblokkeerde_nodes: set[str],
+) -> dict:
+    """
+    Dun omhulsel wat DEUR ELKE WERKTAAK aangeroep word. Neem doelbewus net
+    klein, maklik-processeerbare argumente — nooit die grafiek self nie — en
+    gebruik eerder die reeds-gelaaide _WERKER_GRAF vanaf init_werker().
+    """
+    if _WERKER_GRAF is None:
+        raise RuntimeError(
+            "_WERKER_GRAF is nie geïnitialiseer nie — is init_werker() as "
+            "die poel se initializer ingestel?"
+        )
+    return kontroleer_nodus_dekking(
+        _WERKER_GRAF, node_id, gebruiker_tipe, geblokkeerde_nodes
+    )
+
+
+def kontroleer_alle_nodusse_dekking_parallel(
+    node_ids: list[str],
+    gebruiker_tipe: str,
+    geblokkeerde_nodes: set[str],
+    uitvoerder: ProcessPoolExecutor,
+) -> list[dict]:
+    """
+    Parallelle weergawe van kontroleer_alle_nodusse_dekking(): dien EEN
+    taak per nodus in by 'n reeds-bestaande ProcessPoolExecutor-poel en
+    wag vir almal se resultate.
+
+    Die uitvoerder word deur die toepassing besit en hergebruik. Só word
+    werkprosesse nie vir elke versoek opnuut begin nie. Resultate behou
+    die invoervolgorde, ongeag die volgorde waarin take voltooi word.
+    """
+    take = [
+        uitvoerder.submit(
+            _kontroleer_nodus_dekking_taak, node_id, gebruiker_tipe, geblokkeerde_nodes
+        )
+        for node_id in node_ids
+    ]
+    return [taak.result() for taak in take]
+
+
 def bou_demo_db(db_pad: str, skema_pad: str, seed_pad: str):
     """
     Herskep die SQLite-databasis uit die skema- en voorbeelddata-lêers.
@@ -436,13 +776,12 @@ def bou_demo_db(db_pad: str, skema_pad: str, seed_pad: str):
     import os
     if os.path.exists(db_pad):
         os.remove(db_pad)
-    conn = sqlite3.connect(db_pad)
-    with open(skema_pad) as f:
-        conn.executescript(f.read())
-    with open(seed_pad) as f:
-        conn.executescript(f.read())
-    conn.commit()
-    conn.close()
+    with closing(sqlite3.connect(db_pad)) as conn:
+        with open(skema_pad, encoding="utf-8") as f:
+            conn.executescript(f.read())
+        with open(seed_pad, encoding="utf-8") as f:
+            conn.executescript(f.read())
+        conn.commit()
 
 
 # ---------------------------------------------------------------------------

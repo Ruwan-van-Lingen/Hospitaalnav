@@ -1,7 +1,7 @@
 <!doctype html>
 <!-- 
 admin.html
-  Adminblad vir die Hospitaal administrasie bladsy.
+  Administrasieblad vir die hospitaalnavigasiestelsel.
 
   Hierdie bladsy laat gemagtigde gebruikers toe om:
     • Aan te meld met 'n gebruikersnaam en wagwoord (sessie-koekie).
@@ -16,7 +16,7 @@ admin.html
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Hospitaal Sluitingsadministrasie</title>
+    <title>Hospitaalsluitingsadministrasie</title>
     <link rel="stylesheet" href="/admin.css" />
   </head>
   <body>
@@ -25,7 +25,7 @@ admin.html
         <p class="eyebrow">Hospitaalnavigasie</p>
         <h1>Sluitingsadministrasie</h1>
       </div>
-      <a href="/ui">Openbare Kaart</a>
+      <a href="/ui">Openbare kaart</a>
     </header>
 
     <main>
@@ -69,7 +69,7 @@ admin.html
             <p id="kodeOutomatiesNota" class="muted" hidden></p>
             <label>Beskrywing<textarea id="beskrywing" maxlength="500" rows="4" placeholder="Byvoorbeeld: Waterpyp word in die oostelike gang herstel."></textarea></label>
             <!-- Ontruimingsmodus: ignoreer bestemming, stuur gebruikers na naaste nooduitgang. -->
-            <!-- Hysbakke word outomaties verbied; slegs trappe/lugbrûe/tonnels. -->
+            <!-- Hysbakke word uitgesluit; gange, trappe, lugbrûe en tonnels bly beskikbaar. -->
             <label class="ontruim-toggle">
               <input type="checkbox" id="ontruimingsModus" />
               <span>

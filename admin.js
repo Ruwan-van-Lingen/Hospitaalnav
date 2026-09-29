@@ -35,14 +35,23 @@ let kaartData = null;
  * @returns {Promise<any>} - Ontlede JSON-antwoord.
  */
 async function api(path, options = {}) {
-  const response = await fetch(path, {
-    credentials: "same-origin",
-    headers: { "Content-Type": "application/json", ...(options.headers || {}) },
-    ...options,
-  });
+  let response;
+  try {
+    response = await fetch(path, {
+      credentials: "same-origin",
+      ...options,
+      headers: { "Content-Type": "application/json", ...(options.headers || {}) },
+    });
+  } catch (_) {
+    throw new Error("Kon nie die bediener bereik nie. Probeer asseblief weer.");
+  }
   let body = null;
   try { body = await response.json(); } catch (_) { }
-  if (!response.ok) throw new Error(body?.detail || `HTTP ${response.status}`);
+  if (!response.ok) {
+    throw new Error(typeof body?.detail === "string"
+      ? body.detail
+      : `Die versoek het misluk (HTTP ${response.status}).`);
+  }
   return body;
 }
 
@@ -97,7 +106,7 @@ function werkOuersBy() {
  *
  * @param {string} kind  - Kassietipe: 'node', 'floor' of 'building'.
  * @param {string} label - Sigbare teks langs die kassie.
- * @param {string} value - Waarde van die kassie (die node-ID vir nodes).
+ * @param {string} value - Waarde van die kassie (die nodus-ID vir nodusse).
  * @returns {{ ry: HTMLLabelElement, input: HTMLInputElement }}
  */
 function maakCheckbox(kind, label, value = "") {
@@ -111,7 +120,7 @@ function maakCheckbox(kind, label, value = "") {
 }
 
 // ---------------------------------------------------------------------------
-// Keuseboom-rendering
+// Tekening van die keuseboom
 // ---------------------------------------------------------------------------
 
 /**
@@ -156,7 +165,7 @@ function renderBoom() {
         nodeKeuse.input.addEventListener("change", werkOuersBy);
       });
 
-      // Vloer-kassie-wisselaar: kies/ontsel alle nodusse op hierdie vloer.
+      // Vloerkassie: merk of ontmerk alle nodusse op hierdie vloer.
       vloerKeuse.input.addEventListener("change", () => {
         nodeCheckboxes(vloerWrap).forEach((n) => (n.checked = vloerKeuse.input.checked));
         werkOuersBy();
@@ -166,7 +175,7 @@ function renderBoom() {
       groep.appendChild(vloerWrap);
     });
 
-    // Gebou-kassie-wisselaar: kies/ontsel alle nodusse in die gebou.
+    // Geboukassie: merk of ontmerk alle nodusse in die gebou.
     gebouKeuse.input.addEventListener("change", () => {
       nodeCheckboxes(groep).forEach((n) => (n.checked = gebouKeuse.input.checked));
       werkOuersBy();
@@ -182,14 +191,14 @@ function renderBoom() {
 }
 
 // ---------------------------------------------------------------------------
-// Insidentstatus-rendering
+// Vertoon van die insidentstatus
 // ---------------------------------------------------------------------------
 
 /**
  * Wys of verberg die aktiewe insident-kaartstrokie bo-aan die adminblad.
- * Sluit in: insidentnaam, beskrywing, nodusselling en ontruimingsmodusvlag.
+ * Sluit in: insidentnaam, beskrywing, nodustelling en ontruimingsmodusvlag.
  *
- * @param {object} insident - Insidentobject soos teruggegee deur die API.
+ * @param {object} insident - Insidentobjek soos teruggegee deur die API.
  */
 function renderInsident(insident) {
   const paneel = document.getElementById("aktiewePaneel");
@@ -221,7 +230,7 @@ function renderInsident(insident) {
  * daardie tipe by verstek sluit. Gewone tipes se voorafkeuses bly wysigbaar;
  * outomatiese tipes is 'n leesalleen-voorskou van bediener-afgedwonge gedrag.
  * Die bediener dwing hierdie gedrag in elk geval af (sien main.py), maar die
- * UI hoort dit eerlik te weerspieël sodat die admin nie 'n nodus-keuse of
+ * Koppelvlak hoort dit te weerspieël sodat die admin nie 'n noduskeuse of
  * ontruimingskassie sien wat eintlik geen effek sal hê nie.
  */
 function opdateerVormVirKode() {
@@ -370,12 +379,10 @@ document.getElementById("clearIncidentBtn").addEventListener("click", async () =
   try {
     const insident = await api("/admin/incident", { method: "DELETE" });
     kaartData.incident = insident;
-    // Ontmerk alle nodusse in die boom.
-    nodeCheckboxes(document).forEach((n) => (n.checked = false));
-    werkOuersBy();
+    document.getElementById("incidentForm").reset();
+    opdateerVormVirKode();
     renderInsident(insident);
-    // Stel die ontruimingsmoduskassie terug na ongemerk.
-    document.getElementById("ontruimingsModus").checked = false;
+    boodskap.textContent = "Die sluiting is gekanselleer.";
   } catch (error) {
     boodskap.textContent = error.message;
   }
@@ -383,9 +390,15 @@ document.getElementById("clearIncidentBtn").addEventListener("click", async () =
 
 /** Meld die admin af en wys die aanmeldvorm weer. */
 document.getElementById("logoutBtn").addEventListener("click", async () => {
-  await api("/admin/logout", { method: "POST" });
-  adminPaneel.hidden = true;
-  loginPaneel.hidden = false;
+  try {
+    await api("/admin/logout", { method: "POST" });
+    adminPaneel.hidden = true;
+    loginPaneel.hidden = false;
+    kaartData = null;
+    boodskap.textContent = "";
+  } catch (error) {
+    boodskap.textContent = error.message;
+  }
 });
 
 // ---------------------------------------------------------------------------

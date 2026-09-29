@@ -1,32 +1,26 @@
-"""=================================================================================================================
-test_main.py
-=============
-Geoutomatiseerde toetsstel vir die Hospitaal Navigasie API.
+"""Geoutomatiseerde toetse vir die hospitaalnavigasie-API.
 
 Voer uit met:
     python -m pytest -q
 
-Hierdie toetse gebruik FastAPI se TestClient (gebaseer op httpx) wat die
-volledige ASGI-toepassing in-proses bedien — geen buitestaanse bediener
-word benodig nie. Die databasis word elke keer nuut gebou deur die
-lifespan-hanteerder in main.py.
-
-Toetsdekking
--------------
-  • Tydformatering                          (test_tydformaat)
-  • Bestemmingsoektog: naam en kas           (test_soek_*)
-  • Roeteberekening vir verskillende tipes   (test_gevonde_node_werk_in_roet, test_personeel_kan_icu_bereik)
-  • Ongeldige gebruikerstipe-verwerping      (test_ongeldige_gebruikerstipe_*)
-  • Webkoppelvlak-bediening                 (test_ui_word_bedien)
-  • PNG-vloerplan-generering                (test_roeteprent_is_png)
-  • Adminaanmelding en sessiebeskerming     (test_admin_*)
-  • Sluiting-aktivering en -kansellering    (test_admin_kan_sluiting_*)
-  • A* omseil geblokkeerde nodusse          (test_astar_roeteer_om_aktiewe_sluiting)
-  • Ontruimingsmodus-roete                  (test_ontruimingsroete_*)
-  • Geslote bestemming geef konflik          (test_geslote_bestemming_gee_konflik)
+FastAPI se TestClient bedien die toepassing binne die toetsproses.
+conftest.py verskaf 'n afsonderlike tydelike databasis per toets.
+Die toetse dek formatering, bestemmingsoektog, toegang, roeteberekening,
+PNG-uitvoer, administrasiesessies, sluitings en ontruiming.
 """
 
+import sqlite3
+from contextlib import closing
+
 from fastapi.testclient import TestClient
+
+import main
+from HospitaalGrafiek import (
+    BEREKEN_AFSTAND,
+    BEREKEN_GEWIG,
+    HospitaalGrafiek,
+    bou_demo_db,
+)
 from main import app, formateer_tyd
 
 
@@ -35,10 +29,17 @@ from main import app, formateer_tyd
 # ---------------------------------------------------------------------------
 
 def test_tydformaat():
-    """Kontroleer dat sekondes korrek as mensleesbare string geformateer word."""
+    """Kontroleer dat sekondes as mensleesbare teks geformateer word."""
     assert formateer_tyd(45)   == "45s"
     assert formateer_tyd(77)   == "1m 17s"
     assert formateer_tyd(7384) == "2h 3m 4s"
+
+
+def test_lambda_afstand_en_gewig():
+    """Die lambda-funksies moet afstand en totale reistyd korrek bereken."""
+    assert BEREKEN_AFSTAND((0, 0), (3, 4)) == 5.0
+    assert BEREKEN_GEWIG(8, 25) == 33.0
+    assert BEREKEN_GEWIG(15, 0) == 15.0
 
 
 # ---------------------------------------------------------------------------
@@ -79,7 +80,7 @@ def test_nooddienste_is_beskikbaar_as_beginpunt():
 
 def test_gevonde_node_werk_in_roete():
     """
-    Volledige integrasietoets: soek 'n bestemming en gebruik dan die node-ID
+    Volledige integrasietoets: soek 'n bestemming en gebruik dan die nodus-ID
     in 'n roeteversoek. Kontroleer die pad, tyd en afstand.
     """
     with TestClient(app) as client:
@@ -99,7 +100,7 @@ def test_gevonde_node_werk_in_roete():
 
 
 def test_personeel_kan_icu_bereik():
-    """Personeel moet toegang tot die beperkte ICU-nodus hê."""
+    """Personeel moet toegang tot die beperkte intensiewesorgnodus hê."""
     with TestClient(app) as client:
         response = client.get(
             "/route",
@@ -123,7 +124,7 @@ def test_ongeldige_gebruikerstipe_word_verwerp():
 
 
 # ---------------------------------------------------------------------------
-# Webkoppelvlak-bediening
+# Bediening van die webkoppelvlak
 # ---------------------------------------------------------------------------
 
 def test_ui_word_bedien():
@@ -160,20 +161,20 @@ def test_roeteprent_is_png():
 # ---------------------------------------------------------------------------
 
 def test_admin_eindpunte_vereis_aanmelding():
-    """Beskermde eindpunte moet 401 terugstuur sonder 'n geldige sessie-koekie."""
+    """Beskermde eindpunte moet 401 terugstuur sonder 'n geldige sessiekoekie."""
     with TestClient(app) as client:
         response = client.get("/admin/map")
         blad     = client.get("/admin")
 
     assert response.status_code == 401
-    # Die adminblad self is publiek — slegs die API-eindpunte is beskerm.
+    # Die administrasieblad is publiek; die administrasie-API vereis aanmelding.
     assert blad.status_code == 200
     assert "Sluitingsadministrasie" in blad.text
 
 
 def test_admin_kan_sluiting_aktiveer_en_kanselleer():
     """
-    Volledige sluiting-lewensiklus:
+    Volledige sluitingslewensiklus:
       1. Aanmelding → 2. Aktiveer sluiting → 3. Bevestig via /incident → 4. Kanselleer.
     """
     with TestClient(app) as client:
@@ -206,7 +207,7 @@ def test_admin_kan_sluiting_aktiveer_en_kanselleer():
 def test_astar_roeteer_om_aktiewe_sluiting():
     """
     A* moet 'n alternatiewe roete vind wanneer die lugbrug (MAIN-1-BRIDGE)
-    geblokkeer is. Die alternatiewe pad deur die tonnel is langer.
+    geblokkeer is. Die alternatiewe pad deur die tonnel neem langer.
     """
     with TestClient(app) as client:
         client.post("/admin/login", json={"gebruikersnaam": "admin", "wagwoord": "admin"})
@@ -231,7 +232,7 @@ def test_astar_roeteer_om_aktiewe_sluiting():
         assert ompad.status_code == 200
         assert ompad.json()["incident_active"] is True
         assert "MAIN-1-BRIDGE" not in ompad.json()["pad"]
-        # Die alternatiewe pad moet langer wees as die direkte lugbrugpad.
+        # Die alternatiewe pad moet meer tyd as die direkte lugbrugpad verg.
         assert ompad.json()["geskatte_tyd_sekondes"] > normaal["geskatte_tyd_sekondes"]
 
 
@@ -258,40 +259,31 @@ def test_ontruimingsroete_vind_naaste_uitgang():
     assert data["pad"][-1] == uitgang        # Pad eindig by die nooduitgang.
 
 
-def test_ontruimingsroete_verbied_hysbakke():
+def test_ontruimingsroete_verbied_hysbakke(tmp_path):
     """
     Geen hysbakrand (rand_tipe='HUISBAK') mag in die ontruimingspad voorkom nie.
-    Dit verifieer die brandveiligheidsreël direk in die grafieklaaier.
+    Dit verifieer die uitsluiting direk in die roete-algoritme.
     """
-    from HospitaalGrafiek import HospitaalGrafiek, bou_demo_db
-    import tempfile, os
+    db_pad = tmp_path / "ontruiming.db"
+    bou_demo_db(str(db_pad), str(main.SKEMA_PAD), str(main.SEED_PAD))
+    grafiek = HospitaalGrafiek(str(db_pad))
+    resultaat = grafiek.naaste_veilige_uitgang("MAIN-2-ICU", gebruiker_tipe="PERSONEEL")
+    assert resultaat is not None, "Moet 'n ontruimingsroete vind."
+    pad, _, _ = resultaat
 
-    with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as f:
-        db = f.name
-    try:
-        bou_demo_db(db, "Skema.sql", "SeedData.sql")
-        g = HospitaalGrafiek(db)
-        resultaat = g.naaste_veilige_uitgang("MAIN-2-ICU", gebruiker_tipe="PERSONEEL")
-        assert resultaat is not None, "Moet 'n ontruimingsroete vind."
-        pad, _, _ = resultaat
-
-        import sqlite3 as _sq
-        _conn = _sq.connect(db)
-        huisbak_rande = {
+    with closing(sqlite3.connect(db_pad)) as verbinding:
+        hysbak_rande = {
             (row[0], row[1])
-            for row in _conn.execute(
+            for row in verbinding.execute(
                 "SELECT van_node, na_node FROM rande WHERE rand_tipe='HUISBAK'"
-            ).fetchall()
-        }
-        _conn.close()
-
-        # Kyk elke opeenvolgende paar in die pad.
-        for a, b in zip(pad, pad[1:]):
-            assert (a, b) not in huisbak_rande and (b, a) not in huisbak_rande, (
-                f"Ontruimingspad gebruik 'n hysbakrand: {a} → {b}"
             )
-    finally:
-        os.unlink(db)
+        }
+
+    # Kontroleer elke opeenvolgende paar in albei moontlike randrigtings.
+    for a, b in zip(pad, pad[1:]):
+        assert (a, b) not in hysbak_rande and (b, a) not in hysbak_rande, (
+            f"Ontruimingspad gebruik 'n hysbakrand: {a} → {b}"
+        )
 
 
 def test_ontruimingsmodus_insident_aktiveer_en_roeteer():
@@ -385,7 +377,7 @@ def test_kode_rooi_ontruim_almal_sonder_nodus_keuse():
         assert data["blocked_node_ids"] == []
         assert data["outomaties_modus"] == "ONTRUIM_ALMAL"
 
-        # 'n Gewone publieke gebruiker moet steeds 'n ontruimingsroete kry.
+        # Die personeellid moet steeds 'n ontruimingsroete vanaf intensiewe sorg kry.
         ontruim = client.get("/route/ontruim", params={"begin": "MAIN-2-ICU", "gebruiker_tipe": "PERSONEEL"})
         assert ontruim.status_code == 200
 
@@ -448,7 +440,7 @@ def test_gewone_noodkode_vereis_steeds_minstens_een_nodus():
 
 
 def test_admin_map_bevat_outomaties_modus_per_kode():
-    """/admin/map se noodkodes-lys moet outomaties_modus insluit sodat die admin-UI kan aanpas."""
+    """Noodkodemetadata moet outomaties_modus vir die administrasieblad insluit."""
     with TestClient(app) as client:
         client.post("/admin/login", json={"gebruikersnaam": "admin", "wagwoord": "admin"})
         kaart = client.get("/admin/map").json()
@@ -459,7 +451,7 @@ def test_admin_map_bevat_outomaties_modus_per_kode():
 
 
 def test_admin_map_bevat_voorafkeuses_en_slegs_aktiewe_insidenttipes():
-    """Die admin-dropdown moet die korrekte tipes en hul voorafgekose nodusse ontvang."""
+    """Die administrasiekeuselys moet tipes en hul voorafgekose nodusse ontvang."""
     with TestClient(app) as client:
         client.post("/admin/login", json={"gebruikersnaam": "admin", "wagwoord": "admin"})
         kaart = client.get("/admin/map").json()

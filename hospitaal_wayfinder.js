@@ -30,10 +30,8 @@
  */
 
 
-const VLOER_VERANDER_PENALTY_S = 20.0;
-
 const geboue = [
-  { id: "MAIN", naam: "Hoofgebou" },
+  { id: "MAIN", naam: "Hoofhospitaalgebou" },
   { id: "SYGEBOU", naam: "Sygebou" },
 ];
 
@@ -44,7 +42,7 @@ const vloere = [
     id: "MAIN-2",
     gebou: "MAIN",
     level: 2,
-    naam: "Vlak 2 — ICU / Teater",
+    naam: "Vlak 2 — Intensiewe sorg / Operasieteaters",
   },
   { id: "SYGEBOU-G", gebou: "SYGEBOU", level: 0, naam: "Grondvloer" },
   {
@@ -56,19 +54,19 @@ const vloere = [
 ];
 
 const nodes = [
-  ["MAIN-G-ENT", "MAIN-G", "INGANG", "Hoof Publieke Ingang", 0, 0, null],
-  ["MAIN-G-AMB", "MAIN-G", "INGANG", "Ambulans Baai", 0, 20, null],
+  ["MAIN-G-ENT", "MAIN-G", "INGANG", "Hoofingang", 0, 0, null],
+  ["MAIN-G-AMB", "MAIN-G", "INGANG", "Ambulansbaai", 0, 20, null],
   [
     "MAIN-G-J01",
     "MAIN-G",
     "AANSLUITING",
-    "Voorportaal Kruising",
+    "Voorportaalaansluiting",
     10,
     0,
     null,
   ],
-  ["MAIN-G-ELV", "MAIN-G", "HUISBAK_GROEP", "Hoof Hysbakke", 15, 5, null],
-  ["MAIN-G-STA", "MAIN-G", "TRAPHUIS", "Hoof Trap", 15, 10, null],
+  ["MAIN-G-ELV", "MAIN-G", "HUISBAK_GROEP", "Hoofhysbakgroep", 15, 5, null],
+  ["MAIN-G-STA", "MAIN-G", "TRAPHUIS", "Hooftraphuis", 15, 10, null],
   ["MAIN-G-ER", "MAIN-G", "DEPARTEMENT", "Nooddienste", 5, 20, null],
   ["MAIN-G-TUN", "MAIN-G", "TONNEL", "Tonnel na Sygebou", 10, 30, null],
 
@@ -76,17 +74,17 @@ const nodes = [
     "MAIN-1-ELV",
     "MAIN-1",
     "HUISBAK_GROEP",
-    "Hysbakke Vlak 1",
+    "Hysbakgroep Vlak 1",
     15,
     5,
     null,
   ],
-  ["MAIN-1-STA", "MAIN-1", "TRAPHUIS", "Trap Vlak 1", 15, 10, null],
+  ["MAIN-1-STA", "MAIN-1", "TRAPHUIS", "Traphuis Vlak 1", 15, 10, null],
   [
     "MAIN-1-J01",
     "MAIN-1",
     "AANSLUITING",
-    "Saal Gang Kruising",
+    "Saalgangaansluiting",
     20,
     5,
     null,
@@ -107,38 +105,38 @@ const nodes = [
     "MAIN-2-ELV",
     "MAIN-2",
     "HUISBAK_GROEP",
-    "Hysbakke Vlak 2",
+    "Hysbakgroep Vlak 2",
     15,
     5,
     null,
   ],
-  ["MAIN-2-STA", "MAIN-2", "TRAPHUIS", "Trap Vlak 2", 15, 10, null],
+  ["MAIN-2-STA", "MAIN-2", "TRAPHUIS", "Traphuis Vlak 2", 15, 10, null],
   [
     "MAIN-2-J01",
     "MAIN-2",
     "AANSLUITING",
-    "ICU Gang Kruising",
+    "Intensiewesorgaansluiting",
     20,
     5,
     "SLEGS_ICU",
   ],
-  ["MAIN-2-ICU", "MAIN-2", "DEPARTEMENT", "ICU", 25, 0, "SLEGS_ICU"],
+  ["MAIN-2-ICU", "MAIN-2", "DEPARTEMENT", "Intensiewe sorg", 25, 0, "SLEGS_ICU"],
   [
     "MAIN-2-OR",
     "MAIN-2",
     "DEPARTEMENT",
-    "Operasieteaters",
+    "Operasieteater",
     25,
     10,
     "SLEGS_PERSONEEL",
   ],
 
-  ["SYGEBOU-G-ENT", "SYGEBOU-G", "INGANG", "Sygebou Ingang", 40, 0, null],
+  ["SYGEBOU-G-ENT", "SYGEBOU-G", "INGANG", "Sygebou-ingang", 40, 0, null],
   [
     "SYGEBOU-G-J01",
     "SYGEBOU-G",
     "AANSLUITING",
-    "Sygebou Voorportaal",
+    "Sygebou-voorportaalaansluiting",
     40,
     10,
     null,
@@ -147,7 +145,7 @@ const nodes = [
     "SYGEBOU-G-ELV",
     "SYGEBOU-G",
     "HUISBAK_GROEP",
-    "Sygebou Hysbak",
+    "Sygebou-hysbak",
     40,
     15,
     null,
@@ -165,7 +163,7 @@ const nodes = [
     "SYGEBOU-G-OUT",
     "SYGEBOU-G",
     "DEPARTEMENT",
-    "Pasiënt Ontvangs",
+    "Uitpasiëntontvangs",
     45,
     10,
     null,
@@ -175,7 +173,7 @@ const nodes = [
     "SYGEBOU-1-ELV",
     "SYGEBOU-1",
     "HUISBAK_GROEP",
-    "Sygebou Hysbak Vlak 1",
+    "Sygebou-hysbak Vlak 1",
     40,
     15,
     null,
@@ -200,7 +198,7 @@ const nodes = [
   beperkte: beperkte_groep,
 }));
 
-// [van, na, RandTipe, afstand_m, Basis_gewig_s, wag_penalty_s, vloer_verander, bidirectional]
+// Volgorde: begin, einde, randtipe, afstand, basistyd, wagtyd, vloerverskil, tweerigting.
 const randRye = [
   ["MAIN-G-ENT", "MAIN-G-J01", "GANG", 10, 8, 0, 0, 1],
   ["MAIN-G-J01", "MAIN-G-ELV", "GANG", 6, 5, 0, 0, 1],
@@ -240,16 +238,10 @@ const randRye = [
   ["MAIN-G-TUN", "SYGEBOU-G-TUN", "TONNEL", 18, 15, 0, 0, 1],
 ];
 
-const toegangToestemmings = {
-  PUBLIEK: new Set(),
-  PERSONEEL: new Set(["SLEGS_PERSONEEL", "SLEGS_ICU"]),
-  PASIENT_VERVOER: new Set(["SLEGS_PERSONEEL"]),
-  NOODGEVAL: new Set(["SLEGS_PERSONEEL", "SLEGS_ICU"]),
-};
 const gebruikerTipeEtikette = {
   PUBLIEK: "Publiek / Besoeker",
   PERSONEEL: "Personeel",
-  PASIENT_VERVOER: "Pasiënt Vervoer",
+  PASIENT_VERVOER: "Pasiëntvervoer",
   NOODGEVAL: "Noodgeval",
 };
 
@@ -271,7 +263,7 @@ const RAND_KLEURE = {
   TONNEL: "#6D5DD3",
 };
 
-// Sentinel "vloer" wat die oorsigmodus (alle vloere gelaag) verteenwoordig.
+// Spesiale vloerwaarde wat die oorsigmodus (alle vloere gelaag) verteenwoordig.
 const OORSIG_ID = "OORSIG";
 // Elke vloer kry sy eie kleur in oorsigmodus, sodat gelaagde nodusse (bv.
 // hysbakke wat doelbewus dieselfde x/y oor vloere heen deel) onderskei kan word.
@@ -281,9 +273,8 @@ const VLOER_KLEURE = Object.fromEntries(
 );
 
 /* ============================================================
-   NODE/VLOER LOOKUPS — gebruik slegs vir tekening van vloer plan 
-   Pathfinding kom vanaf die FastAPI / roete eindpunt (graph.astar() 
-   wat bediener-kant hardloop), nie van JS nie.
+   NODUS- EN VLOERINDEKSE — slegs vir die tekening van die vloerplan.
+   Die FastAPI-roete-eindpunt bereken die roete op die bediener.
    ============================================================ */
 const nodeById = Object.fromEntries(nodes.map((n) => [n.id, n]));
 const vloerById = Object.fromEntries(vloere.map((f) => [f.id, f]));
@@ -304,7 +295,7 @@ async function fetchRoute(apiBase, beginId, eindeId, gebruikerTipe) {
   } catch (networkErr) {
     return {
       error: "network",
-      message: `Kon nie ${apiBase} bereik nie. Loop die API? CORS toegelaat?`,
+      message: "Kon nie die roetebediener bereik nie. Probeer asseblief weer.",
     };
   }
 
@@ -316,11 +307,18 @@ async function fetchRoute(apiBase, beginId, eindeId, gebruikerTipe) {
   }
 
   if (!resp.ok) {
-    const detail = body && body.detail ? body.detail : `HTTP ${resp.status}`;
+    const detail = typeof body?.detail === "string"
+      ? body.detail
+      : `Die roeteversoek het misluk (HTTP ${resp.status}).`;
     return {
       error: resp.status === 403 || resp.status === 409 ? "blocked" : "invalid",
       message: detail,
+      status: resp.status,
     };
+  }
+
+  if (!body || !Array.isArray(body.pad)) {
+    return { error: "invalid", message: "Die bediener het geen geldige roetedata teruggestuur nie." };
   }
 
   return {
@@ -331,23 +329,32 @@ async function fetchRoute(apiBase, beginId, eindeId, gebruikerTipe) {
     formattedDistance: body.geskatte_afstand,
     nodeCount: body.node_telling,
     // Wys die nooduitgang se naam in die roete-paneel as ons in ontruimingsmodus is.
-    uitgang: ontruim ? body.uitgang_node : null,
+    uitgang: body.uitgang_node || null,
   };
 }
 
 /* ============================================================
-                        UI TOESTANDE
+                        KOPPELVLAKTOESTAND
 ============================================================ */
 let huidigeVloer = OORSIG_ID;
-let laasteResultaat = null; // {pad, koste}
+let laasteResultaat = null;
 let aktieweInsident = { active: false, blocked_node_ids: [] };
+let insidentVersoek = 0;
+let roeteVersoek = 0;
+let roeteBesig = false;
+let volgendeKaartKeuse = "beginNode";
 
-async function laaiInsident() {
+async function laaiInsident(herteken = true) {
   const apiBase = document.getElementById("apiUrl").value.trim();
+  const versoek = ++insidentVersoek;
   try {
     const response = await fetch(`${apiBase.replace(/\/$/, "")}/incident`);
-    if (!response.ok) return;
-    aktieweInsident = await response.json();
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const insident = await response.json();
+    if (versoek !== insidentVersoek || apiBase !== document.getElementById("apiUrl").value.trim()) return false;
+    const verander = JSON.stringify(insident) !== JSON.stringify(aktieweInsident);
+    aktieweInsident = insident;
+    if (verander) laasteResultaat = null;
     const banier = document.getElementById("incidentBanner");
     banier.hidden = !aktieweInsident.active;
     if (aktieweInsident.active) {
@@ -358,33 +365,32 @@ async function laaiInsident() {
       document.getElementById("incidentTitle").textContent = `Aktiewe sluiting: ${aktieweInsident.name}`;
       document.getElementById("incidentDescription").textContent = ontruimTeks;
     }
-    // Herlaai die seleksielyste nadat die insidentdata ontvang is sodat
-    // geblokkeerde nodusse gewaarborg gedeaktiveer word, ongeag watter
-    // API-aanroep eerste voltooi het.
-    // Stoor die tans-gekose waardes sodat hulle na herlaai herstel kan word.
-    const huidigeBegin = document.getElementById("beginNode").value;
-    const huidigeEinde = document.getElementById("endNode").value;
-    await Promise.all([
-      laaiBestemmings(document.getElementById("beginSoek").value, "beginNode", huidigeBegin || null),
-      laaiBestemmings(document.getElementById("eindSoek").value, "endNode", huidigeEinde || null),
-    ]);
-    renderAll();
-  } catch (_) { }
+    // Werk bestaande opsies by sonder om die gebruiker se soekterme te verloor.
+    merkGesloteBestemmings();
+    document.getElementById("endNode").disabled = Boolean(insident.active && insident.ontruimings_modus);
+    document.getElementById("eindSoek").disabled = document.getElementById("endNode").disabled;
+    if (herteken && verander) renderAll();
+    return true;
+  } catch (_) {
+    if (versoek === insidentVersoek) {
+      laasteResultaat = { error: "network", message: "Kon nie die huidige sluitings bevestig nie. Probeer asseblief weer." };
+      if (herteken) renderAll();
+    }
+    return false;
+  }
 }
 
 function merkGesloteBestemmings() {
-  const gesluit = new Set(aktieweInsident.blocked_node_ids || []);
+  const gesluit = new Set(aktieweInsident.active ? aktieweInsident.blocked_node_ids || [] : []);
   ["beginNode", "endNode"].forEach((id) => {
     const lys = document.getElementById(id);
     [...lys.options].forEach((opsie) => {
       opsie.disabled = gesluit.has(opsie.value);
-      if (opsie.disabled && !opsie.textContent.includes("[GESLUIT]")) {
-        opsie.textContent += " [GESLUIT]";
-      }
+      opsie.textContent = opsie.textContent.replace(/ \[GESLUIT\]$/, "") + (opsie.disabled ? " [GESLUIT]" : "");
     });
     if (lys.selectedOptions[0]?.disabled) {
-      const eersteOop = [...lys.options].find((opsie) => !opsie.disabled);
-      if (eersteOop) lys.value = eersteOop.value;
+      // Moet nooit stilweg 'n ander vertrekpunt kies wanneer die huidige een sluit nie.
+      lys.value = "";
     }
   });
 }
@@ -405,10 +411,7 @@ async function laaiBestemmings(soekterm, selectId, gekoseId = null) {
     const response = await fetch(url);
     if (bestemmingVersoeke.get(selectId) !== versoek) return;
     if (!response.ok) {
-      // Voorheen het 'n nie-OK antwoord hier stilweg 'n leë seleksielys
-      // gelaat, sonder enige aanduiding aan die gebruiker wat verkeerd
-      // geloop het. Wys dit nou sigbaar in die statusreël.
-      wysBestemmingFout(`⚠ Kon nie bestemmings laai nie (HTTP ${response.status}). Is die API basis-URL korrek?`);
+      wysBestemmingFout(`⚠ Kon nie bestemmings laai nie (HTTP ${response.status}).`);
       return;
     }
     const data = await response.json();
@@ -433,13 +436,7 @@ async function laaiBestemmings(soekterm, selectId, gekoseId = null) {
     merkGesloteBestemmings();
   } catch (netwerkFout) {
     if (bestemmingVersoeke.get(selectId) !== versoek) return;
-    // Voorheen is netwerkfoute (verkeerde poort, API nie aan die gang nie,
-    // CORS geblokkeer, ens.) hier stilweg geïgnoreer — die "Vanaf"/"Na"
-    // seleksielyste het dan net leeg gebly sonder enige verduideliking.
-    // Wys dit nou sigbaar sodat die probleem dadelik opgemerk kan word.
-    wysBestemmingFout(
-      `⚠ Kon nie ${apiBase || "die API"} bereik om bestemmings te laai nie. Loop die API? Is die basis-URL korrek?`,
-    );
+    wysBestemmingFout("⚠ Kon nie bestemmings laai nie. Probeer asseblief weer.");
   }
 }
 
@@ -454,6 +451,7 @@ function koppelBestemmingSoektog(inputId, selectId) {
   const invoer = document.getElementById(inputId);
   let timer;
   invoer.addEventListener("input", () => {
+    wisRoete();
     clearTimeout(timer);
     timer = setTimeout(() => laaiBestemmings(invoer.value, selectId), 200);
   });
@@ -483,10 +481,11 @@ function renderTabs() {
   tabsEl.innerHTML = "";
   const roeterVloere =
     laasteResultaat && laasteResultaat.path
-      ? new Set(laasteResultaat.path.map((id) => nodeById[id].vloer))
+      ? new Set(laasteResultaat.path.map((id) => nodeById[id]?.vloer).filter(Boolean))
       : new Set();
 
-  const oorsig = document.createElement("div");
+  const oorsig = document.createElement("button");
+  oorsig.type = "button";
   oorsig.className =
     "tab" +
     (huidigeVloer === OORSIG_ID ? " active" : "") +
@@ -499,7 +498,8 @@ function renderTabs() {
   tabsEl.appendChild(oorsig);
 
   vloere.forEach((f) => {
-    const d = document.createElement("div");
+    const d = document.createElement("button");
+    d.type = "button";
     d.className =
       "tab" +
       (f.id === huidigeVloer ? " active" : "") +
@@ -518,10 +518,11 @@ function renderIndicator() {
   el.innerHTML = "";
   const roeterVloere =
     laasteResultaat && laasteResultaat.path
-      ? new Set(laasteResultaat.path.map((id) => nodeById[id].vloer))
+      ? new Set(laasteResultaat.path.map((id) => nodeById[id]?.vloer).filter(Boolean))
       : new Set();
   vloere.forEach((f) => {
-    const row = document.createElement("div");
+    const row = document.createElement("button");
+    row.type = "button";
     row.className =
       "ind-row" +
       (f.id === huidigeVloer ? " current" : "") +
@@ -534,7 +535,8 @@ function renderIndicator() {
     el.appendChild(row);
   });
   // Laaste in die DOM = eerste bo-aan, want .indicator gebruik column-reverse.
-  const oorsigRow = document.createElement("div");
+  const oorsigRow = document.createElement("button");
+  oorsigRow.type = "button";
   oorsigRow.className =
     "ind-row" +
     (huidigeVloer === OORSIG_ID ? " current" : "") +
@@ -656,14 +658,18 @@ function renderPlan() {
     if (isBlocked) g.classList.add("blocked-node");
     g.onclick = () => {
       if (isBlocked) return;
-      const beginSel = document.getElementById("beginNode"),
-        endSel = document.getElementById("endNode");
-      if (!g.dataset.pickedOnce) {
-        beginSel.value = n.id;
-        g.dataset.pickedOnce = "1";
-      } else {
-        endSel.value = n.id;
+      const ontruim = aktieweInsident.active && aktieweInsident.ontruimings_modus;
+      const keuseId = ontruim ? "beginNode" : volgendeKaartKeuse;
+      const keuse = document.getElementById(keuseId);
+      if (![...keuse.options].some((opsie) => opsie.value === n.id)) {
+        const opsie = document.createElement("option");
+        opsie.value = n.id;
+        opsie.textContent = n.etiket;
+        keuse.appendChild(opsie);
       }
+      keuse.value = n.id;
+      volgendeKaartKeuse = keuseId === "beginNode" ? "endNode" : "beginNode";
+      wisRoete();
     };
 
     if (oorsigModus) {
@@ -750,7 +756,7 @@ function renderPlan() {
     // Geometriese hulpfunksies vir etiketplasing
     // -----------------------------------------------------------------------
 
-    // Kruisboks-toets vir twee as-gelynd uitgelynde reghoeke (AABB).
+    // Botsingstoets vir twee asbelynde reghoeke (AABB).
     // Teorie: twee reghoeke oorvleuel as en slegs as hulle BEIDE op die
     // x-as EN op die y-as oormekaar projekteer. Die "spasie"-buffer
     // vergroot elke reghoek effektief sodat etikette 'n minimumwit-
@@ -761,7 +767,7 @@ function renderPlan() {
       a.y < b.y + b.height + spasie &&
       a.y + a.height + spasie > b.y;
     
-    // Toets of 'n punt (x, y) binne 'n as-gelynd uitgelynde reghoek b val.
+    // Toets of 'n punt (x, y) binne 'n asbelynde reghoek b val.
     // Die spasie-buffer vergroot die reghoek sodat nodusse wat naby
     // maar nie binne die etiketteks val nie, steeds as "botsing" beskou word.
     const puntInReghoek = (x, y, b, spasie = 2) =>
@@ -778,15 +784,12 @@ function renderPlan() {
     //   > 0 : C lê links van AB  (teenkloksgewys)
     //   < 0 : C lê regs van AB   (kloksgewys)
     //   = 0 : A, B, C is kollineêr (op een lyn)
-    // Dit word gebruik in segmenteKruis() om te bepaal aan watter kant van
-
-    // 'n lyn-segment elke eindpunt van 'n ander segment lê
+    // Bepaal aan watter kant van 'n lynstuk die ander segment se eindpunte lê.
     const orientasie = (ax, ay, bx, by, cx2, cy2) =>
       (bx - ax) * (cy2 - ay) - (by - ay) * (cx2 - ax);
 
-    // Toets of lyne-semente AB en CD mekaar sny.
-    // Metode: klassieke kruisproduk-snypunt-algoritme (Shamos-Hoey-variant):
-    //   Stap 1 — Begrensingskas-toets ("bounding box check"): as die begrensings-
+    // Toets of lynsegmente AB en CD mekaar sny met kruisprodukte:
+    //   Stap 1 — Begrensingskastoets: as die begrensings-
     //            kasse van AB en CD nie oorvleuel nie, kan die segmente onmoontlik
     //            kruis — goedkoop vroeë afwysing.
     //   Stap 2 — Oriëntasietoets: segment AB sny CD as en slegs as C en D aan
@@ -806,7 +809,7 @@ function renderPlan() {
       orientasie(c.x, c.y, d.x, d.y, b.x, b.y) <=
       0;
     
-    // Toets of 'n lynstuk 'n as-gelynd uitgelynde reghoek sny.
+    // Toets of 'n lynstuk 'n asbelynde reghoek sny.
     // Tweeledige strategie:
     //   1. Vinnige geval: as ENIGE eindpunt van die lyn binne die reghoek
     //      val (puntInReghoek), kruis die lyn noodwendig die reghoek.
@@ -814,7 +817,7 @@ function renderPlan() {
     //      eindpunt daarin val (bv. 'n diagonale lyn wat hoek tot hoek
     //      deurstoot). Vir hierdie geval word segmenteKruis() geroep teen
     //      elkeen van die vier sye van die reghoek (gedefinieer as vier
-    //      opeenvolgende hoekpunte) — as enige sy gesny word, gee True terug.
+    //      opeenvolgende hoekpunte) — as enige sy gesny word, gee true terug.
     const lynKruisReghoek = (lyn, b) => {
       if (
         puntInReghoek(lyn.x1, lyn.y1, b) ||
@@ -842,19 +845,15 @@ function renderPlan() {
 
     // -----------------------------------------------------------------------
     // Kandidaat-posisie-tellingslus
-    // Elke kandidaatposisie kry 'n "botsingstellings"-waarde; laagste eenwen.
-    // Die gewigshiërargie is doelbewus sterk geskei sodat elke vlak van
-    // onaanvaarbaarheid altyd swaarder weeg as enige aantal van die volgende:
+    // Elke kandidaatposisie kry 'n botsingtelling; die laagste telling wen.
+    // Groter strawwe gee voorkeur aan leesbare etikette binne die kaart.
     //
     //   kandidaatNommer (+0 … +7)
-    //     Kies vroë (linkse/bo) kandidate as alles gelyk is — breek bande
+    //     Kies vroeë kandidate as alles gelyk is — beslis gelykopuitslae
     //     ten gunste van voorspelbare visuele uitleg.
     //
     //   Buite SVG-grense (+100 000 per oortreding)
-    //     'n Etiket wat die tekeningarea verlaat is ALTYD onaanvaarbaar,
-    //     ongeag hoeveel ander kandidate bots. Die groot gaping verseker
-    //     dat selfs 'n kandidaat met 9 × 10 000 ander-etiket-botsings
-    //     (90 000) steeds verkies word bo enige buiteperke-posisie.
+    //     'n Etiket buite die tekengebied kry 'n swaar straf.
     //
     //   Ander-etiket-botsings (+10 000 elk)
     //     Etikette oor mekaar is erger as 'n etiket oor 'n noduspunt —
@@ -878,7 +877,7 @@ function renderPlan() {
       text.setAttribute("text-anchor", posisie.anchor);
       [...text.children].forEach((tspan) => tspan.setAttribute("x", x));
 
-      // Begin met die kandidaatindeks as basiswaarde — vroëre kandidate (nader aan eerste in die lys) word liggies verkies by gelykstelling.
+      // Gebruik die kandidaatindeks om gelykopuitslae voorspelbaar te beslis.
       const boks = text.getBBox();
       // Straf swaar as enige deel van die etiket buite die SVG-tekengebied val.
       let telling = kandidaatNommer;
@@ -895,7 +894,7 @@ function renderPlan() {
         geplaasdeEtikette.filter((ander) =>
           reghoekeOorvleuel(boks, ander, 5),
         ).length * 10000;
-        // Noduspunt binne die etiketteks: tweede prioriteit.
+      // Noduspunt binne die etiketteks: tweede prioriteit.
       telling +=
         vloerNodes.filter(
           (ander) => {
@@ -904,7 +903,7 @@ function renderPlan() {
               puntInReghoek(anderPosisie.x, anderPosisie.y, boks, 9);
           },
         ).length * 3000;
-        // Ganglyn wat die etiket kruis: laagste prioriteit — word aanvaar as laaste uitweg.
+      // Ganglyn wat die etiket kruis: laagste prioriteit.
       telling +=
         vloerLyne.filter((lyn) => lynKruisReghoek(lyn, boks)).length * 500;
 
@@ -954,7 +953,10 @@ function renderRoutePanel() {
     return;
   }
   if (laasteResultaat.error) {
-    el.innerHTML = `<div class="empty-note">${laasteResultaat.message}</div>`;
+    const nota = document.createElement("div");
+    nota.className = "empty-note";
+    nota.textContent = laasteResultaat.message;
+    el.appendChild(nota);
     return;
   }
   if (!laasteResultaat.path) {
@@ -966,7 +968,7 @@ function renderRoutePanel() {
     const uitgang = nodeById[laasteResultaat.uitgang];
     const uitEl = document.createElement("div");
     uitEl.style.cssText = "background:#8f2525;color:#fff;border-radius:6px;padding:8px 10px;margin-bottom:10px;font-family:'IBM Plex Mono',monospace;font-size:12px;";
-    uitEl.innerHTML = `🚨 Nooduitgang: <strong>${uitgang ? uitgang.etiket : laasteResultaat.uitgang}</strong>`;
+    uitEl.textContent = `🚨 Nooduitgang: ${uitgang ? uitgang.etiket : laasteResultaat.uitgang}`;
     el.appendChild(uitEl);
   }
 
@@ -975,22 +977,33 @@ function renderRoutePanel() {
   laasteResultaat.path.forEach((id, i) => {
     const n = nodeById[id];
     const li = document.createElement("li");
-    li.innerHTML = `<span>${i + 1}. ${n.etiket}</span><span class="t">${vloerById[n.vloer].gebou} L${vloerById[n.vloer].level}</span>`;
+    const etiket = document.createElement("span");
+    etiket.textContent = `${i + 1}. ${n?.etiket || id}`;
+    const vloer = document.createElement("span");
+    vloer.className = "t";
+    vloer.textContent = n ? `${vloerById[n.vloer].gebou} Vlak ${vloerById[n.vloer].level}` : "";
+    li.append(etiket, vloer);
     li.onclick = () => {
+      if (!n) return;
       huidigeVloer = n.vloer;
       renderAll();
     };
     ul.appendChild(li);
   });
   el.appendChild(ul);
-  const total = document.createElement("div");
-  total.className = "route-total";
-  total.innerHTML = `<span>Totale tyd</span><span>${laasteResultaat.formattedCost}</span>`;
-  el.appendChild(total);
-  const totalAfstand = document.createElement("div");
-  totalAfstand.className = "route-total";
-  totalAfstand.innerHTML = `<span>Totale afstand</span><span>${laasteResultaat.formattedDistance}</span>`;
-  el.appendChild(totalAfstand);
+  [
+    ["Totale tyd", laasteResultaat.formattedCost],
+    ["Totale afstand", laasteResultaat.formattedDistance],
+  ].forEach(([naam, waarde]) => {
+    const ry = document.createElement("div");
+    ry.className = "route-total";
+    const etiket = document.createElement("span");
+    etiket.textContent = naam;
+    const totaal = document.createElement("span");
+    totaal.textContent = waarde ?? "Onbekend";
+    ry.append(etiket, totaal);
+    el.appendChild(ry);
+  });
 }
 
 function renderStatus() {
@@ -1001,7 +1014,7 @@ function renderStatus() {
     return;
   }
   if (laasteResultaat.error === "blocked") {
-    el.textContent = `⛔ Toegang geweier (403): ${laasteResultaat.message}`;
+    el.textContent = `⛔ Roete geblokkeer (${laasteResultaat.status}): ${laasteResultaat.message}`;
     el.className = "status blocked";
   } else if (laasteResultaat.error === "invalid") {
     el.textContent = `⚠ Ongeldige versoek: ${laasteResultaat.message}`;
@@ -1013,7 +1026,7 @@ function renderStatus() {
     el.textContent = "⛔ Geen roete beskikbaar nie.";
     el.className = "status blocked";
   } else {
-    el.textContent = `✓ Roete gevind via API: ${laasteResultaat.nodeCount} node(s), ${laasteResultaat.formattedCost}, ${laasteResultaat.formattedDistance}.`;
+    el.textContent = `✓ Roete gevind: ${laasteResultaat.nodeCount} nodus(se), ${laasteResultaat.formattedCost}, ${laasteResultaat.formattedDistance}.`;
     el.className = "status ok";
   }
 }
@@ -1026,46 +1039,86 @@ function renderAll() {
   renderStatus();
 }
 
+function wisRoete() {
+  // Laat antwoorde vir 'n vorige keuse mag nie 'n nuwe keuse of herstel oorskryf nie.
+  roeteVersoek++;
+  roeteBesig = false;
+  laasteResultaat = null;
+  const knoppie = document.getElementById("findBtn");
+  knoppie.disabled = false;
+  knoppie.textContent = "Vind Roete";
+  renderAll();
+}
+
 document.getElementById("findBtn").onclick = async () => {
-  const begin = bestemmingId("beginNode");
-  const end = bestemmingId("endNode");
-  const ut = document.getElementById("gebruikerTipe").value;
-  const apiBase = document.getElementById("apiUrl").value.trim();
-
-  const ontruimModus = aktieweInsident.active && aktieweInsident.ontruimings_modus;
-  if (!begin || (!end && !ontruimModus)) {
-    laasteResultaat = {
-      error: "invalid",
-      message: ontruimModus
-        ? "Kies asseblief 'n geldige beginpunt uit die soeklys."
-        : "Kies asseblief 'n geldige beginpunt en bestemming uit die soeklys.",
-    };
-    renderAll();
-    return;
-  }
-
+  const versoek = ++roeteVersoek;
+  roeteBesig = true;
+  laasteResultaat = null;
+  renderAll();
   const btn = document.getElementById("findBtn");
   btn.disabled = true;
   btn.textContent = "Soek...";
-  document.getElementById("status").textContent = "⏳ Roep API aan...";
+  document.getElementById("status").textContent = "⏳ Bereken roete...";
   document.getElementById("status").className = "status";
 
-  laasteResultaat = await fetchRoute(apiBase, begin, end, ut);
-
-  btn.disabled = false;
-  btn.textContent = "Vind Roete";
-  if (laasteResultaat.path) huidigeVloer = nodeById[begin].vloer;
-  renderAll();
+  try {
+    // Herbevestig sluitings voor elke roete, ook wanneer die blad lank oop was.
+    if (!(await laaiInsident(false)) || versoek !== roeteVersoek) return;
+    const begin = bestemmingId("beginNode");
+    const end = bestemmingId("endNode");
+    const ut = document.getElementById("gebruikerTipe").value;
+    const apiBase = document.getElementById("apiUrl").value.trim();
+    const ontruimModus = aktieweInsident.active && aktieweInsident.ontruimings_modus;
+    if (!begin || (!end && !ontruimModus)) {
+      laasteResultaat = {
+        error: "invalid",
+        message: ontruimModus
+          ? "Kies asseblief 'n geldige beginpunt uit die soeklys."
+          : "Kies asseblief 'n geldige beginpunt en bestemming uit die soeklys.",
+      };
+      return;
+    }
+    const resultaat = await fetchRoute(apiBase, begin, end, ut);
+    if (versoek !== roeteVersoek) return;
+    laasteResultaat = resultaat;
+    if (resultaat.path && nodeById[begin]) huidigeVloer = nodeById[begin].vloer;
+  } catch (_) {
+    if (versoek === roeteVersoek) {
+      laasteResultaat = { error: "network", message: "Die roete kon nie bereken word nie. Probeer asseblief weer." };
+    }
+  } finally {
+    if (versoek === roeteVersoek) {
+      roeteBesig = false;
+      btn.disabled = false;
+      btn.textContent = "Vind Roete";
+      renderAll();
+    }
+  }
 };
 document.getElementById("clearBtn").onclick = () => {
-  laasteResultaat = null;
-  renderAll();
+  volgendeKaartKeuse = "beginNode";
+  wisRoete();
 };
 
-// Laai eers die insidentstatus voordat die seleksielyste gevul word,
-// sodat merkGesloteBestemmings() gewaarborg die korrekte geblokkeerde
-// nodusly s het wanneer dit die opsies deaktiveer.
+["beginNode", "endNode", "gebruikerTipe"].forEach((id) => {
+  document.getElementById(id).addEventListener("change", wisRoete);
+});
+document.getElementById("apiUrl").addEventListener("change", () => {
+  wisRoete();
+  laaiBestemmings(document.getElementById("beginSoek").value, "beginNode");
+  laaiBestemmings(document.getElementById("eindSoek").value, "endNode");
+  laaiInsident();
+});
+
+// Gebruik die blad se bediener; 'n plaaslike HTML-voorskou kan die adres handmatig stel.
+if (/^https?:$/.test(window.location.protocol)) {
+  document.getElementById("apiUrl").value = window.location.origin;
+}
 renderLegend();
 renderAll();
 populateSelects();
 laaiInsident();
+// Hou reeds oop kaarte op datum nadat 'n administrateur 'n insident verander.
+setInterval(() => {
+  if (!document.hidden && !roeteBesig) laaiInsident();
+}, 15000);

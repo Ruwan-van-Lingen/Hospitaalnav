@@ -1,11 +1,11 @@
 /*
   admin.css
 
-  Stylblad vir die Hospitaal administrasieblad (admin.html).
+  Stylblad vir die hospitaaladministrasieblad (admin.html).
 
   Gebruik CSS-veranderlikes vir die kleurpalet sodat die ontwerp maklik
   aangepas kan word. Die styl stem ooreen met die webkoppelvlak se donker
-  marienerblou kleurskema (hospitaal_wayfinder.css), maar gebruik 'n
+  vlootblou kleurskema (hospitaal_wayfinder.css), maar gebruik 'n
   ligter papierwit agtergrond vir die hoofinhoudsarea — die adminblad
   is bedoel vir gebruik op 'n rekenaar eerder as 'n mobiele toestel.
 
@@ -16,7 +16,7 @@
   • Statusbalk (statusbar)    — Wys of die stelsel tans aktief/gesond is.
   • Waarskuwing (alert)       — Opvallende blok met 'n rooi linkerrand vir foute of insidente.
   • Werkarea (workspace)      — Tweekolomrooster: keuseboom links, inhoud en aksies regs.
-  • Keuseboom (tree)          — Geboue, vloere en nodes as 'n aanvinkbare lys, twee per ry.
+  • Keuseboom (tree)          — Geboue, vloere en nodusse as 'n aanvinkbare lys, twee per ry.
   • Ontruimingsmodus-wissel   — Skakelaar om ontruimingsmodus te aktiveer, met beskrywingsteks.
   • Aksies (actions)          — Knoppies onderaan die werkarea, bv. "Aktiveer".
 */
@@ -257,7 +257,7 @@ button {
   padding:13px 22px; 
 }
 
-/* Ontruimingsmodus-wissel: checkbox links, beskrywingsteks regs. */
+/* Ontruimingsmodus: merkblokkie links, beskrywingsteks regs. */
 .ontruim-toggle { 
   flex-direction:row; 
   align-items:flex-start; 

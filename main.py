@@ -8,7 +8,8 @@ Hierdie lêer definieer alle HTTP-eindpunte en bestuur die toepassingslewensiklu
   • Grafiek-voorlading in geheue (HospitaalGrafiek word eenmalig gelaai).
   • Adminaanmelding via 'n ondertekende koekie (HMAC-SHA256).
   • Roeteberekening (A* vir normale navigasie, Dijkstra vir ontruiming).
-  • Statieseleêerbediening vir die webkoppelvlak en adminblad.
+  • Bediening van statiese lêers vir die webkoppelvlak en adminblad.
+  • Spanboom-, netwerkvloei- en parallelle ontruimingsontleding.
 
 Eindpunte
 ----------
@@ -25,6 +26,9 @@ Eindpunte
   GET  /route             — Bereken die kortste toegelate roete (A*).
   GET  /route/ontruim     — Vind die naaste nooduitgang (Dijkstra).
   GET  /route/image       — Bereken roete en lewer as PNG-vloerplan.
+  GET  /analise/spanboom  — Minimum spanboom van die infrastruktuur.
+  GET  /analise/maks_vloei — Gemodelleerde maksimum vloei na nooduitgange.
+  GET  /admin/dekking-kontrole — Parallelle ontruimingskontrole per nodus.
 """
 
 import os
@@ -33,10 +37,13 @@ import base64
 import hashlib
 import hmac
 import json
+import math
 import sqlite3
 import time
 from contextlib import asynccontextmanager, contextmanager
+from concurrent.futures import ProcessPoolExecutor
 from pathlib import Path
+from threading import Lock
 
 from fastapi import Cookie, Depends, FastAPI, HTTPException, Query, Response
 from fastapi.middleware.cors import CORSMiddleware
@@ -44,7 +51,12 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 from starlette.background import BackgroundTask
 
-from HospitaalGrafiek import HospitaalGrafiek, bou_demo_db
+from HospitaalGrafiek import (
+    HospitaalGrafiek,
+    bou_demo_db,
+    init_werker,
+    kontroleer_alle_nodusse_dekking_parallel,
+)
 from VloerPlan import teken_vloer_plan
 
 # ---------------------------------------------------------------------------
@@ -52,7 +64,9 @@ from VloerPlan import teken_vloer_plan
 # bereken sodat die toepassing vanuit enige gids begin kan word.
 # ---------------------------------------------------------------------------
 BASE_GIDS  = Path(__file__).resolve().parent
-DB_PAD     = BASE_GIDS / "hospitaal.db"
+DB_PAD     = Path(os.getenv("DB_PAD", str(BASE_GIDS / "hospitaal.db")))
+if not DB_PAD.is_absolute():
+    DB_PAD = BASE_GIDS / DB_PAD
 SKEMA_PAD  = BASE_GIDS / "Skema.sql"
 SEED_PAD   = BASE_GIDS / "SeedData.sql"
 
@@ -198,6 +212,12 @@ def verseker_insident_skema():
                 "ALTER TABLE nodes ADD COLUMN is_nooduitgang INTEGER NOT NULL DEFAULT 0"
             )
 
+        # Ouer databasisse gebruik die randtipe se demonstrasiekapasiteit
+        # totdat 'n gemete kapasiteit uitdruklik gestoor word.
+        rand_cols = {row[1] for row in conn.execute("PRAGMA table_info(rande)")}
+        if "kapasiteit" not in rand_cols:
+            conn.execute("ALTER TABLE rande ADD COLUMN kapasiteit REAL")
+
         conn.commit()
     finally:
         conn.close()
@@ -215,13 +235,37 @@ async def lifespan(app: FastAPI):
     1. Bou (of herbou) die SQLite-databasis uit Skema.sql + SeedData.sql.
     2. Verseker dat insident-tabelle en nuwe kolomme bestaan.
     3. Laai die hospitaalgrafiek eenmalig in geheue — alle roeteversoeke
-       hergebruik hierdie enkele instansie sonder verdere databasistoegange.
+       hergebruik hierdie instansie. Toegangsregte en insidente word apart gelees.
     """
+    DB_PAD.parent.mkdir(parents=True, exist_ok=True)
     if AUTO_HERBOU_DB or not DB_PAD.exists():
         bou_demo_db(str(DB_PAD), str(SKEMA_PAD), str(SEED_PAD))
     verseker_insident_skema()
     app.state.grafiek = HospitaalGrafiek(str(DB_PAD))
-    yield  # Die toepassing bedien versoeke tussen hier en die einde van die blok.
+    app.state.dekking_pool = None
+    app.state.dekking_slot = Lock()
+    try:
+        yield  # Bedien versoeke nadat die grafiek gereed is.
+    finally:
+        if app.state.dekking_pool is not None:
+            app.state.dekking_pool.shutdown(wait=True)
+            app.state.dekking_pool = None
+
+
+def kry_dekking_pool(app: FastAPI) -> ProcessPoolExecutor:
+    """Skep hoogstens een begrensde werkprosespoel per toepassing.
+
+    Die slot voorkom dubbele poele by gelyktydige eerste versoeke. Elke
+    werkproses laai sy eie grafiek eenmalig; gewone roetes benodig geen poel nie.
+    """
+    with app.state.dekking_slot:
+        if app.state.dekking_pool is None:
+            app.state.dekking_pool = ProcessPoolExecutor(
+                max_workers=min(4, os.cpu_count() or 1),
+                initializer=init_werker,
+                initargs=(str(DB_PAD),),
+            )
+        return app.state.dekking_pool
 
 
 app = FastAPI(
@@ -270,8 +314,8 @@ def formateer_afstand(meter: float) -> str:
 @contextmanager
 def db_verbinding():
     """
-    Konteksbestuurder wat 'n SQLite-verbinding oopmaak, commit by sukses,
-    en rollback plus sluiting by 'n fout verseker.
+    Open 'n SQLite-verbinding en bevestig veranderinge by sukses.
+    Rol die transaksie terug by 'n fout en sluit altyd die verbinding.
     """
     conn = sqlite3.connect(DB_PAD)
     conn.row_factory = sqlite3.Row
@@ -365,7 +409,12 @@ def vereis_admin(hospitaal_admin_sessie: str | None = Cookie(default=None)) -> s
         if not hmac.compare_digest(handtekening, verwag):
             raise ValueError
         inhoud = json.loads(base64.urlsafe_b64decode(data + "=" * (-len(data) % 4)))
-        if inhoud.get("sub") != ADMIN_GEBRUIKERSNAAM or inhoud.get("exp", 0) < time.time():
+        if not isinstance(inhoud, dict):
+            raise ValueError
+        verval = inhoud.get("exp", 0)
+        if not isinstance(verval, (int, float)) or not math.isfinite(verval):
+            raise ValueError
+        if inhoud.get("sub") != ADMIN_GEBRUIKERSNAAM or verval <= time.time():
             raise ValueError
         return inhoud["sub"]
     except (ValueError, TypeError, json.JSONDecodeError):
@@ -473,10 +522,14 @@ def kry_roete(
     Gee 409 terug as die begin- of doelpunt geblokkeer is.
     Gee 403 terug as geen toegelate pad bestaan vir die gebruikerstipe.
     A* omseil outomaties enige nodusse wat deur die aktiewe insident geblokkeer is.
+    Tydens ontruimingsmodus bepaal Dijkstra die uitgang; doel word geïgnoreer.
     """
     try:
         insident = kry_insident()
         geblokkeer = set(insident["blocked_node_ids"])
+
+        if insident["ontruimings_modus"]:
+            return bereken_ontruimingsroete(begin, gebruiker_tipe, insident)
 
         # Kyk vroeg of die eksplisiete begin- of doelpunt self geblokkeer is —
         # A* sou dit ook vind, maar hierdie kontrole gee 'n duideliker foutboodskap.
@@ -515,6 +568,7 @@ def kry_roete(
             "incident_active":       insident["active"],
             "incident_code":         insident.get("code"),
             "avoided_nodes":         insident["blocked_node_ids"],
+            "ontruimings_modus":     False,
         }
 
     except ValueError as e:
@@ -531,15 +585,19 @@ def kry_ontruimingsroete(
 
     Die gebruiker se gewenste bestemming word GEÏGNOREER — die algoritme
     bepaal self watter nooduitgang (is_nooduitgang=1 in die databasis)
-    die tyd-optimale teiken is. Hysbakke word verbied; slegs trappe,
-    lugbrûe en tonnels word toegelaat (brandveiligheidsprotokol SANS 10400-T).
+    die tyd-optimale teiken is. Hysbakke word uitgesluit. Hierdie
+    demonstrasiemodel is nie 'n gesertifiseerde ontruimingsplan nie.
 
     Sien HospitaalGrafiek.naaste_veilige_uitgang() vir die algoritme-besonderhede.
 
     Gee 409 terug as geen veilige roete bereikbaar is nie.
     """
+    return bereken_ontruimingsroete(begin, gebruiker_tipe, kry_insident())
+
+
+def bereken_ontruimingsroete(begin: str, gebruiker_tipe: str, insident: dict) -> dict:
+    """Gebruik dieselfde insidentmomentopname vir gewone en noodroeteversoeke."""
     try:
-        insident = kry_insident()
         geblokkeer = set(insident["blocked_node_ids"])
 
         if begin in geblokkeer:
@@ -569,6 +627,7 @@ def kry_ontruimingsroete(
         return {
             "begin_node":            begin,
             "uitgang_node":          uitgang_node,
+            "doel_node":             uitgang_node,
             "gebruiker_tipe":        gebruiker_tipe,
             "geskatte_tyd_sekondes": round(tyd_sekondes, 1),
             "geskatte_tyd":          formateer_tyd(tyd_sekondes),
@@ -578,6 +637,8 @@ def kry_ontruimingsroete(
             "pad":                   pad,
             "incident_active":       insident["active"],
             "avoided_nodes":         insident["blocked_node_ids"],
+            "incident_code":         insident.get("code"),
+            "ontruimings_modus":     True,
         }
 
     except ValueError as e:
@@ -598,16 +659,8 @@ def kry_roete_prentjie(
     versend is, sodat geen tydelike lêers agtergelaat word nie.
     """
     try:
-        insident = kry_insident()
-        resultaat = app.state.grafiek.astar(
-            begin, doel,
-            gebruiker_tipe=gebruiker_tipe,
-            geblokkeerde_nodes=set(insident["blocked_node_ids"]),
-        )
-        if resultaat is None:
-            raise HTTPException(status_code=403, detail="Geen roete gevind nie.")
-
-        pad, _, _ = resultaat
+        # Dieselfde toegangs-, sluitings- en ontruimingsreëls as die JSON-roete.
+        roete = kry_roete(begin, doel, gebruiker_tipe)
 
         # Skep 'n tydelike lêer; delete=False sodat FileResponse dit kan lees
         # voordat BackgroundTask dit verwyder.
@@ -617,7 +670,11 @@ def kry_roete_prentjie(
         uit_pad = Path(tydelike_leer.name)
         tydelike_leer.close()
 
-        teken_vloer_plan(str(DB_PAD), str(uit_pad), verlig_pad=pad)
+        try:
+            teken_vloer_plan(str(DB_PAD), str(uit_pad), verlig_pad=roete["pad"])
+        except Exception:
+            uit_pad.unlink(missing_ok=True)
+            raise
         return FileResponse(
             uit_pad,
             media_type="image/png",
@@ -632,6 +689,97 @@ def kry_roete_prentjie(
 # Adminbeskermde eindpunte
 # ---------------------------------------------------------------------------
 
+@app.get("/analise/spanboom")
+def kry_min_spanboom(_: str = Depends(vereis_admin)):
+    """Ontleed ongerigte infrastruktuur sonder gebruiker- of insidentfilters.
+
+    'n Ontkoppelde grafiek lewer 'n minimum spanwoud, nie 'n enkele spanboom nie.
+    Hierdie ontleding bereken nie 'n navigasie- of ontruimingsroete nie.
+    """
+    kante, gewig = app.state.grafiek.bereken_min_spanboom()
+    aantal_nodusse = len(app.state.grafiek.nodes)
+    komponente = aantal_nodusse - len(kante)
+    return {
+        "totale_gewig_s": round(gewig, 1),
+        "totale_gewig": formateer_tyd(gewig),
+        "aantal_kante": len(kante),
+        "aantal_nodusse": aantal_nodusse,
+        "aantal_komponente": komponente,
+        "is_verbind": komponente == 1,
+        "kante": [{"van": a, "na": b, "gewig_s": w} for a, b, w in kante],
+    }
+
+
+@app.get("/analise/maks_vloei")
+def kry_maks_vloei(
+    bron: str = Query(..., description="Die bronpunt se node-ID"),
+    gebruiker_tipe: str = Query("PUBLIEK", description="Gebruikerstipe"),
+    _: str = Depends(vereis_admin),
+):
+    """Bereken gemodelleerde deurvloei; kapasiteite is demonstrasiewaardes.
+
+    Respekteer die aktiewe sluiting en toegangsregte en sluit hysbakke uit.
+    Nul met reeds_by_uitgang=True beteken geen verdere netwerkreis is nodig nie.
+    """
+    insident = kry_insident()
+    try:
+        resultaat = app.state.grafiek.maks_vloei_na_uitgange(
+            bron, gebruiker_tipe, set(insident["blocked_node_ids"])
+        )
+    except ValueError as fout:
+        raise HTTPException(status_code=400, detail=str(fout))
+    if resultaat is None:
+        raise HTTPException(
+            status_code=409,
+            detail="Geen toegelate ontruimingsvloei vanaf hierdie bronpunt is beskikbaar nie.",
+        )
+    vloei, bottelnekke = resultaat
+    return {
+        "bron_node": bron,
+        "gebruiker_tipe": gebruiker_tipe,
+        "maks_vloei_persone_per_s": round(vloei, 2),
+        "reeds_by_uitgang": app.state.grafiek.nodes[bron]["is_nooduitgang"],
+        "bottelnek_kante": [
+            {"van": a, "na": b, "kapasiteit": k} for a, b, k in bottelnekke
+        ],
+        "incident_active": insident["active"],
+        "avoided_nodes": insident["blocked_node_ids"],
+    }
+
+
+@app.get("/admin/dekking-kontrole")
+def dekking_kontrole(
+    gebruiker_tipe: str = Query("PUBLIEK", description="Gebruikerstipe vir ontruimingstoegang"),
+    _: str = Depends(vereis_admin),
+):
+    """Kontroleer elke nodus se ontruimingsdekking in herbruikbare werkprosesse.
+
+    Die ontleding is leesalleen. Elke werktaak ontvang dieselfde momentopname
+    van die huidige sluiting sodat die resultate onderling vergelykbaar is.
+    """
+    try:
+        # Valideer vóór die poel geskep word, selfs as alle nodusse gesluit is.
+        app.state.grafiek.toegelate_groepe(gebruiker_tipe)
+    except ValueError as fout:
+        raise HTTPException(status_code=400, detail=str(fout))
+    insident = kry_insident()
+    resultate = kontroleer_alle_nodusse_dekking_parallel(
+        list(app.state.grafiek.nodes),
+        gebruiker_tipe,
+        set(insident["blocked_node_ids"]),
+        kry_dekking_pool(app),
+    )
+    onbereikbaar = [r for r in resultate if not r["bereikbaar"]]
+    return {
+        "gebruiker_tipe": gebruiker_tipe,
+        "incident_active": insident["active"],
+        "totaal_nodusse": len(resultate),
+        "onbereikbaar_telling": len(onbereikbaar),
+        "onbereikbaar": onbereikbaar,
+        "alle_resultate": resultate,
+    }
+
+
 @app.post("/admin/login")
 def admin_login(invoer: AdminAanmelding, response: Response):
     """
@@ -640,8 +788,8 @@ def admin_login(invoer: AdminAanmelding, response: Response):
     Gebruik hmac.compare_digest vir timinganval-bestande vergelyking van
     beide die gebruikersnaam en wagwoord.
     """
-    gebruiker_ok = hmac.compare_digest(invoer.gebruikersnaam, ADMIN_GEBRUIKERSNAAM)
-    wagwoord_ok  = hmac.compare_digest(invoer.wagwoord, ADMIN_WAGWOORD)
+    gebruiker_ok = hmac.compare_digest(invoer.gebruikersnaam.encode(), ADMIN_GEBRUIKERSNAAM.encode())
+    wagwoord_ok  = hmac.compare_digest(invoer.wagwoord.encode(), ADMIN_WAGWOORD.encode())
     if not (gebruiker_ok and wagwoord_ok):
         raise HTTPException(status_code=401, detail="Verkeerde gebruikersnaam of wagwoord.")
     response.set_cookie(

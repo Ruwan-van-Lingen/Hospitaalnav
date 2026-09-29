@@ -3,21 +3,21 @@ VloerPlan.py
 =============
 Matplotlib-gebaseerde vloerplanvisualiseerder vir die Hospitaal Navigasiestelsel.
 
-Hierdie module lewer 'n topologiese grafiekskets as 'n multi-paneel PNG-prent,
-een paneel per vloer. Dit word gebruik deur die /route/image eindpunt in
+Hierdie module lewer 'n topologiese grafiekskets as 'n PNG-prent met
+een paneel per vloer. Dit word gebruik deur die /route/image-eindpunt in
 main.py om 'n aflaaibare roetekaart te genereer.
 
 Waarom Matplotlib (en nie SVG of die webkoppelvlak nie)?
 ---------------------------------------------------------
 Die webkoppelvlak (hospitaal_wayfinder.js) teken die interaktiewe SVG-kaart
 kliëntkant. Hierdie module dien 'n ander doel: dit genereer 'n statiese
-PNG-lêer bediener-kant, geskik vir druk of aflaai. Matplotlib se Agg-agterkant
-("non-interactive Anti-Grain Geometry") werk sonder 'n vertoonskerm of GUI,
-wat dit veilig maak vir bediener- en Docker-omgewings.
+PNG-lêer op die bediener, geskik vir druk of aflaai. Matplotlib se
+nie-interaktiewe Agg-agterkant werk sonder 'n vertoonskerm of grafiese
+koppelvlak en is daarom bruikbaar in bediener- en Docker-omgewings.
 
 Prent-uitleg
 -------------
-• Elke vloer kry sy eie paneel (subplot).
+• Elke vloer kry sy eie paneel.
 • Nodusse word by hul (pos_x, pos_y)-koördinate geplaas.
 • Rande word as lyne tussen nodusse geteken.
 • As 'n roetepad verskaf word, word die betrokke nodusse en rande in rooi uitgelig met 'n dikker lyndikte.
@@ -27,8 +27,8 @@ Prent-uitleg
 import sqlite3
 import matplotlib
 
-# Gebruik die bedienerveilige Agg-agterkant voor enige ander matplotlib-invoer.
-# Dit voorkom Tk/GUI-hoofdraadfout in FastAPI/Docker-omgewings.
+# Kies die Agg-agterkant voordat matplotlib.pyplot ingevoer word.
+# Geen Tk-venster of grafiese vertoonskerm word vir die PNG benodig nie.
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from matplotlib.lines import Line2D
@@ -45,7 +45,7 @@ NODE_KLEURE = {
     "DEPARTEMENT":   "#2980b9",  # Blou  — departemente en sale
 }
 
-# Kleurpalet vir rand-tipes.
+# Kleurpalet vir randtipes.
 RAND_KLEURE = {
     "GANG":    "#b0b8bf",  # Liggrys — gewone gange
     "HUISBAK": "#e67e22",  # Oranje  — hysbakverbindings
@@ -82,18 +82,18 @@ def teken_vloer_plan(db_pad: str, uit_pad: str, verlig_pad: list[str] | None = N
     rande = cur.fetchall()
     conn.close()
 
-    # Bou 'n stel van (van, na) rand-pare wat op die pad lê, vir vinnige naslaan.
+    # Bou 'n stel van (van, na)-randpare op die pad vir vinnige naslaan.
     verlig_rande: set[tuple[str, str]] = set()
     if verlig_pad:
         for a, b in zip(verlig_pad, verlig_pad[1:]):
             verlig_rande.add((a, b))
-            verlig_rande.add((b, a))  # Teken in beide rigtings, aangesien rande bidirectioneel is.
+            verlig_rande.add((b, a))  # Dieselfde getekende lyn verteenwoordig albei rigtings.
 
-    # Skep een subplot per vloer, gerangskik horisontaal.
+    # Skep een paneel per vloer, horisontaal gerangskik.
     n_vloere = len(vloere)
     fig, axes = plt.subplots(1, n_vloere, figsize=(6 * n_vloere, 6))
     if n_vloere == 1:
-        axes = [axes]  # Verseker altyd 'n itereerbare lys, selfs vir 'n enkelvloer-gebou.
+        axes = [axes]  # Verseker 'n itereerbare lys, ook wanneer daar net een vloer is.
 
     for ax, vloer in zip(axes, vloere):
         vloer_id = vloer["vloer_id"]

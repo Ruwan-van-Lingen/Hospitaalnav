@@ -42,22 +42,22 @@ CREATE TABLE
 INSERT INTO
     node_tipes (tipe_kode, beskrywing)
 VALUES
-    ('AANSLUITING', 'Gang aansluiting / keuse punt'),
-    ('HUISBAK_GROEP', 'Huisbak op n gegewe vloer'),
-    ('TRAPHUIS', 'Trappe toegang punt'),
+    ('AANSLUITING', 'Gangaansluiting / keusepunt'),
+    ('HUISBAK_GROEP', 'Hysbak op ''n gegewe vloer'),
+    ('TRAPHUIS', 'Toegangspunt tot trappe'),
     ('DEUR', 'Deur tussen die gang en die kamer/saal'),
     (
         'INGANG',
-        'Gebou ingang (publiek/ambulans/personeel)'
+        'Gebou-ingang (publiek/ambulans/personeel)'
     ),
     (
         'LUGBRUG',
-        'Lug brug konneksie punt tussen geboue'
+        'Lugbrugverbinding tussen geboue'
     ),
-    ('TONNEL', 'Ondergrondse tonnel konneksie punt'),
+    ('TONNEL', 'Ondergrondse tonnelverbinding'),
     (
         'DEPARTEMENT',
-        'Departement / kamer bestemming node'
+        'Bestemmingsnodus vir ''n departement / kamer'
     );
 
 -- ----------------------------------------------------------
@@ -73,8 +73,7 @@ CREATE TABLE
         pos_y REAL NOT NULL,
         is_beperk INTEGER NOT NULL DEFAULT 0, -- 1 dui 'n beperkte gebied aan.
         beperkte_groep TEXT, -- Toegangsgroep, of NULL wanneer die nodus oop is.
-        -- Nooduitgang-vlag: 1 = hierdie nodus is 'n veilige versamelpunt
-        -- wat gebruik word as teiken tydens ontruimingsmodus.
+        -- Nooduitgangsvlag: 1 = hierdie nodus is as 'n ontruimingsteiken gemerk.
         -- Ingange (tipe_kode='INGANG') word tipies as nooduitgange gemerk.
         is_nooduitgang INTEGER NOT NULL DEFAULT 0
     );
@@ -97,6 +96,7 @@ CREATE TABLE
         wag_penalty_s REAL NOT NULL DEFAULT 0, -- Bykomende wagtyd, byvoorbeeld vir 'n hysbak.
         vloer_verander INTEGER NOT NULL DEFAULT 0, -- Aantal vloere wat oorgesteek word.
         bidirectional INTEGER NOT NULL DEFAULT 1,
+        kapasiteit REAL CHECK (kapasiteit >= 0), -- Persone per sekonde; NULL gebruik die demonstrasieverstek.
         UNIQUE (van_node, na_node)
     );
 
@@ -117,13 +117,13 @@ CREATE TABLE
 INSERT INTO
     gebruiker_tipes (gebruiker_tipe, beskrywing)
 VALUES
-    ('PUBLIEK', 'Algemene besoekers / pasiente'),
-    ('PERSONEEL', 'Hospitaal personeel, all saale'),
+    ('PUBLIEK', 'Algemene besoekers / pasiënte'),
+    ('PERSONEEL', 'Hospitaalpersoneel, alle sale'),
     (
         'PASIENT_VERVOER',
-        'Porters/vervoer met beperkte-saal toegang'
+        'Pasiëntvervoer met beperkte saaltoegang'
     ),
-    ('NOODGEVAL', 'Noodgeval reaksie, alle toegang');
+    ('NOODGEVAL', 'Noodreaksie, alle toegang');
 
 ----------------------------------------------------------------------------
 -- Koppel elke gebruikerstipe aan die beperkte groepe wat hulle mag betree.
@@ -151,10 +151,10 @@ CREATE TABLE
         kode_id TEXT PRIMARY KEY, -- Byvoorbeeld 'VUUR', 'MEDIES'
         naam TEXT NOT NULL,
         -- Outomatiese gedrag by aktivering van hierdie kode. NULL beteken
-        -- 'n gewone handmatige sluiting (admin kies self nodusse, soos tot
-        -- dusver). Ondersteunde waardes:
+        -- 'n gewone handmatige sluiting waarvoor die administrateur self
+        -- nodusse kies. Ondersteunde waardes:
         --   'ONTRUIM_ALMAL' — ontruim outomaties ALMAL na die naaste
-        --                      nooduitgang; geen nodus-keuse word vereis nie
+        --                      nooduitgang; geen noduskeuse word vereis nie
         --                      (bv. Kode Rooi/brand).
         --   'SLUIT_ALLES'   — sluit die HELE hospitaal outomaties (elke
         --                      nodus word geblokkeer); geen roetes is
@@ -181,7 +181,7 @@ CREATE TABLE
         ---------------------------------------------------------------------------
         -- Ontruimingsmodus: 1 = ignoreer die gebruiker se gewenste bestemming
         -- en stuur hom/haar eerder na die naaste veilige nooduitgang.
-        -- Slegs trappe, lugbrûe eb tonnels mag tydens ontruiming gebruik word.
+        -- Hysbakrande word tydens ontruiming uitgesluit.
         ---------------------------------------------------------------------------
         ontruimings_modus INTEGER NOT NULL DEFAULT 0
     );

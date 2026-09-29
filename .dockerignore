@@ -1,15 +1,35 @@
+# Weergawebeheer en plaaslike projekkopieë
 .git
 .gitignore
-.pytest_cache
+hospitaalnav.git
+heuningbye
+
+# Python-omgewings, kaslêers en toetsuitsette
 __pycache__
 *.py[cod]
 .venv
 venv
 env
+.pytest_cache
+.pytest_tmp*
+pytest-tmp*
+.coverage
+htmlcov
+
+# Plaaslike data en geheime word by looptyd verskaf
+.env
+.env.*
+data
 *.db
 *.db-shm
 *.db-wal
 *.log
+
+# Redigeerderinstellings en gegenereerde dokumente
+.vscode
+.idea
+.DS_Store
+Thumbs.db
 *.pptx
 temp*.png
 vloer_plan*.png

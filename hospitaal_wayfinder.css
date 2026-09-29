@@ -1,14 +1,14 @@
 /*
   hospitaal_wayfinder.css
 
-  Stylblad vir die interaktiewe Hospitaal Navigasiewebkoppelvlak
+  Stylblad vir die interaktiewe hospitaalnavigasiekoppelvlak
   (hospitaal_wayfinder.html).
 
   Gebruik CSS-veranderlikes vir die kleurpalet sodat die ontwerp maklik
-  aangepas kan word. Die algehele styl is 'n donker marienerblou ("navy")
+  aangepas kan word. Die algehele styl is 'n donker vlootblou
   skema — geskik vir 'n hospitaalomgewing wat beide snags en bedags gebruik
   word. Die adminblad (admin.css) gebruik 'n ligter papierwit hoofinhoud-
-  area, maar deel dieselfde --navy en --amber ankerkleurtokens.
+  area, maar deel dieselfde --navy- en --amber-kleurveranderlikes.
 
   Hoofkomponente
   ---------------
@@ -20,7 +20,7 @@
   • Vloerplan (plan-wrap)   — SVG-kaart-omhulsel met skaduwee-effek.
   • Legende (legend)        — Kleursleutel vir nodustipes en vloere.
   • Hysbakstyl-aanwyser     — Vloer-vir-vloer-aanduiding in die sykantpaneel.
-  • Roetelys (route-list)   — Stap-vir-stap-instruksies in die sykantpaneel.
+  • Roetelys (route-list)   — Roetepunte in volgorde in die sykantpaneel.
 */
 :root {
   --navy: #12222e;
@@ -288,6 +288,7 @@ svg {
   gap: 2px;
 }
 .ind-row {
+  text-align: left;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -328,6 +329,13 @@ svg {
 }
 .ind-row.onroute.current .dot {
   background: #1b1200;
+}
+
+button:focus-visible,
+select:focus-visible,
+input:focus-visible {
+  outline: 2px solid var(--amber);
+  outline-offset: 3px;
 }
 
 .route-list {
