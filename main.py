@@ -79,7 +79,7 @@ SEED_PAD   = BASE_GIDS / "SeedData.sql"
 # ---------------------------------------------------------------------------
 AUTO_HERBOU_DB       = os.getenv("AUTO_HERBOU_DB", "true").lower() == "true"
 ADMIN_GEBRUIKERSNAAM = os.getenv("ADMIN_GEBRUIKERSNAAM", "admin")
-ADMIN_WAGWOORD       = os.getenv("ADMIN_WAGWOORD", "admin")
+ADMIN_WAGWOORD       = os.getenv("ADMIN_WAGWOORD", "heuningbye123!")
 SESSIE_GEHEIM        = os.getenv("SESSIE_GEHEIM", "verander-hierdie-ontwikkelingsgeheim")
 
 # Sessie-instellings

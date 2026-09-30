@@ -18,9 +18,14 @@
 const loginPaneel = document.getElementById("loginPaneel");
 const adminPaneel = document.getElementById("adminPaneel");
 const boodskap = document.getElementById("boodskap");
+const loginBoodskap = document.getElementById("loginBoodskap");
+const loginKnoppie = document.getElementById("loginBtn");
 
 /** Stoor die kaartdata (geboue, vloere, nodusse, noodkodes, insident) in geheue. */
 let kaartData = null;
+
+/** Identifiseer die jongste kaartlaai sodat 'n ou antwoord nie die paneel kan verander nie. */
+let laaiVolgorde = 0;
 
 // ---------------------------------------------------------------------------
 // API-hulpfunksie
@@ -280,7 +285,11 @@ function opdateerVormVirKode() {
  * reeds aktief is.
  */
 async function laaiAdmin() {
-  kaartData = await api("/admin/map");
+  const hierdieVersoek = ++laaiVolgorde;
+  const nuweKaartData = await api("/admin/map");
+  if (hierdieVersoek !== laaiVolgorde) return false;
+
+  kaartData = nuweKaartData;
   loginPaneel.hidden = true;
   adminPaneel.hidden = false;
 
@@ -290,15 +299,18 @@ async function laaiAdmin() {
   const kode = document.getElementById("kode");
   kode.innerHTML = "";
   kaartData.noodkodes.forEach((item) => {
-    const opsie = new Option(item.naam, item.kode_id);
+    const opsie = document.createElement("option");
+    opsie.textContent = item.naam;
+    opsie.value = item.kode_id;
     opsie.dataset.outomaties = item.outomaties_modus || "";
     opsie.dataset.voorafNodusse = JSON.stringify(item.vooraf_node_ids || []);
-    kode.add(opsie);
+    kode.appendChild(opsie);
   });
 
   renderBoom();
   renderInsident(kaartData.incident);
   opdateerVormVirKode();
+  return true;
 }
 
 // ---------------------------------------------------------------------------
@@ -308,6 +320,11 @@ async function laaiAdmin() {
 /** Aanmeld-vorm: stuur bewyse na /admin/login en laai die adminpaneel. */
 document.getElementById("loginForm").addEventListener("submit", async (event) => {
   event.preventDefault();
+  // Maak enige sessiekontrole wat reeds loop ongeldig voordat aanmelding begin.
+  laaiVolgorde += 1;
+  loginBoodskap.textContent = "";
+  loginKnoppie.disabled = true;
+  loginKnoppie.textContent = "Meld aan…";
   try {
     await api("/admin/login", {
       method: "POST",
@@ -319,7 +336,10 @@ document.getElementById("loginForm").addEventListener("submit", async (event) =>
     document.getElementById("wagwoord").value = ""; // Verwyder wagwoord uit die DOM.
     await laaiAdmin();
   } catch (error) {
-    loginPaneel.querySelector("p").textContent = error.message;
+    loginBoodskap.textContent = error.message;
+  } finally {
+    loginKnoppie.disabled = false;
+    loginKnoppie.textContent = "Meld aan";
   }
 });
 
@@ -396,6 +416,7 @@ document.getElementById("logoutBtn").addEventListener("click", async () => {
     loginPaneel.hidden = false;
     kaartData = null;
     boodskap.textContent = "";
+    loginBoodskap.textContent = "";
   } catch (error) {
     boodskap.textContent = error.message;
   }
@@ -408,7 +429,10 @@ document.getElementById("logoutBtn").addEventListener("click", async () => {
 // As 'n geldige sessie-koekie reeds bestaan (bv. ná 'n bladsy-herlaai),
 // word die adminpaneel direk vertoon sonder dat aanmelding nodig is.
 // By 'n sessie-mislukking val dit stilweg terug na die aanmeldvorm.
+const aanvanklikeVersoek = laaiVolgorde + 1;
 laaiAdmin().catch(() => {
-  loginPaneel.hidden = false;
-  adminPaneel.hidden = true;
+  if (laaiVolgorde === aanvanklikeVersoek) {
+    loginPaneel.hidden = false;
+    adminPaneel.hidden = true;
+  }
 });

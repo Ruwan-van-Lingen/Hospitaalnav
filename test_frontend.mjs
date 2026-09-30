@@ -57,7 +57,7 @@ const bestemming = (node_id, etiket = node_id) => ({
 });
 const wagVirAntwoorde = () => new Promise((klaar) => setImmediate(klaar));
 
-async function koppelvlak(bronkode = bron) {
+async function koppelvlak(bronkode = bron, fetchFunksie = null) {
   const elemente = new Map();
   const dokument = {
     hidden: false,
@@ -75,9 +75,9 @@ async function koppelvlak(bronkode = bron) {
     window: { location: { protocol: "https:", origin: "https://hospitaal.voorbeeld" } },
     setTimeout, clearTimeout,
     setInterval() {},
-    fetch: async (url) => url.endsWith("/incident")
+    fetch: fetchFunksie || (async (url) => url.endsWith("/incident")
       ? antwoord(geenInsident)
-      : antwoord({ bestemmings: [bestemming("MAIN-G-ENT"), bestemming("SYGEBOU-1-RAD")] }),
+      : antwoord({ bestemmings: [bestemming("MAIN-G-ENT"), bestemming("SYGEBOU-1-RAD")] })),
   });
   vm.runInContext(bronkode, konteks);
   await wagVirAntwoorde();
@@ -170,13 +170,27 @@ test("ouer bestemmingsoektogte kan nie nuwer resultate oorskryf nie", async () =
 });
 
 test("opeenvolgende kaartklikke kies begin en bestemming op verskillende nodusse", async () => {
+  const { element, lees } = await koppelvlak();
+  const nodusse = () => element("plan").children.filter((kind) => kind.naam === "g");
+  nodusse()[0].onclick();
+  assert.equal(element("beginNode").value, lees("nodes[0].id"));
+  assert.equal(element("beginSoek").value, lees("nodes[0].etiket"));
+  assert.match(element("status").textContent, /Klik nou op 'n bestemming/);
+  nodusse()[1].onclick();
+  assert.equal(element("beginNode").value, lees("nodes[0].id"));
+  assert.equal(element("endNode").value, lees("nodes[1].id"));
+  assert.equal(element("eindSoek").value, lees("nodes[1].etiket"));
+  assert.match(element("status").textContent, /Bestemming gekies/);
+});
+
+test("dieselfde tweede kaartklik kan nie ook die bestemming wees nie", async () => {
   const { element } = await koppelvlak();
   const nodusse = () => element("plan").children.filter((kind) => kind.naam === "g");
   nodusse()[0].onclick();
-  const begin = element("beginNode").value;
-  nodusse()[1].onclick();
-  assert.equal(element("beginNode").value, begin);
-  assert.notEqual(element("endNode").value, begin);
+  const vorigeBestemming = element("endNode").value;
+  nodusse()[0].onclick();
+  assert.equal(element("endNode").value, vorigeBestemming);
+  assert.match(element("status").textContent, /ander nodus/);
 });
 
 test("adminversoeke behou JSON-opskrifte en vertaal netwerkfoute", async () => {
@@ -197,4 +211,45 @@ test("mislukte adminafmelding wys die fout en hou die paneel oop", async () => {
   await element("logoutBtn").listeners.click();
   assert.equal(element("adminPaneel").hidden, false);
   assert.match(element("boodskap").textContent, /Kon nie die bediener bereik nie/);
+});
+
+test("suksesvolle adminaanmelding laai en wys die adminpaneel", async () => {
+  const adminKaart = {
+    geboue: [],
+    noodkodes: [{ kode_id: "GEEL", naam: "Kode Geel", vooraf_node_ids: [] }],
+    incident: geenInsident,
+  };
+  const fetchFunksie = async (url) => url === "/admin/map"
+    ? antwoord(adminKaart)
+    : antwoord({ success: true });
+  const { element } = await koppelvlak(adminBron, fetchFunksie);
+  element("gebruikersnaam").value = "admin";
+  element("wagwoord").value = "admin";
+
+  await element("loginForm").listeners.submit({ preventDefault() {} });
+
+  assert.equal(element("loginPaneel").hidden, true);
+  assert.equal(element("adminPaneel").hidden, false);
+  assert.equal(element("wagwoord").value, "");
+  assert.equal(element("loginBtn").disabled, false);
+  assert.equal(element("kode").options[0].value, "GEEL");
+});
+
+test("'n ou sessiekontrole kan nie suksesvolle aanmelding wegsteek nie", async () => {
+  let verwerpOuKontrole;
+  let kaartVersoeke = 0;
+  const adminKaart = { geboue: [], noodkodes: [], incident: geenInsident };
+  const fetchFunksie = async (url) => {
+    if (url === "/admin/map" && kaartVersoeke++ === 0) {
+      return new Promise((_, verwerp) => { verwerpOuKontrole = verwerp; });
+    }
+    return antwoord(url === "/admin/map" ? adminKaart : { success: true });
+  };
+  const { element } = await koppelvlak(adminBron, fetchFunksie);
+  await element("loginForm").listeners.submit({ preventDefault() {} });
+  verwerpOuKontrole(new Error("Ou sessie het verval"));
+  await wagVirAntwoorde();
+
+  assert.equal(element("loginPaneel").hidden, true);
+  assert.equal(element("adminPaneel").hidden, false);
 });

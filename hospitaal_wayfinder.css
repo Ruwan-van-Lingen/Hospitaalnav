@@ -260,6 +260,8 @@ svg {
   display: inline-block;
 }
 .blocked-node { cursor: not-allowed !important; }
+.bron-node { filter: drop-shadow(0 0 4px rgba(21, 101, 192, 0.75)); }
+.bestemming-node { filter: drop-shadow(0 0 4px rgba(46, 125, 50, 0.75)); }
 
 .side {
   padding: 20px 20px 20px 0;

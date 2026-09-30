@@ -17,7 +17,7 @@ services:
       # Stel eie waardes via die omgewing of 'n plaaslike .env-lêer.
       # Die terugvalwaardes is slegs vir plaaslike demonstrasies.
       ADMIN_GEBRUIKERSNAAM: "${ADMIN_GEBRUIKERSNAAM:-admin}"
-      ADMIN_WAGWOORD: "${ADMIN_WAGWOORD:-admin}"
+      ADMIN_WAGWOORD: "${ADMIN_WAGWOORD:-heuningbye123!}"
       SESSIE_GEHEIM: "${SESSIE_GEHEIM:-verander-hierdie-ontwikkelingsgeheim}"
     volumes:
       - hospitaaldata:/app/data

@@ -97,6 +97,19 @@ h2 {
   color:var(--muted); 
 }
 
+.login .vormboodskap {
+  min-height:1.2em;
+  margin:10px 0;
+  color:var(--red);
+  font-size:13px;
+  font-weight:700;
+}
+
+button:disabled {
+  cursor:wait;
+  opacity:.65;
+}
+
 label { 
   display:flex; 
   flex-direction:column; 

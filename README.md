@@ -61,7 +61,7 @@ Stel die omgewing en begin die toepassing:
 
 ```powershell
 $env:ADMIN_GEBRUIKERSNAAM = "admin"
-$env:ADMIN_WAGWOORD = "kies-'n-sterk-wagwoord"
+$env:ADMIN_WAGWOORD = "heuningbye123!"
 $env:SESSIE_GEHEIM = "kies-'n-lang-willekeurige-geheim"
 $env:AUTO_HERBOU_DB = "false"
 python -m uvicorn main:app --reload
@@ -104,7 +104,7 @@ gebruik dit slegs wanneer jy die data doelbewus wil verwyder.
 | `DB_PAD` | Databasispad; verstek is `hospitaal.db` langs `main.py`. Relatiewe paaie word vanaf die projekgids bereken. |
 | `AUTO_HERBOU_DB` | `true` herskep die databasis by opstart; `false` behou bestaande data. Plaaslike verstek is `true`; Compose stel `false`. |
 | `ADMIN_GEBRUIKERSNAAM` | Administrateur se gebruikersnaam; ontwikkelingsverstek is `admin`. |
-| `ADMIN_WAGWOORD` | Administrateur se wagwoord; ontwikkelingsverstek is `admin`. |
+| `ADMIN_WAGWOORD` | Administrateur se wagwoord; ontwikkelingsverstek is `heuningbye123!`. |
 | `SESSIE_GEHEIM` | Geheim waarmee die administrasiesessie onderteken word. |
 
 'n Ontbrekende databasis word uit die SQL-lêers geskep, ongeag

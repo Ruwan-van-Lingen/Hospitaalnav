@@ -344,6 +344,54 @@ let roeteVersoek = 0;
 let roeteBesig = false;
 let volgendeKaartKeuse = "beginNode";
 
+/** Voeg 'n geklikte nodus by 'n keuselys indien die soekresultate dit nie bevat nie. */
+function versekerNodusOpsie(keuse, nodus) {
+  if (![...keuse.options].some((opsie) => opsie.value === nodus.id)) {
+    const opsie = document.createElement("option");
+    opsie.value = nodus.id;
+    opsie.textContent = nodus.etiket;
+    keuse.appendChild(opsie);
+  }
+}
+
+/**
+ * Eerste kaartklik kies die bron; die volgende geldige, ander nodus kies die bestemming.
+ * Daarna begin die siklus weer by die bron. In ontruimingsmodus word slegs 'n bron gekies.
+ */
+function kiesNodusOpKaart(nodus, isGeblokkeer = false) {
+  if (isGeblokkeer) return;
+
+  const ontruim = aktieweInsident.active && aktieweInsident.ontruimings_modus;
+  const keuseId = ontruim ? "beginNode" : volgendeKaartKeuse;
+  const begin = document.getElementById("beginNode");
+  const status = document.getElementById("status");
+
+  if (keuseId === "endNode" && nodus.id === begin.value) {
+    status.textContent = "⚠ Kies 'n ander nodus as bestemming.";
+    status.className = "status blocked";
+    return;
+  }
+
+  const keuse = document.getElementById(keuseId);
+  versekerNodusOpsie(keuse, nodus);
+  keuse.value = nodus.id;
+
+  const soekId = keuseId === "beginNode" ? "beginSoek" : "eindSoek";
+  document.getElementById(soekId).value = nodus.etiket;
+
+  volgendeKaartKeuse = ontruim || keuseId === "endNode" ? "beginNode" : "endNode";
+  wisRoete();
+
+  if (ontruim) {
+    status.textContent = `Bron gekies: ${nodus.etiket}. Kies “Vind Roete” vir die naaste uitgang.`;
+  } else if (keuseId === "beginNode") {
+    status.textContent = `Bron gekies: ${nodus.etiket}. Klik nou op 'n bestemming.`;
+  } else {
+    status.textContent = `Bestemming gekies: ${nodus.etiket}. Die roete is gereed om bereken te word.`;
+  }
+  status.className = "status ok";
+}
+
 async function laaiInsident(herteken = true) {
   const apiBase = document.getElementById("apiUrl").value.trim();
   const versoek = ++insidentVersoek;
@@ -653,24 +701,14 @@ function renderPlan() {
       cy = posisie.y;
     const isHl = highlightSet.has(n.id);
     const isBlocked = blockedSet.has(n.id);
+    const isBegin = document.getElementById("beginNode").value === n.id;
+    const isEinde = document.getElementById("endNode").value === n.id;
     const g = document.createElementNS(NS, "g");
     g.style.cursor = isBlocked ? "not-allowed" : "pointer";
     if (isBlocked) g.classList.add("blocked-node");
-    g.onclick = () => {
-      if (isBlocked) return;
-      const ontruim = aktieweInsident.active && aktieweInsident.ontruimings_modus;
-      const keuseId = ontruim ? "beginNode" : volgendeKaartKeuse;
-      const keuse = document.getElementById(keuseId);
-      if (![...keuse.options].some((opsie) => opsie.value === n.id)) {
-        const opsie = document.createElement("option");
-        opsie.value = n.id;
-        opsie.textContent = n.etiket;
-        keuse.appendChild(opsie);
-      }
-      keuse.value = n.id;
-      volgendeKaartKeuse = keuseId === "beginNode" ? "endNode" : "beginNode";
-      wisRoete();
-    };
+    if (isBegin) g.classList.add("bron-node");
+    if (isEinde) g.classList.add("bestemming-node");
+    g.onclick = () => kiesNodusOpKaart(n, isBlocked);
 
     if (oorsigModus) {
       const vloerHalo = document.createElementNS(NS, "circle");
@@ -702,10 +740,13 @@ function renderPlan() {
     const circle = document.createElementNS(NS, "circle");
     circle.setAttribute("cx", cx);
     circle.setAttribute("cy", cy);
-    circle.setAttribute("r", isHl ? 9 : 6.5);
+    circle.setAttribute("r", isHl || isBegin || isEinde ? 9 : 6.5);
     circle.setAttribute("fill", isBlocked ? "#E14B4B" : NODE_KLEURE[n.tipe] || "#333");
-    circle.setAttribute("stroke", isBlocked ? "#7b1414" : isHl ? "#FFB100" : "#fff");
-    circle.setAttribute("stroke-width", isBlocked || isHl ? 2.4 : 1.2);
+    circle.setAttribute(
+      "stroke",
+      isBlocked ? "#7b1414" : isBegin ? "#1565C0" : isEinde ? "#2E7D32" : isHl ? "#FFB100" : "#fff",
+    );
+    circle.setAttribute("stroke-width", isBlocked || isHl || isBegin || isEinde ? 3 : 1.2);
     g.appendChild(circle);
 
     // Probeer verskeie posisies en kies die een met die minste botsings.
@@ -1100,9 +1141,16 @@ document.getElementById("clearBtn").onclick = () => {
   wisRoete();
 };
 
-["beginNode", "endNode", "gebruikerTipe"].forEach((id) => {
-  document.getElementById(id).addEventListener("change", wisRoete);
+[
+  ["beginNode", "endNode"],
+  ["endNode", "beginNode"],
+].forEach(([id, volgende]) => {
+  document.getElementById(id).addEventListener("change", () => {
+    volgendeKaartKeuse = volgende;
+    wisRoete();
+  });
 });
+document.getElementById("gebruikerTipe").addEventListener("change", wisRoete);
 document.getElementById("apiUrl").addEventListener("change", () => {
   wisRoete();
   laaiBestemmings(document.getElementById("beginSoek").value, "beginNode");

@@ -33,9 +33,10 @@ admin.html
         <h2>Adminaanmelding</h2>
         <p>Gebruik 'n gemagtigde rekening om roetes te verander.</p>
         <form id="loginForm">
-          <label>Gebruikersnaam<input id="gebruikersnaam" autocomplete="username" required /></label>
-          <label>Wagwoord<input id="wagwoord" type="password" autocomplete="current-password" required /></label>
-          <button type="submit">Meld aan</button>
+          <label for="gebruikersnaam">Gebruikersnaam<input id="gebruikersnaam" name="gebruikersnaam" autocomplete="username" required /></label>
+          <label for="wagwoord">Wagwoord<input id="wagwoord" name="wagwoord" type="password" autocomplete="current-password" required /></label>
+          <p id="loginBoodskap" class="vormboodskap" role="status" aria-live="polite"></p>
+          <button id="loginBtn" type="submit">Meld aan</button>
         </form>
       </section>
 
