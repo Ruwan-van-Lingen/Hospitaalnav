@@ -67,6 +67,11 @@ async function koppelvlak(bronkode = bron, fetchFunksie = null) {
     },
     createElement: (naam) => new Element(naam),
     createElementNS: (_, naam) => new Element(naam),
+    createTextNode(teks) {
+      const node = new Element("#text");
+      node.textContent = teks;
+      return node;
+    },
     querySelectorAll: () => [],
     querySelector: () => new Element(),
   };
@@ -252,4 +257,74 @@ test("'n ou sessiekontrole kan nie suksesvolle aanmelding wegsteek nie", async (
 
   assert.equal(element("loginPaneel").hidden, true);
   assert.equal(element("adminPaneel").hidden, false);
+});
+
+test("veiligheids- en netwerkanalise wys al drie resultate", async () => {
+  const adminKaart = {
+    geboue: [{
+      naam: "Hoofgebou",
+      vloere: [{
+        naam: "Grondvloer",
+        nodes: [{ node_id: "MAIN-G-ER", etiket: "Ongevalle", tipe_kode: "DEPARTEMENT", is_nooduitgang: 0 }],
+      }],
+    }],
+    noodkodes: [],
+    incident: geenInsident,
+  };
+  const fetchFunksie = async (url) => {
+    if (url === "/admin/map") return antwoord(adminKaart);
+    if (url === "/analise/spanboom") return antwoord({
+      is_verbind: true, aantal_komponente: 1, aantal_nodusse: 26,
+      aantal_kante: 25, totale_gewig: "2m 10s",
+    });
+    if (url.startsWith("/admin/dekking-kontrole")) return antwoord({
+      totaal_nodusse: 26, onbereikbaar_telling: 1,
+      onbereikbaar: [{ node_id: "MAIN-2-ICU", rede: "geen_bereikbare_uitgang" }],
+    });
+    if (url.startsWith("/analise/maks_vloei")) return antwoord({
+      bron_node: "MAIN-G-ER", maks_vloei_persone_per_s: 4,
+      reeds_by_uitgang: false,
+      bottelnek_kante: [{ van: "MAIN-G-ER", na: "MAIN-G-J01", kapasiteit: 4 }],
+    });
+    return antwoord({});
+  };
+  const { element } = await koppelvlak(adminBron, fetchFunksie);
+
+  await element("analiseBtn").listeners.click();
+
+  assert.equal(element("verbindingStatus").textContent, "Verbind");
+  assert.match(element("dekkingStatus").textContent, /1 risiko-nodus/);
+  assert.match(element("vloeiStatus").textContent, /4 persone\/s/);
+  assert.match(element("onbereikbaarLys").textContent, /MAIN-2-ICU/);
+  assert.match(element("bottelnekLys").textContent, /MAIN-G-ER/);
+  assert.equal(element("analiseBtn").disabled, false);
+});
+
+test("een mislukte ontleding verberg nie die ander veiligheidsresultate nie", async () => {
+  const adminKaart = {
+    geboue: [{ naam: "Hoofgebou", vloere: [{
+      naam: "Grondvloer",
+      nodes: [{ node_id: "MAIN-G-ENT", etiket: "Ingang", is_nooduitgang: 1 }],
+    }] }],
+    noodkodes: [],
+    incident: geenInsident,
+  };
+  const fetchFunksie = async (url) => {
+    if (url === "/admin/map") return antwoord(adminKaart);
+    if (url === "/analise/spanboom") return antwoord({
+      is_verbind: true, aantal_nodusse: 1, aantal_kante: 0, totale_gewig: "0s",
+    });
+    if (url.startsWith("/admin/dekking-kontrole")) return antwoord({
+      totaal_nodusse: 1, onbereikbaar_telling: 0, onbereikbaar: [],
+    });
+    return antwoord({ detail: "Geen toegelate ontruimingsvloei beskikbaar nie." }, 409);
+  };
+  const { element } = await koppelvlak(adminBron, fetchFunksie);
+
+  await element("analiseBtn").listeners.click();
+
+  assert.equal(element("verbindingStatus").textContent, "Verbind");
+  assert.equal(element("dekkingStatus").textContent, "Alle nodusse bereikbaar");
+  assert.equal(element("vloeiStatus").textContent, "Geen veilige vloei");
+  assert.match(element("analiseBoodskap").textContent, /2 van 3/);
 });

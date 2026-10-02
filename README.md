@@ -14,6 +14,8 @@ reistye, afstande en toegangsbeperkings.
   by ontruiming uitgesluit.
 - Wys roetes en sluitings op 'n interaktiewe SVG-kaart of laai 'n PNG-kaart af.
 - Bestuur een aktiewe insident deur die beskermde administrasieblad.
+- Bekyk lewendige veiligheids- en netwerkanalise op die adminblad, insluitend
+  infrastruktuurverbinding, ontruimingsdekking en deurvloei-bottelnekke.
 - Kontroleer ontruimingsdekking per nodus met parallelle werkprosesse.
 - Bereken 'n minimum spanboom of spanwoud met Kruskal.
 - Bereken gemodelleerde maksimum vloei na nooduitgange met Edmonds–Karp.

@@ -58,6 +58,63 @@ admin.html
           <button class="danger" id="clearIncidentBtn">Kanselleer sluiting</button>
         </div>
 
+        <section class="card analise-paneel" aria-labelledby="analiseTitel">
+          <div class="analise-kop">
+            <div>
+              <p class="eyebrow">Lewendige stelselkontrole</p>
+              <h2 id="analiseTitel">Veiligheids- en netwerkanalise</h2>
+              <p class="muted">Kontroleer infrastruktuurverbinding, ontruimingsdekking en deurvloei met die aktiewe sluiting ingereken.</p>
+            </div>
+            <button id="analiseBtn" type="button">Voer analise uit</button>
+          </div>
+
+          <div class="analise-kontroles">
+            <label>Gebruikerstipe
+              <select id="analiseGebruiker">
+                <option value="PUBLIEK">Publiek</option>
+                <option value="PERSONEEL">Personeel</option>
+                <option value="PASIENT_VERVOER">Pasiëntvervoer</option>
+                <option value="NOODGEVAL">Noodgeval</option>
+              </select>
+            </label>
+            <label>Bron vir deurvloei
+              <select id="analiseBron"></select>
+            </label>
+          </div>
+
+          <p id="analiseBoodskap" class="analise-boodskap" role="status" aria-live="polite">Kies die toepaslike waardes en voer die analise uit.</p>
+
+          <div class="analise-metrieke">
+            <article class="metriek" id="verbindingKaart">
+              <span>Infrastruktuur</span>
+              <strong id="verbindingStatus">Nog nie ontleed nie</strong>
+              <small id="verbindingDetail">—</small>
+            </article>
+            <article class="metriek" id="dekkingKaart">
+              <span>Ontruimingsdekking</span>
+              <strong id="dekkingStatus">Nog nie ontleed nie</strong>
+              <small id="dekkingDetail">—</small>
+            </article>
+            <article class="metriek" id="vloeiKaart">
+              <span>Maksimum deurvloei</span>
+              <strong id="vloeiStatus">Nog nie ontleed nie</strong>
+              <small id="vloeiDetail">—</small>
+            </article>
+          </div>
+
+          <div class="analise-detailrooster">
+            <div>
+              <h3>Onbereikbare nodusse</h3>
+              <ul id="onbereikbaarLys" class="analise-lys"><li>Geen analise beskikbaar nie.</li></ul>
+            </div>
+            <div>
+              <h3>Deurvloei-bottelnekke</h3>
+              <ul id="bottelnekLys" class="analise-lys"><li>Geen analise beskikbaar nie.</li></ul>
+            </div>
+          </div>
+          <p class="analise-voetnota">Die deurvloeisyfers is demonstrasiewaardes en vervang nie ’n gevalideerde hospitaalveiligheidsplan nie.</p>
+        </section>
+
         <form id="incidentForm" class="workspace">
           <section class="card details">
             <p class="step">01</p>

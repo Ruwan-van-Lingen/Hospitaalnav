@@ -178,6 +178,117 @@ button {
   margin:5px 0; 
 } 
 
+.analise-paneel {
+  margin-bottom:18px;
+}
+
+.analise-kop {
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap:20px;
+}
+
+.analise-kop .muted {
+  max-width:720px;
+  margin:4px 0 0;
+}
+
+.analise-kontroles {
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:16px;
+  margin-top:10px;
+}
+
+.analise-kontroles label {
+  margin:10px 0;
+}
+
+.analise-boodskap {
+  min-height:1.2em;
+  margin:4px 0 14px;
+  color:var(--muted);
+  font-size:13px;
+}
+
+.analise-boodskap.fout {
+  color:var(--red);
+  font-weight:700;
+}
+
+.analise-metrieke {
+  display:grid;
+  grid-template-columns:repeat(3,minmax(0,1fr));
+  gap:12px;
+}
+
+.metriek {
+  min-height:112px;
+  padding:15px;
+  border:1px solid var(--line);
+  border-left:5px solid #7d929e;
+  border-radius:9px;
+  background:#f8fafb;
+}
+
+.metriek.goed { border-left-color:#299764; }
+.metriek.waarskuwing { border-left-color:var(--amber); }
+.metriek.gevaar { border-left-color:var(--red); }
+
+.metriek span,
+.metriek small {
+  display:block;
+  color:var(--muted);
+}
+
+.metriek span {
+  font-size:11px;
+  font-weight:800;
+  letter-spacing:.08em;
+  text-transform:uppercase;
+}
+
+.metriek strong {
+  display:block;
+  margin:9px 0 5px;
+  font-size:20px;
+}
+
+.analise-detailrooster {
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:22px;
+  margin-top:18px;
+}
+
+.analise-detailrooster h3 {
+  margin:0 0 8px;
+  font-size:15px;
+}
+
+.analise-lys {
+  max-height:170px;
+  overflow:auto;
+  margin:0;
+  padding:10px 10px 10px 28px;
+  border:1px solid var(--line);
+  border-radius:8px;
+  background:#f8fafb;
+  color:var(--muted);
+  font-size:13px;
+}
+
+.analise-lys li + li {
+  margin-top:6px;
+}
+
+.analise-voetnota {
+  margin:14px 0 0;
+  color:var(--muted);
+  font-size:11px;
+}
+
 .muted { 
   color:var(--muted); 
   font-size:13px; 
@@ -306,6 +417,16 @@ button {
   .alert{
     align-items:flex-start;
     flex-direction:column;
+  }
+
+  .analise-kop{
+    flex-direction:column;
+  }
+
+  .analise-kontroles,
+  .analise-metrieke,
+  .analise-detailrooster{
+    grid-template-columns:1fr;
   }
   
   header{

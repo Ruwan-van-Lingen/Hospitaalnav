@@ -10,6 +10,7 @@
  *   • Aktivering van 'n nuwe sluiting, insluitend ontruimingsmodus (POST /admin/incident).
  *   • Kansellering van die aktiewe sluiting (DELETE /admin/incident).
  *   • Vertoon van die aktiewe insidentstatus bo-aan die vorm.
+ *   • Veiligheids- en netwerkanalise vir dekking, verbinding en deurvloei.
  *
  * Alles kommunikeer met die FastAPI-agterkant via die api()-hulpfunksie,
  * wat JSON stuur en ontvang en HTTP-foute as JavaScript-foute gooi.
@@ -276,6 +277,168 @@ function opdateerVormVirKode() {
 }
 
 // ---------------------------------------------------------------------------
+// Veiligheids- en netwerkanalise
+// ---------------------------------------------------------------------------
+
+/** Vul die deurvloeibron-keuselys met al die nodusse uit die adminkaart. */
+function vulAnaliseBronne() {
+  const bronKeuse = document.getElementById("analiseBron");
+  const vorigeWaarde = bronKeuse.value;
+  bronKeuse.innerHTML = "";
+  let eersteGewoneNodus = "";
+
+  kaartData.geboue.forEach((gebou) => {
+    gebou.vloere.forEach((vloer) => {
+      vloer.nodes.forEach((node) => {
+        const opsie = document.createElement("option");
+        opsie.value = node.node_id;
+        opsie.textContent = `${node.etiket} — ${gebou.naam}, ${vloer.naam}`;
+        bronKeuse.appendChild(opsie);
+        if (!eersteGewoneNodus && !node.is_nooduitgang) eersteGewoneNodus = node.node_id;
+      });
+    });
+  });
+
+  const waardes = bronKeuse.options.map
+    ? bronKeuse.options.map((opsie) => opsie.value)
+    : [...bronKeuse.options].map((opsie) => opsie.value);
+  bronKeuse.value = waardes.includes(vorigeWaarde)
+    ? vorigeWaarde
+    : (eersteGewoneNodus || waardes[0] || "");
+}
+
+/** Werk een opsommingskaart se status, detail en kleurtoestand by. */
+function stelMetriek(kaartId, statusId, detailId, status, detail, toestand) {
+  const kaart = document.getElementById(kaartId);
+  kaart.className = `metriek ${toestand || ""}`.trim();
+  document.getElementById(statusId).textContent = status;
+  document.getElementById(detailId).textContent = detail;
+}
+
+/** Vervang 'n analise-detaillys sonder om API-teks as HTML uit te voer. */
+function vulAnaliseLys(lysId, items, leëBoodskap, formateer) {
+  const lys = document.getElementById(lysId);
+  lys.innerHTML = "";
+  const waardes = items.length ? items : [null];
+  waardes.forEach((item) => {
+    const ry = document.createElement("li");
+    ry.textContent = item === null ? leëBoodskap : formateer(item);
+    lys.appendChild(ry);
+  });
+}
+
+/** Merk bestaande syfers as verouderd nadat die aktiewe sluiting verander. */
+function merkAnaliseVerouderd() {
+  const analiseBoodskap = document.getElementById("analiseBoodskap");
+  analiseBoodskap.className = "analise-boodskap";
+  analiseBoodskap.textContent =
+    "Die sluiting het verander. Voer die analise weer uit vir huidige resultate.";
+}
+
+/**
+ * Laai die drie bestaande adminontledings parallel en wys elke resultaat
+ * onafhanklik. Een mislukte ontleding verberg dus nie die ander twee nie.
+ */
+async function laaiVeiligheidsanalise() {
+  const knoppie = document.getElementById("analiseBtn");
+  const analiseBoodskap = document.getElementById("analiseBoodskap");
+  const gebruiker = document.getElementById("analiseGebruiker").value;
+  const bron = document.getElementById("analiseBron").value;
+
+  if (!bron) {
+    analiseBoodskap.className = "analise-boodskap fout";
+    analiseBoodskap.textContent = "Geen bronnodus is beskikbaar vir die deurvloei-ontleding nie.";
+    return;
+  }
+
+  knoppie.disabled = true;
+  knoppie.textContent = "Ontleed…";
+  analiseBoodskap.className = "analise-boodskap";
+  analiseBoodskap.textContent = "Veiligheids- en netwerkdata word bereken…";
+
+  const gebruikerParameter = encodeURIComponent(gebruiker);
+  const bronParameter = encodeURIComponent(bron);
+  const [spanUitslag, dekkingUitslag, vloeiUitslag] = await Promise.allSettled([
+    api("/analise/spanboom"),
+    api(`/admin/dekking-kontrole?gebruiker_tipe=${gebruikerParameter}`),
+    api(`/analise/maks_vloei?bron=${bronParameter}&gebruiker_tipe=${gebruikerParameter}`),
+  ]);
+
+  if (spanUitslag.status === "fulfilled") {
+    const data = spanUitslag.value;
+    stelMetriek(
+      "verbindingKaart", "verbindingStatus", "verbindingDetail",
+      data.is_verbind ? "Verbind" : `${data.aantal_komponente} komponente`,
+      `${data.aantal_nodusse} nodusse, ${data.aantal_kante} kante · ${data.totale_gewig}`,
+      data.is_verbind ? "goed" : "gevaar",
+    );
+  } else {
+    stelMetriek(
+      "verbindingKaart", "verbindingStatus", "verbindingDetail",
+      "Kon nie bereken nie", spanUitslag.reason.message, "gevaar",
+    );
+  }
+
+  if (dekkingUitslag.status === "fulfilled") {
+    const data = dekkingUitslag.value;
+    const veilig = data.onbereikbaar_telling === 0;
+    stelMetriek(
+      "dekkingKaart", "dekkingStatus", "dekkingDetail",
+      veilig ? "Alle nodusse bereikbaar" : `${data.onbereikbaar_telling} risiko-nodus(se)`,
+      `${data.totaal_nodusse - data.onbereikbaar_telling} van ${data.totaal_nodusse} het 'n veilige uitgang`,
+      veilig ? "goed" : "gevaar",
+    );
+    vulAnaliseLys(
+      "onbereikbaarLys",
+      data.onbereikbaar,
+      "Geen onbereikbare nodusse gevind nie.",
+      (item) => `${item.node_id} — ${item.rede === "nodus_geblokkeer" ? "nodus is gesluit" : "geen bereikbare uitgang"}`,
+    );
+  } else {
+    stelMetriek(
+      "dekkingKaart", "dekkingStatus", "dekkingDetail",
+      "Kon nie bereken nie", dekkingUitslag.reason.message, "gevaar",
+    );
+    vulAnaliseLys("onbereikbaarLys", [], dekkingUitslag.reason.message, () => "");
+  }
+
+  if (vloeiUitslag.status === "fulfilled") {
+    const data = vloeiUitslag.value;
+    stelMetriek(
+      "vloeiKaart", "vloeiStatus", "vloeiDetail",
+      data.reeds_by_uitgang
+        ? "Reeds by uitgang"
+        : `${data.maks_vloei_persone_per_s} persone/s`,
+      data.reeds_by_uitgang
+        ? "Geen verdere netwerkbeweging is nodig nie."
+        : `${data.bottelnek_kante.length} bottelnek-kant(e) vanaf ${data.bron_node}`,
+      data.reeds_by_uitgang || data.maks_vloei_persone_per_s > 0 ? "goed" : "waarskuwing",
+    );
+    vulAnaliseLys(
+      "bottelnekLys",
+      data.bottelnek_kante,
+      data.reeds_by_uitgang ? "Die bron is reeds 'n nooduitgang." : "Geen bottelnekke gevind nie.",
+      (item) => `${item.van} → ${item.na}: ${item.kapasiteit} persone/s`,
+    );
+  } else {
+    stelMetriek(
+      "vloeiKaart", "vloeiStatus", "vloeiDetail",
+      "Geen veilige vloei", vloeiUitslag.reason.message, "gevaar",
+    );
+    vulAnaliseLys("bottelnekLys", [], vloeiUitslag.reason.message, () => "");
+  }
+
+  const foutTelling = [spanUitslag, dekkingUitslag, vloeiUitslag]
+    .filter((uitslag) => uitslag.status === "rejected").length;
+  analiseBoodskap.className = `analise-boodskap${foutTelling ? " fout" : ""}`;
+  analiseBoodskap.textContent = foutTelling
+    ? `${3 - foutTelling} van 3 ontledings is voltooi; sien die gemerkte fout(e).`
+    : `Analise voltooi om ${new Date().toLocaleTimeString("af-ZA")}.`;
+  knoppie.disabled = false;
+  knoppie.textContent = "Voer analise uit";
+}
+
+// ---------------------------------------------------------------------------
 // Bladsy-inisialisering
 // ---------------------------------------------------------------------------
 
@@ -310,6 +473,7 @@ async function laaiAdmin() {
   renderBoom();
   renderInsident(kaartData.incident);
   opdateerVormVirKode();
+  vulAnaliseBronne();
   return true;
 }
 
@@ -345,6 +509,9 @@ document.getElementById("loginForm").addEventListener("submit", async (event) =>
 
 /** Wissel die vorm se sigbaarheid elke keer as die admin 'n ander noodkode kies. */
 document.getElementById("kode").addEventListener("change", opdateerVormVirKode);
+
+/** Begin die leesalleen veiligheids- en netwerkanalise op aanvraag. */
+document.getElementById("analiseBtn").addEventListener("click", laaiVeiligheidsanalise);
 
 /** Insidentvorm: bevestig dan aktiveer die sluiting met die gekose nodusse. */
 document.getElementById("incidentForm").addEventListener("submit", async (event) => {
@@ -387,6 +554,7 @@ document.getElementById("incidentForm").addEventListener("submit", async (event)
     });
     kaartData.incident = insident;
     renderInsident(insident);
+    merkAnaliseVerouderd();
     boodskap.textContent = "Sluiting is suksesvol geaktiveer.";
   } catch (error) {
     boodskap.textContent = error.message;
@@ -402,6 +570,7 @@ document.getElementById("clearIncidentBtn").addEventListener("click", async () =
     document.getElementById("incidentForm").reset();
     opdateerVormVirKode();
     renderInsident(insident);
+    merkAnaliseVerouderd();
     boodskap.textContent = "Die sluiting is gekanselleer.";
   } catch (error) {
     boodskap.textContent = error.message;
