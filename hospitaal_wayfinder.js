@@ -524,13 +524,16 @@ function populateSelects() {
   laaiBestemmings("", "endNode", "SYGEBOU-1-RAD");
 }
 
+/** Gee die stel vloer-ID's waardeur die huidige roete loop (leeg as daar geen roete is nie). */
+function kryRoeterVloere() {
+  if (!laasteResultaat || !laasteResultaat.path) return new Set();
+  return new Set(laasteResultaat.path.map((id) => nodeById[id]?.vloer).filter(Boolean));
+}
+
 function renderTabs() {
   const tabsEl = document.getElementById("tabs");
   tabsEl.innerHTML = "";
-  const roeterVloere =
-    laasteResultaat && laasteResultaat.path
-      ? new Set(laasteResultaat.path.map((id) => nodeById[id]?.vloer).filter(Boolean))
-      : new Set();
+  const roeterVloere = kryRoeterVloere();
 
   const oorsig = document.createElement("button");
   oorsig.type = "button";
@@ -564,10 +567,7 @@ function renderTabs() {
 function renderIndicator() {
   const el = document.getElementById("indicator");
   el.innerHTML = "";
-  const roeterVloere =
-    laasteResultaat && laasteResultaat.path
-      ? new Set(laasteResultaat.path.map((id) => nodeById[id]?.vloer).filter(Boolean))
-      : new Set();
+  const roeterVloere = kryRoeterVloere();
   vloere.forEach((f) => {
     const row = document.createElement("button");
     row.type = "button";
@@ -624,6 +624,110 @@ const PAD_X = 55;
 const PAD_Y = 90;
 const px = (n) => n.x * SCALE + PAD_X;
 const py = (n) => n.y * SCALE + PAD_Y;
+
+// Agt moontlike plekke vir 'n etiket relatief tot sy nodus (dx/dy in SVG-eenhede).
+// Die eerste vier is die gunstelinge; die laaste vier is hoek-posisies as noodplan.
+const ETIKET_POSISIES = [
+  { dx: 0, dy: 20, anchor: "middle" },
+  { dx: 0, dy: -21, anchor: "middle" },
+  { dx: 14, dy: -5, anchor: "start" },
+  { dx: -14, dy: -5, anchor: "end" },
+  { dx: 12, dy: 18, anchor: "start" },
+  { dx: -12, dy: 18, anchor: "end" },
+  { dx: 12, dy: -18, anchor: "start" },
+  { dx: -12, dy: -18, anchor: "end" },
+];
+
+// -----------------------------------------------------------------------
+// Geometriese hulpfunksies vir etiketplasing
+// -----------------------------------------------------------------------
+
+// Botsingstoets vir twee asbelynde reghoeke (AABB).
+// Teorie: twee reghoeke oorvleuel as en slegs as hulle BEIDE op die
+// x-as EN op die y-as oormekaar projekteer. Die "spasie"-buffer
+// vergroot elke reghoek effektief sodat etikette 'n minimumwit-
+// ruimte tussen mekaar behou (verstekwaarde: 3px).
+const reghoekeOorvleuel = (a, b, spasie = 3) =>
+  a.x < b.x + b.width + spasie &&
+  a.x + a.width + spasie > b.x &&
+  a.y < b.y + b.height + spasie &&
+  a.y + a.height + spasie > b.y;
+
+// Toets of 'n punt (x, y) binne 'n asbelynde reghoek b val.
+// Die spasie-buffer vergroot die reghoek sodat nodusse wat naby
+// maar nie binne die etiketteks val nie, steeds as "botsing" beskou word.
+const puntInReghoek = (x, y, b, spasie = 2) =>
+  x >= b.x - spasie &&
+  x <= b.x + b.width + spasie &&
+  y >= b.y - spasie &&
+  y <= b.y + b.height + spasie;
+
+// Kruisproduk-oriëntasietoets (skaalmaat van die 2D kruisproduk AB × AC).
+// Bereken die z-komponent van die kruisproduk van vektore AB en AC:
+//   AB = (bx-ax, by-ay),  AC = (cx-ax, cy-ay)
+//   z  = (bx-ax)(cy-ay) - (by-ay)(cx-ax)
+// Interpretasie van die teken:
+//   > 0 : C lê links van AB  (teenkloksgewys)
+//   < 0 : C lê regs van AB   (kloksgewys)
+//   = 0 : A, B, C is kollineêr (op een lyn)
+// Bepaal aan watter kant van 'n lynstuk die ander segment se eindpunte lê.
+const orientasie = (ax, ay, bx, by, cx2, cy2) =>
+  (bx - ax) * (cy2 - ay) - (by - ay) * (cx2 - ax);
+
+// Toets of lynsegmente AB en CD mekaar sny met kruisprodukte:
+//   Stap 1 — Begrensingskastoets: as die begrensings-
+//            kasse van AB en CD nie oorvleuel nie, kan die segmente onmoontlik
+//            kruis — goedkoop vroeë afwysing.
+//   Stap 2 — Oriëntasietoets: segment AB sny CD as en slegs as C en D aan
+//            TEENOORGESTELDE kante van lyn AB lê (orientasie-produkte ≤ 0),
+//            EN A en B aan teenoorgestelde kante van CD lê.
+//            Die ≤ 0 (eerder as < 0) dek die randgeval waar eindpunte
+//            presies op die teenoorgestelde segment lê (kollineêr).
+const segmenteKruis = (a, b, c, d) =>
+  Math.max(a.x, b.x) >= Math.min(c.x, d.x) &&
+  Math.max(c.x, d.x) >= Math.min(a.x, b.x) &&
+  Math.max(a.y, b.y) >= Math.min(c.y, d.y) &&
+  Math.max(c.y, d.y) >= Math.min(a.y, b.y) &&
+  orientasie(a.x, a.y, b.x, b.y, c.x, c.y) *
+  orientasie(a.x, a.y, b.x, b.y, d.x, d.y) <=
+  0 &&
+  orientasie(c.x, c.y, d.x, d.y, a.x, a.y) *
+  orientasie(c.x, c.y, d.x, d.y, b.x, b.y) <=
+  0;
+
+// Toets of 'n lynstuk 'n asbelynde reghoek sny.
+// Tweeledige strategie:
+//   1. Vinnige geval: as ENIGE eindpunt van die lyn binne die reghoek
+//      val (puntInReghoek), kruis die lyn noodwendig die reghoek.
+//   2. Randgeval: 'n lyn kan deur 'n reghoek steek sonder dat enige
+//      eindpunt daarin val (bv. 'n diagonale lyn wat hoek tot hoek
+//      deurstoot). Vir hierdie geval word segmenteKruis() geroep teen
+//      elkeen van die vier sye van die reghoek (gedefinieer as vier
+//      opeenvolgende hoekpunte) — as enige sy gesny word, gee true terug.
+const lynKruisReghoek = (lyn, b) => {
+  if (
+    puntInReghoek(lyn.x1, lyn.y1, b) ||
+    puntInReghoek(lyn.x2, lyn.y2, b)
+  ) {
+    return true;
+  }
+  const hoeke = [
+    { x: b.x, y: b.y },
+    { x: b.x + b.width, y: b.y },
+    { x: b.x + b.width, y: b.y + b.height },
+    { x: b.x, y: b.y + b.height },
+  ];
+  const begin = { x: lyn.x1, y: lyn.y1 };
+  const einde = { x: lyn.x2, y: lyn.y2 };
+  return hoeke.some((hoek, hoekNommer) =>
+    segmenteKruis(
+      begin,
+      einde,
+      hoek,
+      hoeke[(hoekNommer + 1) % hoeke.length],
+    ),
+  );
+};
 
 function renderPlan() {
   const svg = document.getElementById("plan");
@@ -750,21 +854,11 @@ function renderPlan() {
     g.appendChild(circle);
 
     // Probeer verskeie posisies en kies die een met die minste botsings.
-    const etiketPosisies = [
-      { dx: 0, dy: 20, anchor: "middle" },
-      { dx: 0, dy: -21, anchor: "middle" },
-      { dx: 14, dy: -5, anchor: "start" },
-      { dx: -14, dy: -5, anchor: "end" },
-      { dx: 12, dy: 18, anchor: "start" },
-      { dx: -12, dy: 18, anchor: "end" },
-      { dx: 12, dy: -18, anchor: "start" },
-      { dx: -12, dy: -18, anchor: "end" },
-    ];
     const beginPosisie = i % 4;
     const kandidaatPosisies = [
-      ...etiketPosisies.slice(beginPosisie, 4),
-      ...etiketPosisies.slice(0, beginPosisie),
-      ...etiketPosisies.slice(4),
+      ...ETIKET_POSISIES.slice(beginPosisie, 4),
+      ...ETIKET_POSISIES.slice(0, beginPosisie),
+      ...ETIKET_POSISIES.slice(4),
     ];
     const etiket = n.etiket + (isBlocked ? " [GESLUIT]" : n.beperkte ? ` [${n.beperkte}]` : "");
     const woorde = etiket.split(" ");
@@ -792,97 +886,6 @@ function renderPlan() {
     });
     g.appendChild(text);
     svg.appendChild(g);
-
-    // -----------------------------------------------------------------------
-    // Geometriese hulpfunksies vir etiketplasing
-    // -----------------------------------------------------------------------
-
-    // Botsingstoets vir twee asbelynde reghoeke (AABB).
-    // Teorie: twee reghoeke oorvleuel as en slegs as hulle BEIDE op die
-    // x-as EN op die y-as oormekaar projekteer. Die "spasie"-buffer
-    // vergroot elke reghoek effektief sodat etikette 'n minimumwit-
-    // ruimte tussen mekaar behou (verstekwaarde: 3px).
-    const reghoekeOorvleuel = (a, b, spasie = 3) =>
-      a.x < b.x + b.width + spasie &&
-      a.x + a.width + spasie > b.x &&
-      a.y < b.y + b.height + spasie &&
-      a.y + a.height + spasie > b.y;
-    
-    // Toets of 'n punt (x, y) binne 'n asbelynde reghoek b val.
-    // Die spasie-buffer vergroot die reghoek sodat nodusse wat naby
-    // maar nie binne die etiketteks val nie, steeds as "botsing" beskou word.
-    const puntInReghoek = (x, y, b, spasie = 2) =>
-      x >= b.x - spasie &&
-      x <= b.x + b.width + spasie &&
-      y >= b.y - spasie &&
-      y <= b.y + b.height + spasie;
-    
-    // Kruisproduk-oriëntasietoets (skaalmaat van die 2D kruisproduk AB × AC).
-    // Bereken die z-komponent van die kruisproduk van vektore AB en AC:
-    //   AB = (bx-ax, by-ay),  AC = (cx-ax, cy-ay)
-    //   z  = (bx-ax)(cy-ay) - (by-ay)(cx-ax)
-    // Interpretasie van die teken:
-    //   > 0 : C lê links van AB  (teenkloksgewys)
-    //   < 0 : C lê regs van AB   (kloksgewys)
-    //   = 0 : A, B, C is kollineêr (op een lyn)
-    // Bepaal aan watter kant van 'n lynstuk die ander segment se eindpunte lê.
-    const orientasie = (ax, ay, bx, by, cx2, cy2) =>
-      (bx - ax) * (cy2 - ay) - (by - ay) * (cx2 - ax);
-
-    // Toets of lynsegmente AB en CD mekaar sny met kruisprodukte:
-    //   Stap 1 — Begrensingskastoets: as die begrensings-
-    //            kasse van AB en CD nie oorvleuel nie, kan die segmente onmoontlik
-    //            kruis — goedkoop vroeë afwysing.
-    //   Stap 2 — Oriëntasietoets: segment AB sny CD as en slegs as C en D aan
-    //            TEENOORGESTELDE kante van lyn AB lê (orientasie-produkte ≤ 0),
-    //            EN A en B aan teenoorgestelde kante van CD lê.
-    //            Die ≤ 0 (eerder as < 0) dek die randgeval waar eindpunte
-    //            presies op die teenoorgestelde segment lê (kollineêr).
-    const segmenteKruis = (a, b, c, d) =>
-      Math.max(a.x, b.x) >= Math.min(c.x, d.x) &&
-      Math.max(c.x, d.x) >= Math.min(a.x, b.x) &&
-      Math.max(a.y, b.y) >= Math.min(c.y, d.y) &&
-      Math.max(c.y, d.y) >= Math.min(a.y, b.y) &&
-      orientasie(a.x, a.y, b.x, b.y, c.x, c.y) *
-      orientasie(a.x, a.y, b.x, b.y, d.x, d.y) <=
-      0 &&
-      orientasie(c.x, c.y, d.x, d.y, a.x, a.y) *
-      orientasie(c.x, c.y, d.x, d.y, b.x, b.y) <=
-      0;
-    
-    // Toets of 'n lynstuk 'n asbelynde reghoek sny.
-    // Tweeledige strategie:
-    //   1. Vinnige geval: as ENIGE eindpunt van die lyn binne die reghoek
-    //      val (puntInReghoek), kruis die lyn noodwendig die reghoek.
-    //   2. Randgeval: 'n lyn kan deur 'n reghoek steek sonder dat enige
-    //      eindpunt daarin val (bv. 'n diagonale lyn wat hoek tot hoek
-    //      deurstoot). Vir hierdie geval word segmenteKruis() geroep teen
-    //      elkeen van die vier sye van die reghoek (gedefinieer as vier
-    //      opeenvolgende hoekpunte) — as enige sy gesny word, gee true terug.
-    const lynKruisReghoek = (lyn, b) => {
-      if (
-        puntInReghoek(lyn.x1, lyn.y1, b) ||
-        puntInReghoek(lyn.x2, lyn.y2, b)
-      ) {
-        return true;
-      }
-      const hoeke = [
-        { x: b.x, y: b.y },
-        { x: b.x + b.width, y: b.y },
-        { x: b.x + b.width, y: b.y + b.height },
-        { x: b.x, y: b.y + b.height },
-      ];
-      const begin = { x: lyn.x1, y: lyn.y1 };
-      const einde = { x: lyn.x2, y: lyn.y2 };
-      return hoeke.some((hoek, hoekNommer) =>
-        segmenteKruis(
-          begin,
-          einde,
-          hoek,
-          hoeke[(hoekNommer + 1) % hoeke.length],
-        ),
-      );
-    };
 
     // -----------------------------------------------------------------------
     // Kandidaat-posisie-tellingslus

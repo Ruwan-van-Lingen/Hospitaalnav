@@ -440,50 +440,52 @@ def tuisblad():
     return {"boodskap": "Welkom by die Hospitaal Navigasie API. Gaan na /docs vir die dokumentasie."}
 
 
+def bedien_leer(leernaam: str, media_type: str | None = None) -> FileResponse:
+    """
+    Bedien een statiese lêer uit die projekgids, of gee 404 as dit ontbreek.
+
+    Al die bladsy-, CSS- en JavaScript-eindpunte hieronder gebruik hierdie
+    funksie, sodat die bestaan-kontrole net op een plek geskryf is. As
+    media_type None is, raai FileResponse dit uit die lêernaam (bv. .html).
+    """
+    pad = BASE_GIDS / leernaam
+    if not pad.exists():
+        raise HTTPException(status_code=404, detail=f"{leernaam} nie gevind nie.")
+    return FileResponse(str(pad), media_type=media_type)
+
+
 @app.get("/ui")
 def ui():
     """Bedien die interaktiewe webkoppelvlak direk vanaf dieselfde API-adres."""
-    html_pad = BASE_GIDS / "hospitaal_wayfinder.html"
-    if not html_pad.exists():
-        raise HTTPException(status_code=404, detail="hospitaal_wayfinder.html nie gevind nie.")
-    return FileResponse(str(html_pad))
+    return bedien_leer("hospitaal_wayfinder.html")
 
 
 @app.get("/admin")
 def admin_ui():
     """Bedien die adminblad vir sluitingsbestuur."""
-    html_pad = BASE_GIDS / "admin.html"
-    if not html_pad.exists():
-        raise HTTPException(status_code=404, detail="admin.html nie gevind nie.")
-    return FileResponse(str(html_pad))
+    return bedien_leer("admin.html")
 
 
 @app.get("/admin.css", include_in_schema=False)
 def admin_css():
-    return FileResponse(str(BASE_GIDS / "admin.css"), media_type="text/css")
+    return bedien_leer("admin.css", "text/css")
 
 
 @app.get("/admin.js", include_in_schema=False)
 def admin_javascript():
-    return FileResponse(str(BASE_GIDS / "admin.js"), media_type="text/javascript")
+    return bedien_leer("admin.js", "text/javascript")
 
 
 @app.get("/hospitaal_wayfinder.css", include_in_schema=False)
 def ui_css():
     """Bedien die webkoppelvlak se stylblad."""
-    css_pad = BASE_GIDS / "hospitaal_wayfinder.css"
-    if not css_pad.exists():
-        raise HTTPException(status_code=404, detail="hospitaal_wayfinder.css nie gevind nie.")
-    return FileResponse(str(css_pad), media_type="text/css")
+    return bedien_leer("hospitaal_wayfinder.css", "text/css")
 
 
 @app.get("/hospitaal_wayfinder.js", include_in_schema=False)
 def ui_javascript():
     """Bedien die webkoppelvlak se JavaScript."""
-    js_pad = BASE_GIDS / "hospitaal_wayfinder.js"
-    if not js_pad.exists():
-        raise HTTPException(status_code=404, detail="hospitaal_wayfinder.js nie gevind nie.")
-    return FileResponse(str(js_pad), media_type="text/javascript")
+    return bedien_leer("hospitaal_wayfinder.js", "text/javascript")
 
 
 # ---------------------------------------------------------------------------
