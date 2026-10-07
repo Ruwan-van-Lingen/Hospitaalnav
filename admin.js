@@ -299,9 +299,8 @@ function vulAnaliseBronne() {
     });
   });
 
-  const waardes = bronKeuse.options.map
-    ? bronKeuse.options.map((opsie) => opsie.value)
-    : [...bronKeuse.options].map((opsie) => opsie.value);
+  // 'n options-versameling het nie self 'n .map nie, daarom eers na 'n gewone lys.
+  const waardes = [...bronKeuse.options].map((opsie) => opsie.value);
   bronKeuse.value = waardes.includes(vorigeWaarde)
     ? vorigeWaarde
     : (eersteGewoneNodus || waardes[0] || "");

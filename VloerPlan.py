@@ -169,8 +169,6 @@ def teken_vloer_plan(db_pad: str, uit_pad: str, verlig_pad: list[str] | None = N
 # Handmatige demonstrasie (voer uit as: python VloerPlan.py)
 # ---------------------------------------------------------------------------
 if __name__ == "__main__":
-    import sys
-    sys.path.insert(0, ".")
     from HospitaalGrafiek import HospitaalGrafiek, bou_demo_db
 
     bou_demo_db("hospitaal.db", "Skema.sql", "SeedData.sql")

@@ -155,6 +155,17 @@ class HospitaalGrafiek:
             conn.close()
         self.bestemmingsindeks = indeks
 
+    def _is_bruikbaar(self, node_id: str, toegelaat: set[str], geblokkeer: set[str]) -> bool:
+        """Keur 'n nodus goed as dit nie geblokkeer of vir hierdie gebruiker beperk is nie.
+
+        Word deur astar(), naaste_veilige_uitgang() en maks_vloei_na_uitgange()
+        gedeel, sodat die toegangsreël net op een plek gewysig hoef te word.
+        """
+        if node_id in geblokkeer:
+            return False
+        groep = self.nodes[node_id]["beperkte_groep"]
+        return groep is None or groep in toegelaat
+
     def toegelate_groepe(self, gebruiker_tipe: str) -> set[str]:
         """
         Gee die stel beperkte groepe terug wat hierdie gebruikerstipe mag betree.
@@ -252,15 +263,9 @@ class HospitaalGrafiek:
         toegelaat = self.toegelate_groepe(gebruiker_tipe)
         geblokkeer = geblokkeerde_nodes or set()
 
-        def is_bruikbaar(node_id: str) -> bool:
-            """Keur 'n nodus goed as dit nie geblokkeer of beperk is nie."""
-            if node_id in geblokkeer:
-                return False
-            groep = self.nodes[node_id]["beperkte_groep"]
-            return groep is None or groep in toegelaat
-
         # Kyk vroeg of begin of doel self ontoeganklik is.
-        if not is_bruikbaar(begin) or not is_bruikbaar(doel):
+        if not (self._is_bruikbaar(begin, toegelaat, geblokkeer)
+                and self._is_bruikbaar(doel, toegelaat, geblokkeer)):
             return None
 
         # Hoop-inskrywing: (f_score, g_score, node_id)
@@ -282,7 +287,7 @@ class HospitaalGrafiek:
             besoek.add(huidig)
 
             for rand in self.adjacency[huidig]:
-                if not is_bruikbaar(rand.na_node):
+                if not self._is_bruikbaar(rand.na_node, toegelaat, geblokkeer):
                     continue  # Ontoeganklik vir hierdie gebruikerstipe of tydelik geblokkeer.
                 tentatiewe_g = koste_so_ver + rand.gewig_s
                 if tentatiewe_g < g_score.get(rand.na_node, math.inf):
@@ -333,13 +338,7 @@ class HospitaalGrafiek:
         toegelaat = self.toegelate_groepe(gebruiker_tipe)
         geblokkeer = geblokkeerde_nodes or set()
 
-        def is_bruikbaar(node_id: str) -> bool:
-            if node_id in geblokkeer:
-                return False
-            groep = self.nodes[node_id]["beperkte_groep"]
-            return groep is None or groep in toegelaat
-
-        if not is_bruikbaar(begin):
+        if not self._is_bruikbaar(begin, toegelaat, geblokkeer):
             return None
 
         # --- Bou die omgekeerde aangrensingsstruktuur ---
@@ -366,7 +365,7 @@ class HospitaalGrafiek:
         hoop: list[tuple[float, str]] = []  # (koste, node_id)
 
         for nid, data in self.nodes.items():
-            if data["is_nooduitgang"] and is_bruikbaar(nid):
+            if data["is_nooduitgang"] and self._is_bruikbaar(nid, toegelaat, geblokkeer):
                 g_score[nid] = 0.0
                 afstand_score[nid] = 0.0
                 heapq.heappush(hoop, (0.0, nid))
@@ -393,7 +392,7 @@ class HospitaalGrafiek:
 
             for rand in omgekeerde[huidig]:
                 bure = rand.na_node
-                if not is_bruikbaar(bure):
+                if not self._is_bruikbaar(bure, toegelaat, geblokkeer):
                     continue
                 tentatiewe_g = koste_so_ver + rand.gewig_s
                 if tentatiewe_g < g_score.get(bure, math.inf):
@@ -502,13 +501,7 @@ class HospitaalGrafiek:
         toegelaat = self.toegelate_groepe(gebruiker_tipe)
         geblokkeer = geblokkeerde_nodes or set()
 
-        def is_bruikbaar(node_id: str) -> bool:
-            if node_id in geblokkeer:
-                return False
-            groep = self.nodes[node_id]["beperkte_groep"]
-            return groep is None or groep in toegelaat
-
-        if not is_bruikbaar(bron):
+        if not self._is_bruikbaar(bron, toegelaat, geblokkeer):
             return None
 
         # Geen netwerkvloei is nodig as die persoon reeds by 'n uitgang is.
@@ -522,12 +515,12 @@ class HospitaalGrafiek:
         kapasiteit: dict[object, dict[object, float]] = defaultdict(dict)
 
         for van_node, rande in self.adjacency.items():
-            if not is_bruikbaar(van_node):
+            if not self._is_bruikbaar(van_node, toegelaat, geblokkeer):
                 continue
             for rand in rande:
                 if rand.rand_tipe == "HUISBAK":
                     continue  # Brandveiligheidsreël: geen hysbakke tydens ontruiming.
-                if not is_bruikbaar(rand.na_node):
+                if not self._is_bruikbaar(rand.na_node, toegelaat, geblokkeer):
                     continue
                 kapasiteit[van_node][rand.na_node] = (
                     kapasiteit[van_node].get(rand.na_node, 0.0) + rand.kapasiteit
@@ -539,7 +532,7 @@ class HospitaalGrafiek:
         # Koppel elke toegelate nooduitgang aan die kunsmatige put.
         het_uitgang = False
         for node_id, data in self.nodes.items():
-            if data["is_nooduitgang"] and is_bruikbaar(node_id):
+            if data["is_nooduitgang"] and self._is_bruikbaar(node_id, toegelaat, geblokkeer):
                 kapasiteit[node_id][SUPERPUT] = maksimum_kapasiteit
                 kapasiteit[SUPERPUT].setdefault(node_id, 0.0)
                 het_uitgang = True
@@ -594,7 +587,7 @@ class HospitaalGrafiek:
         bottelnek_kante: list[tuple[str, str, float]] = []
         for van_node in sorted(bereikbaar - {SUPERPUT}):
             for rand in self.adjacency.get(van_node, []):
-                if rand.rand_tipe == "HUISBAK" or not is_bruikbaar(rand.na_node):
+                if rand.rand_tipe == "HUISBAK" or not self._is_bruikbaar(rand.na_node, toegelaat, geblokkeer):
                     continue
                 if rand.na_node not in bereikbaar:
                     bottelnek_kante.append((van_node, rand.na_node, rand.kapasiteit))
