@@ -18,9 +18,9 @@
  * Kaart-oorsigmodus (OORSIG_ID)
  * --------------------------------
  * Die "Oorsig — Alle Vloere"-oortjie vertoon alle vloere in lae op een SVG-kaart.
- * Nodusse wat presies dieselfde (x, y) koördinate deel oor vloere (bv.
- * hysbakke) word net een keer geteken. Vertikale hysbak- en trap-rande word in
- * oorsigmodus oorgeslaan omdat hulle as onsigbare lyne sou teken.
+ * Hysbak- en traphuisnodusse wat deur vertikale rande verbind is, vorm een
+ * visuele groep met 'n gedeelde etiket. Elke vloer se kleiner noduspunt bly
+ * afsonderlik klikbaar. Ander gelaagde nodusse kry klein vloerverskuiwings.
  *
  * Etiketplasing
  * -----------------
@@ -69,6 +69,11 @@ const nodes = [
   ["MAIN-G-STA", "MAIN-G", "TRAPHUIS", "Hooftraphuis", 15, 10, null],
   ["MAIN-G-ER", "MAIN-G", "DEPARTEMENT", "Nooddienste", 5, 20, null],
   ["MAIN-G-TUN", "MAIN-G", "TONNEL", "Tonnel na Sygebou", 10, 30, null],
+  ["MAIN-G-J02", "MAIN-G", "AANSLUITING", "Westelike gangaansluiting", 20, 0, null],
+  ["MAIN-G-ADM", "MAIN-G", "DEPARTEMENT", "Pasiënttoelatings", 25, -5, null],
+  ["MAIN-G-PHA", "MAIN-G", "DEPARTEMENT", "Hoofapteek", 25, 5, null],
+  ["MAIN-G-BLO", "MAIN-G", "DEPARTEMENT", "Bloedbank", 30, -5, null],
+  ["MAIN-G-SEC", "MAIN-G", "DEPARTEMENT", "Sekuriteitskantoor", 30, 5, null],
 
   [
     "MAIN-1-ELV",
@@ -100,6 +105,11 @@ const nodes = [
     20,
     null,
   ],
+  ["MAIN-1-J02", "MAIN-1", "AANSLUITING", "Westelike saalaansluiting", 30, 5, null],
+  ["MAIN-1-WARDC", "MAIN-1", "DEPARTEMENT", "Saal C", 35, 0, null],
+  ["MAIN-1-PED", "MAIN-1", "DEPARTEMENT", "Pediatriese saal", 35, 10, null],
+  ["MAIN-1-MAT", "MAIN-1", "DEPARTEMENT", "Kraamsaal", 40, 0, null],
+  ["MAIN-1-FAM", "MAIN-1", "DEPARTEMENT", "Familie-wagarea", 40, 10, null],
 
   [
     "MAIN-2-ELV",
@@ -130,6 +140,10 @@ const nodes = [
     10,
     "SLEGS_PERSONEEL",
   ],
+  ["MAIN-2-REC", "MAIN-2", "DEPARTEMENT", "Herstelkamer", 35, 10, "SLEGS_PERSONEEL"],
+  ["MAIN-2-STER", "MAIN-2", "DEPARTEMENT", "Steriele voorraad", 35, 15, "SLEGS_PERSONEEL"],
+  ["MAIN-2-NICU", "MAIN-2", "DEPARTEMENT", "Neonatale intensiewe sorg", 35, 0, "SLEGS_ICU"],
+  ["MAIN-2-NUR", "MAIN-2", "DEPARTEMENT", "Personeelstasie", 30, 15, "SLEGS_PERSONEEL"],
 
   ["SYGEBOU-G-ENT", "SYGEBOU-G", "INGANG", "Sygebou-ingang", 40, 0, null],
   [
@@ -168,6 +182,10 @@ const nodes = [
     10,
     null,
   ],
+  ["SYGEBOU-G-LAB", "SYGEBOU-G", "DEPARTEMENT", "Patologielaboratorium", 50, 5, null],
+  ["SYGEBOU-G-CAF", "SYGEBOU-G", "DEPARTEMENT", "Kafeteria", 50, 15, null],
+  ["SYGEBOU-G-PHY", "SYGEBOU-G", "DEPARTEMENT", "Fisioterapie", 55, 5, null],
+  ["SYGEBOU-G-BIL", "SYGEBOU-G", "DEPARTEMENT", "Rekeninge-afdeling", 55, 15, null],
 
   [
     "SYGEBOU-1-ELV",
@@ -188,6 +206,12 @@ const nodes = [
     null,
   ],
   ["SYGEBOU-1-RAD", "SYGEBOU-1", "DEPARTEMENT", "Radiologie", 45, 20, null],
+  ["SYGEBOU-1-J01", "SYGEBOU-1", "AANSLUITING", "Beeldvormingsaansluiting", 50, 20, null],
+  ["SYGEBOU-1-CT", "SYGEBOU-1", "DEPARTEMENT", "CT-skandering", 55, 15, null],
+  ["SYGEBOU-1-MRI", "SYGEBOU-1", "DEPARTEMENT", "MRI-eenheid", 55, 25, null],
+  ["SYGEBOU-1-US", "SYGEBOU-1", "DEPARTEMENT", "Ultraklank", 60, 15, null],
+  ["SYGEBOU-1-XRAY", "SYGEBOU-1", "DEPARTEMENT", "X-straaleenheid", 60, 20, null],
+  ["SYGEBOU-1-NUC", "SYGEBOU-1", "DEPARTEMENT", "Kerngeneeskunde", 60, 25, null],
 ].map(([id, vloer, tipe, etiket, x, y, beperkte_groep]) => ({
   id,
   vloer,
@@ -206,6 +230,12 @@ const randRye = [
   ["MAIN-G-J01", "MAIN-G-ER", "GANG", 22, 18, 0, 0, 1],
   ["MAIN-G-AMB", "MAIN-G-ER", "GANG", 6, 5, 0, 0, 1],
   ["MAIN-G-J01", "MAIN-G-TUN", "GANG", 32, 27, 0, 0, 1],
+  ["MAIN-G-J01", "MAIN-G-J02", "GANG", 10, 8, 0, 0, 1],
+  ["MAIN-G-J02", "MAIN-G-ADM", "GANG", 7, 6, 0, 0, 1],
+  ["MAIN-G-J02", "MAIN-G-PHA", "GANG", 7, 6, 0, 0, 1],
+  ["MAIN-G-ADM", "MAIN-G-BLO", "GANG", 5, 4, 0, 0, 1],
+  ["MAIN-G-PHA", "MAIN-G-SEC", "GANG", 5, 4, 0, 0, 1],
+  ["MAIN-G-BLO", "MAIN-G-SEC", "GANG", 10, 8, 0, 0, 1],
 
   ["MAIN-G-ELV", "MAIN-1-ELV", "HUISBAK", 0, 8, 25, 1, 1],
   ["MAIN-1-ELV", "MAIN-2-ELV", "HUISBAK", 0, 8, 25, 1, 1],
@@ -218,21 +248,43 @@ const randRye = [
   ["MAIN-1-J01", "MAIN-1-WARDA", "GANG", 6, 5, 0, 0, 1],
   ["MAIN-1-J01", "MAIN-1-WARDB", "GANG", 6, 5, 0, 0, 1],
   ["MAIN-1-J01", "MAIN-1-BRIDGE", "GANG", 16, 13, 0, 0, 1],
+  ["MAIN-1-J01", "MAIN-1-J02", "GANG", 10, 8, 0, 0, 1],
+  ["MAIN-1-J02", "MAIN-1-WARDC", "GANG", 7, 6, 0, 0, 1],
+  ["MAIN-1-J02", "MAIN-1-PED", "GANG", 7, 6, 0, 0, 1],
+  ["MAIN-1-WARDC", "MAIN-1-MAT", "GANG", 5, 4, 0, 0, 1],
+  ["MAIN-1-PED", "MAIN-1-FAM", "GANG", 5, 4, 0, 0, 1],
+  ["MAIN-1-MAT", "MAIN-1-FAM", "GANG", 10, 8, 0, 0, 1],
 
   ["MAIN-2-ELV", "MAIN-2-J01", "GANG", 6, 5, 0, 0, 1],
   ["MAIN-2-STA", "MAIN-2-J01", "GANG", 6, 5, 0, 0, 1],
   ["MAIN-2-J01", "MAIN-2-ICU", "GANG", 6, 5, 0, 0, 1],
   ["MAIN-2-J01", "MAIN-2-OR", "GANG", 6, 5, 0, 0, 1],
+  ["MAIN-2-OR", "MAIN-2-REC", "GANG", 10, 8, 0, 0, 1],
+  ["MAIN-2-REC", "MAIN-2-STER", "GANG", 6, 5, 0, 0, 1],
+  ["MAIN-2-ICU", "MAIN-2-NICU", "GANG", 10, 8, 0, 0, 1],
+  ["MAIN-2-OR", "MAIN-2-NUR", "GANG", 7, 6, 0, 0, 1],
+  ["MAIN-2-NUR", "MAIN-2-STER", "GANG", 5, 4, 0, 0, 1],
 
   ["SYGEBOU-G-ENT", "SYGEBOU-G-J01", "GANG", 10, 8, 0, 0, 1],
   ["SYGEBOU-G-J01", "SYGEBOU-G-ELV", "GANG", 6, 5, 0, 0, 1],
   ["SYGEBOU-G-J01", "SYGEBOU-G-OUT", "GANG", 6, 5, 0, 0, 1],
   ["SYGEBOU-G-J01", "SYGEBOU-G-TUN", "GANG", 30, 25, 0, 0, 1],
+  ["SYGEBOU-G-J01", "SYGEBOU-G-LAB", "GANG", 11, 9, 0, 0, 1],
+  ["SYGEBOU-G-J01", "SYGEBOU-G-CAF", "GANG", 11, 9, 0, 0, 1],
+  ["SYGEBOU-G-LAB", "SYGEBOU-G-PHY", "GANG", 5, 4, 0, 0, 1],
+  ["SYGEBOU-G-CAF", "SYGEBOU-G-BIL", "GANG", 5, 4, 0, 0, 1],
+  ["SYGEBOU-G-PHY", "SYGEBOU-G-BIL", "GANG", 10, 8, 0, 0, 1],
 
   ["SYGEBOU-G-ELV", "SYGEBOU-1-ELV", "HUISBAK", 0, 8, 25, 1, 1],
 
   ["SYGEBOU-1-ELV", "SYGEBOU-1-BRIDGE", "GANG", 10, 8, 0, 0, 1],
   ["SYGEBOU-1-ELV", "SYGEBOU-1-RAD", "GANG", 6, 5, 0, 0, 1],
+  ["SYGEBOU-1-RAD", "SYGEBOU-1-J01", "GANG", 6, 5, 0, 0, 1],
+  ["SYGEBOU-1-J01", "SYGEBOU-1-CT", "GANG", 7, 6, 0, 0, 1],
+  ["SYGEBOU-1-J01", "SYGEBOU-1-MRI", "GANG", 7, 6, 0, 0, 1],
+  ["SYGEBOU-1-CT", "SYGEBOU-1-US", "GANG", 5, 4, 0, 0, 1],
+  ["SYGEBOU-1-J01", "SYGEBOU-1-XRAY", "GANG", 10, 8, 0, 0, 1],
+  ["SYGEBOU-1-MRI", "SYGEBOU-1-NUC", "GANG", 5, 4, 0, 0, 1],
 
   ["MAIN-1-BRIDGE", "SYGEBOU-1-BRIDGE", "LUGBRUG", 25, 21, 0, 0, 1],
   ["MAIN-G-TUN", "SYGEBOU-G-TUN", "TONNEL", 18, 15, 0, 0, 1],
@@ -278,6 +330,56 @@ const VLOER_KLEURE = Object.fromEntries(
    ============================================================ */
 const nodeById = Object.fromEntries(nodes.map((n) => [n.id, n]));
 const vloerById = Object.fromEntries(vloere.map((f) => [f.id, f]));
+
+/**
+ * Bou groepe uit werklike vertikale rande eerder as uit soortgelyke name.
+ * Só word slegs dieselfde fisiese hysbak of traphuis oor verskillende vloere
+ * saamgegroepeer; toevallige gelyke koördinate bly aparte plekke.
+ */
+function bouVertikaleGroepe() {
+  const bure = new Map();
+  randRye.forEach(([van, na, tipe]) => {
+    if (tipe !== "HUISBAK" && tipe !== "TRAPPE") return;
+    if (!bure.has(van)) bure.set(van, []);
+    if (!bure.has(na)) bure.set(na, []);
+    bure.get(van).push(na);
+    bure.get(na).push(van);
+  });
+
+  const besoek = new Set();
+  const groepe = [];
+  bure.forEach((_, beginId) => {
+    if (besoek.has(beginId)) return;
+    const stapel = [beginId];
+    const nodusse = [];
+    while (stapel.length) {
+      const id = stapel.pop();
+      if (besoek.has(id)) continue;
+      besoek.add(id);
+      nodusse.push(nodeById[id]);
+      (bure.get(id) || []).forEach((buurId) => stapel.push(buurId));
+    }
+
+    nodusse.sort(
+      (a, b) => vloerById[a.vloer].level - vloerById[b.vloer].level,
+    );
+    const leier = nodusse[0];
+    groepe.push({
+      id: `VERTIKAAL-${leier.id}`,
+      naam: leier.etiket,
+      leier,
+      nodusse,
+    });
+  });
+  return groepe;
+}
+
+const vertikaleGroepe = bouVertikaleGroepe();
+const vertikaleGroepByNode = Object.fromEntries(
+  vertikaleGroepe.flatMap((groep) =>
+    groep.nodusse.map((nodus) => [nodus.id, groep]),
+  ),
+);
 
 async function fetchRoute(apiBase, beginId, eindeId, gebruikerTipe) {
   const basis = apiBase.replace(/\/$/, "");
@@ -344,12 +446,19 @@ let roeteVersoek = 0;
 let roeteBesig = false;
 let volgendeKaartKeuse = "beginNode";
 
+/** Formateer 'n kaartnodus presies soos 'n bestemming wat vanaf die API kom. */
+function kaartNodusEtiket(nodus) {
+  const vloer = vloerById[nodus.vloer];
+  const gebou = geboue.find((item) => item.id === vloer?.gebou);
+  return `${nodus.etiket} — ${gebou?.naam || "Onbekende gebou"}, ${vloer?.naam || nodus.vloer} (${nodus.id})`;
+}
+
 /** Voeg 'n geklikte nodus by 'n keuselys indien die soekresultate dit nie bevat nie. */
 function versekerNodusOpsie(keuse, nodus) {
   if (![...keuse.options].some((opsie) => opsie.value === nodus.id)) {
     const opsie = document.createElement("option");
     opsie.value = nodus.id;
-    opsie.textContent = nodus.etiket;
+    opsie.textContent = kaartNodusEtiket(nodus);
     keuse.appendChild(opsie);
   }
 }
@@ -616,14 +725,51 @@ function renderLegend() {
   });
 }
 
-// Uitlegkonstantes:
-// SCALE plaas nodusse ver genoeg uitmekaar om oorvleueling te voorkom.
-// PAD_Y laat ruimte bo-aan vir die vloertitel, sodat dit nie ’n nodusetiket oorvleuel nie.
-const SCALE = 15;
-const PAD_X = 55;
-const PAD_Y = 90;
-const px = (n) => n.x * SCALE + PAD_X;
-const py = (n) => n.y * SCALE + PAD_Y;
+// Uitleggrense stem met die SVG se viewBox ooreen. Ruim kantmarges keer dat
+// lang departementname buite die kaart afgesny word.
+const KAART_BREEDTE = 780;
+const KAART_HOOGTE = 560;
+const KAART_MARGE_X = 115;
+const KAART_BO_MARGE = 78;
+const KAART_ONDER_MARGE = 62;
+const MAKS_SKaal = 14;
+const OORSIG_VERSKUIWINGS = [
+  { x: -28, y: -22 },
+  { x: 0, y: -30 },
+  { x: 28, y: -22 },
+  { x: -20, y: 24 },
+  { x: 20, y: 24 },
+];
+
+/** Breek 'n lang kaartetiket by woordgrense in kort, leesbare lyne. */
+function breekEtiketLyne(teks, maksimumKarakters = 20, maksimumLyne = 3) {
+  const lyne = [];
+  teks.split(/\s+/).filter(Boolean).forEach((woord) => {
+    const huidige = lyne[lyne.length - 1];
+    if (!huidige || (`${huidige} ${woord}`).length > maksimumKarakters) {
+      lyne.push(woord);
+    } else {
+      lyne[lyne.length - 1] = `${huidige} ${woord}`;
+    }
+  });
+  if (lyne.length <= maksimumLyne) return lyne;
+  return [
+    ...lyne.slice(0, maksimumLyne - 1),
+    lyne.slice(maksimumLyne - 1).join(" "),
+  ];
+}
+
+/** Plaas die vloerlede van 'n vertikale groep rondom een gedeelde middelpunt. */
+function vertikaleGroepVerskuiwing(groep, nodus) {
+  const indeks = groep.nodusse.findIndex((item) => item.id === nodus.id);
+  const totaal = groep.nodusse.length;
+  const hoek = -Math.PI / 2 + (2 * Math.PI * indeks) / totaal;
+  const radius = totaal === 2 ? 8 : 10;
+  return {
+    x: Math.cos(hoek) * radius,
+    y: Math.sin(hoek) * radius,
+  };
+}
 
 function renderPlan() {
   const svg = document.getElementById("plan");
@@ -631,11 +777,10 @@ function renderPlan() {
   svg.innerHTML = "";
 
   const oorsigModus = huidigeVloer === OORSIG_ID;
-  // In oorsigmodus word elke vloer se nodusse in lae op dieselfde kaart vertoon
-  // (die hele kampus deel reeds een koördinaatstelsel: hysbakke en trappe het doelbewus 
-  // identiese x/y oor vloere heen). Andersins word net die huidige vloer se nodusse gewys.
+  // In oorsigmodus word ALLE nodusse geteken. Vertikale vervoer word visueel
+  // gegroepeer; ander gelaagde nodusse kry klein vloerverskuiwings.
   const vloerNodes = oorsigModus
-    ? [...new Map(nodes.map((n) => [`${n.x},${n.y}`, n])).values()]
+    ? nodes
     : nodes.filter((n) => n.vloer === huidigeVloer);
   const vloerLyne = [];
   const geplaasdeEtikette = [];
@@ -651,8 +796,51 @@ function renderPlan() {
       verligRande.add(p[i + 1] + "|" + p[i]);
     }
   }
-  // Bepaal die posisie om 'n nodus te teken.
-  const vertoonPosisie = (n) => ({ x: px(n), y: py(n) });
+  // Pas die huidige aansig dinamies binne die kaart. Elke vloer gebruik dus die
+  // beskikbare ruimte, terwyl die volledige kampus steeds veilig binnepas.
+  const xWaardes = vloerNodes.map((n) => n.x);
+  const yWaardes = vloerNodes.map((n) => n.y);
+  const minimumX = Math.min(...xWaardes);
+  const maksimumX = Math.max(...xWaardes);
+  const minimumY = Math.min(...yWaardes);
+  const maksimumY = Math.max(...yWaardes);
+  const spanX = Math.max(maksimumX - minimumX, 1);
+  const spanY = Math.max(maksimumY - minimumY, 1);
+  const beskikbareBreedte = KAART_BREEDTE - 2 * KAART_MARGE_X;
+  const beskikbareHoogte = KAART_HOOGTE - KAART_BO_MARGE - KAART_ONDER_MARGE;
+  const skaal = Math.min(
+    MAKS_SKaal,
+    beskikbareBreedte / spanX,
+    beskikbareHoogte / spanY,
+  );
+  const inhoudBreedte = spanX * skaal;
+  const inhoudHoogte = spanY * skaal;
+  const oorsprongX = KAART_MARGE_X + (beskikbareBreedte - inhoudBreedte) / 2;
+  const oorsprongY = KAART_BO_MARGE + (beskikbareHoogte - inhoudHoogte) / 2;
+  const vloerIndeks = Object.fromEntries(vloere.map((vloer, indeks) => [vloer.id, indeks]));
+  const basisPosisie = (n) => ({
+    x: oorsprongX + (n.x - minimumX) * skaal,
+    y: oorsprongY + (n.y - minimumY) * skaal,
+  });
+  const vertoonPosisie = (n) => {
+    const groep = vertikaleGroepByNode[n.id];
+    const verskuiwing = !oorsigModus
+      ? { x: 0, y: 0 }
+      : groep
+        ? vertikaleGroepVerskuiwing(groep, n)
+        : OORSIG_VERSKUIWINGS[vloerIndeks[n.vloer] % OORSIG_VERSKUIWINGS.length];
+    const basis = basisPosisie(n);
+    return {
+      x: basis.x + verskuiwing.x,
+      y: basis.y + verskuiwing.y,
+    };
+  };
+  // Oorsigrande eindig by die groep se enkele middelpunt. Wanneer die groep
+  // met sweef oopvou, bly die lyne dus netjies aan die groep gekoppel.
+  const randPosisie = (n) =>
+    oorsigModus && vertikaleGroepByNode[n.id]
+      ? basisPosisie(n)
+      : vertoonPosisie(n);
 
   // Teken rande — in oorsigmodus word alle vloere se gange, lugbrûe en
   // tonnels gewys (vertikale hysbak-/trap-rande word oorgeslaan omdat hul
@@ -666,8 +854,8 @@ function renderPlan() {
     if (magTeken) {
       const a = nodeById[van],
         b = nodeById[na];
-      const aPos = vertoonPosisie(a);
-      const bPos = vertoonPosisie(b);
+      const aPos = randPosisie(a);
+      const bPos = randPosisie(b);
       vloerLyne.push({ x1: aPos.x, y1: aPos.y, x2: bPos.x, y2: bPos.y });
       const isHl = verligRande.has(van + "|" + na);
       // 'n Rand word rooi geteken as BEIDE eindpunte geblokkeer is —
@@ -692,6 +880,98 @@ function renderPlan() {
     }
   });
 
+  // Elke vertikale groep kry een SVG-houer. Die houer wys normaalweg net die
+  // saamgestelde middelpunt en vou sy vloerlede oop wanneer die gebruiker sweef.
+  const groepVertoonToestande = new Map();
+  if (oorsigModus) {
+    vertikaleGroepe.forEach((groep) => {
+      const houer = document.createElementNS(NS, "g");
+      houer.dataset.vertikaleGroep = groep.id;
+      houer.style.cursor = "pointer";
+      const toestand = {
+        houer,
+        lede: [],
+        leierPunte: [],
+        saamgevouElemente: [],
+      };
+      const stelOop = (isOop) => {
+        toestand.lede.forEach((lid, indeks) => {
+          lid.style.display = isOop || indeks === 0 ? "" : "none";
+        });
+        toestand.leierPunte.forEach((element) => {
+          element.style.display = isOop ? "" : "none";
+        });
+        toestand.saamgevouElemente.forEach((element) => {
+          element.style.display = isOop ? "none" : "";
+        });
+        houer.dataset.isOop = String(isOop);
+      };
+      houer.onmouseenter = () => stelOop(true);
+      houer.onmouseleave = () => stelOop(false);
+      toestand.stelOop = stelOop;
+      groepVertoonToestande.set(groep.id, toestand);
+      svg.appendChild(houer);
+    });
+  }
+
+  // 'n Onmiddellike SVG-sweefkaart vervang lang permanente oorsigetikette.
+  // Dit hou die kaart rustig sonder om enige nodusbesonderhede weg te steek.
+  let aktieweHulpmiddel = null;
+  const verbergHulpmiddel = () => {
+    if (aktieweHulpmiddel) aktieweHulpmiddel.style.display = "none";
+  };
+  const wysHulpmiddel = (n, groep, cx, cy) => {
+    verbergHulpmiddel();
+    const vloer = vloerById[n.vloer];
+    const gebou = geboue.find((item) => item.id === vloer?.gebou);
+    const besonderhede = groep
+      ? `${groep.nodusse.length} gekoppelde vloere: ${groep.nodusse
+        .map((item) => vloerById[item.vloer].naam)
+        .join(", ")}`
+      : `${gebou?.naam || "Onbekende gebou"} · ${vloer?.naam || n.vloer}`;
+    const lyne = [
+      n.etiket,
+      ...breekEtiketLyne(besonderhede, 38, 2),
+      ...(n.beperkte ? [`Toegang: ${n.beperkte.replaceAll("_", " ")}`] : []),
+    ];
+    const breedte = Math.min(
+      260,
+      Math.max(150, Math.max(...lyne.map((lyn) => lyn.length)) * 5.7 + 20),
+    );
+    const hoogte = 18 + lyne.length * 13;
+    const x = Math.max(8, Math.min(cx + 14, KAART_BREEDTE - breedte - 8));
+    const y = Math.max(44, Math.min(cy - hoogte - 12, KAART_HOOGTE - hoogte - 8));
+    const kaart = document.createElementNS(NS, "g");
+    kaart.dataset.hulpmiddel = n.id;
+    kaart.setAttribute("pointer-events", "none");
+
+    const agtergrond = document.createElementNS(NS, "rect");
+    agtergrond.setAttribute("x", x);
+    agtergrond.setAttribute("y", y);
+    agtergrond.setAttribute("width", breedte);
+    agtergrond.setAttribute("height", hoogte);
+    agtergrond.setAttribute("rx", 5);
+    agtergrond.setAttribute("fill", "#102634");
+    agtergrond.setAttribute("stroke", "#D9A21B");
+    agtergrond.setAttribute("stroke-width", 1);
+    agtergrond.setAttribute("opacity", "0.97");
+    kaart.appendChild(agtergrond);
+
+    lyne.forEach((lyn, indeks) => {
+      const teks = document.createElementNS(NS, "text");
+      teks.setAttribute("x", x + 10);
+      teks.setAttribute("y", y + 17 + indeks * 13);
+      teks.setAttribute("font-size", indeks === 0 ? "10" : "8.5");
+      teks.setAttribute("font-weight", indeks === 0 ? "700" : "400");
+      teks.setAttribute("font-family", "Inter, sans-serif");
+      teks.setAttribute("fill", indeks === 0 ? "#fff" : "#D8E5EB");
+      teks.textContent = lyn;
+      kaart.appendChild(teks);
+    });
+    aktieweHulpmiddel = kaart;
+    svg.appendChild(kaart);
+  };
+
   // Teken die nodusse met ’n soliede buitelyn sodat hulle duidelik sigbaar bly.
   // Plaas elke etiket onder of, waar nodig, bo die nodus om oorvleueling
   // met aangrensende etikette en ganglyne te beperk.
@@ -699,16 +979,49 @@ function renderPlan() {
     const posisie = vertoonPosisie(n);
     const cx = posisie.x,
       cy = posisie.y;
+    const groep = oorsigModus ? vertikaleGroepByNode[n.id] : null;
+    const isGroepLeier = groep?.leier.id === n.id;
+    const groepToestand = groep ? groepVertoonToestande.get(groep.id) : null;
     const isHl = highlightSet.has(n.id);
     const isBlocked = blockedSet.has(n.id);
     const isBegin = document.getElementById("beginNode").value === n.id;
     const isEinde = document.getElementById("endNode").value === n.id;
     const g = document.createElementNS(NS, "g");
+    g.dataset.nodeId = n.id;
+    g.dataset.vloer = n.vloer;
+    if (groep) {
+      g.dataset.groepId = groep.id;
+      g.dataset.groepGrootte = String(groep.nodusse.length);
+      g.dataset.groepLid = n.id;
+      groepToestand.lede.push(g);
+      if (!isGroepLeier) g.style.display = "none";
+    }
     g.style.cursor = isBlocked ? "not-allowed" : "pointer";
     if (isBlocked) g.classList.add("blocked-node");
     if (isBegin) g.classList.add("bron-node");
     if (isEinde) g.classList.add("bestemming-node");
     g.onclick = () => kiesNodusOpKaart(n, isBlocked);
+    g.onmouseenter = () => wysHulpmiddel(n, groep, cx, cy);
+    g.onmouseleave = verbergHulpmiddel;
+
+    const hulpmiddelTeks = document.createElementNS(NS, "title");
+    hulpmiddelTeks.textContent = groep && isGroepLeier
+      ? `${groep.naam} — ${groep.nodusse.map((item) => vloerById[item.vloer].naam).join(", ")}`
+      : `${n.etiket} (${n.id})`;
+    g.appendChild(hulpmiddelTeks);
+
+    if (groep && isGroepLeier) {
+      const middel = basisPosisie(n);
+      const groepHalo = document.createElementNS(NS, "circle");
+      groepHalo.setAttribute("cx", middel.x);
+      groepHalo.setAttribute("cy", middel.y);
+      groepHalo.setAttribute("r", 19);
+      groepHalo.setAttribute("fill", "rgba(217, 119, 6, 0.08)");
+      groepHalo.setAttribute("stroke", NODE_KLEURE[n.tipe]);
+      groepHalo.setAttribute("stroke-width", 2);
+      groepHalo.setAttribute("stroke-dasharray", "4,3");
+      g.appendChild(groepHalo);
+    }
 
     if (oorsigModus) {
       const vloerHalo = document.createElementNS(NS, "circle");
@@ -720,6 +1033,10 @@ function renderPlan() {
       vloerHalo.setAttribute("stroke-width", 2.5);
       vloerHalo.setAttribute("opacity", "0.9");
       g.appendChild(vloerHalo);
+      if (groep && isGroepLeier) {
+        vloerHalo.style.display = "none";
+        groepToestand.leierPunte.push(vloerHalo);
+      }
     }
 
     if (n.beperkte) {
@@ -748,17 +1065,76 @@ function renderPlan() {
     );
     circle.setAttribute("stroke-width", isBlocked || isHl || isBegin || isEinde ? 3 : 1.2);
     g.appendChild(circle);
+    if (groep && isGroepLeier) {
+      circle.style.display = "none";
+      groepToestand.leierPunte.push(circle);
+
+      const middel = basisPosisie(n);
+      const saamgevouPunt = document.createElementNS(NS, "circle");
+      saamgevouPunt.setAttribute("cx", middel.x);
+      saamgevouPunt.setAttribute("cy", middel.y);
+      saamgevouPunt.setAttribute("r", isHl || isBegin || isEinde ? 10 : 8.5);
+      saamgevouPunt.setAttribute("fill", NODE_KLEURE[n.tipe]);
+      saamgevouPunt.setAttribute("stroke", isHl ? "#FFB100" : "#fff");
+      saamgevouPunt.setAttribute("stroke-width", isHl ? 3 : 1.8);
+      g.appendChild(saamgevouPunt);
+
+      const groepTelling = document.createElementNS(NS, "text");
+      groepTelling.setAttribute("x", middel.x);
+      groepTelling.setAttribute("y", middel.y + 3.2);
+      groepTelling.setAttribute("text-anchor", "middle");
+      groepTelling.setAttribute("font-size", "8");
+      groepTelling.setAttribute("font-weight", "700");
+      groepTelling.setAttribute("font-family", "Inter, sans-serif");
+      groepTelling.setAttribute("fill", "#fff");
+      groepTelling.setAttribute("pointer-events", "none");
+      groepTelling.textContent = String(groep.nodusse.length);
+      g.appendChild(groepTelling);
+      groepToestand.saamgevouElemente.push(saamgevouPunt, groepTelling);
+    }
+
+    // Die groep se ander vloerlede behou hul eie klikbare punte en hulpmiddels,
+    // maar slegs die leier teken die gedeelde etiket.
+    if (groep && !isGroepLeier) {
+      groepToestand.houer.appendChild(g);
+      return;
+    }
+
+    // Aansluitings se lang name word in die oorsig eers op sweef gewys. Hulle
+    // punte en rande bly sigbaar, en 'n aktiewe/geslote aansluiting behou sy
+    // etiket sodat belangrike roete-inligting nooit versteek word nie.
+    const wysPermanenteEtiket = !oorsigModus ||
+      groep ||
+      n.tipe !== "AANSLUITING" ||
+      isHl ||
+      isBlocked ||
+      isBegin ||
+      isEinde;
+    if (!wysPermanenteEtiket) {
+      svg.appendChild(g);
+      return;
+    }
 
     // Probeer verskeie posisies en kies die een met die minste botsings.
     const etiketPosisies = [
-      { dx: 0, dy: 20, anchor: "middle" },
-      { dx: 0, dy: -21, anchor: "middle" },
-      { dx: 14, dy: -5, anchor: "start" },
-      { dx: -14, dy: -5, anchor: "end" },
-      { dx: 12, dy: 18, anchor: "start" },
-      { dx: -12, dy: 18, anchor: "end" },
-      { dx: 12, dy: -18, anchor: "start" },
-      { dx: -12, dy: -18, anchor: "end" },
+      { dx: 0, dy: 24, anchor: "middle" },
+      { dx: 0, dy: -26, anchor: "middle" },
+      { dx: 18, dy: -4, anchor: "start" },
+      { dx: -18, dy: -4, anchor: "end" },
+      { dx: 22, dy: 20, anchor: "start" },
+      { dx: -22, dy: 20, anchor: "end" },
+      { dx: 22, dy: -20, anchor: "start" },
+      { dx: -22, dy: -20, anchor: "end" },
+      { dx: 0, dy: 39, anchor: "middle" },
+      { dx: 0, dy: -41, anchor: "middle" },
+      { dx: 34, dy: 3, anchor: "start" },
+      { dx: -34, dy: 3, anchor: "end" },
+      { dx: 44, dy: 24, anchor: "start" },
+      { dx: -44, dy: 24, anchor: "end" },
+      { dx: 44, dy: -24, anchor: "start" },
+      { dx: -44, dy: -24, anchor: "end" },
+      { dx: 0, dy: 54, anchor: "middle" },
+      { dx: 0, dy: -56, anchor: "middle" },
     ];
     const beginPosisie = i % 4;
     const kandidaatPosisies = [
@@ -766,16 +1142,25 @@ function renderPlan() {
       ...etiketPosisies.slice(0, beginPosisie),
       ...etiketPosisies.slice(4),
     ];
-    const etiket = n.etiket + (isBlocked ? " [GESLUIT]" : n.beperkte ? ` [${n.beperkte}]` : "");
-    const woorde = etiket.split(" ");
-    const middelpunt = Math.ceil(woorde.length / 2);
-    const etiketLyne =
-      woorde.length > 2
-        ? [
-          woorde.slice(0, middelpunt).join(" "),
-          woorde.slice(middelpunt).join(" "),
-        ]
-        : [etiket];
+    const groepGeblokkeer = groep
+      ? groep.nodusse.filter((item) => blockedSet.has(item.id)).length
+      : 0;
+    const groepStatus = groepGeblokkeer === groep?.nodusse.length
+      ? " [GESLUIT]"
+      : groepGeblokkeer > 0
+        ? " [DEELS GESLUIT]"
+        : "";
+    const basisEtiket = groep
+      ? `${groep.naam} (${groep.nodusse.length} vloere)`
+      : n.etiket;
+    const etiket = basisEtiket + (groep
+      ? groepStatus
+      : isBlocked
+        ? " [GESLUIT]"
+        : n.beperkte && !oorsigModus
+          ? ` [${n.beperkte}]`
+          : "");
+    const etiketLyne = breekEtiketLyne(etiket, oorsigModus ? 18 : 24, 3);
 
     const text = document.createElementNS(NS, "text");
     text.setAttribute("font-size", "9");
@@ -791,7 +1176,12 @@ function renderPlan() {
       text.appendChild(tspan);
     });
     g.appendChild(text);
-    svg.appendChild(g);
+    if (groepToestand) {
+      groepToestand.houer.appendChild(g);
+      groepToestand.stelOop(false);
+    } else {
+      svg.appendChild(g);
+    }
 
     // -----------------------------------------------------------------------
     // Geometriese hulpfunksies vir etiketplasing
@@ -910,9 +1300,10 @@ function renderPlan() {
     // -----------------------------------------------------------------------
 
     let beste = null;
+    const etiketMiddel = groep ? basisPosisie(n) : { x: cx, y: cy };
     kandidaatPosisies.forEach((posisie, kandidaatNommer) => {
-      const x = cx + posisie.dx;
-      const y = cy + posisie.dy;
+      const x = etiketMiddel.x + posisie.dx;
+      const y = etiketMiddel.y + posisie.dy;
       text.setAttribute("x", x);
       text.setAttribute("y", y);
       text.setAttribute("text-anchor", posisie.anchor);
@@ -983,6 +1374,16 @@ function renderPlan() {
   // Gebruik 'n veilige terugvalwaarde sodat die funksie nie misluk nie.
   title.textContent = f ? `${f.gebou} — ${f.naam}` : "Oorsig — Alle Vloere";
   svg.appendChild(title);
+  if (oorsigModus) {
+    const wenk = document.createElementNS(NS, "text");
+    wenk.setAttribute("x", 20);
+    wenk.setAttribute("y", 47);
+    wenk.setAttribute("font-size", "8.5");
+    wenk.setAttribute("font-family", "Inter, sans-serif");
+    wenk.setAttribute("fill", "#58707D");
+    wenk.textContent = "Beweeg oor 'n nodus vir volle besonderhede.";
+    svg.appendChild(wenk);
+  }
 }
 
 function renderRoutePanel() {

@@ -226,6 +226,22 @@ def verseker_insident_skema():
         conn.close()
 
 
+def verseker_seed_data():
+    """Voeg ontbrekende standaardnodusse en -rande uit SeedData.sql by.
+
+    SeedData.sql gebruik idempotente ``INSERT OR IGNORE``-stellings. Daarom kan
+    hierdie migrasie ook op 'n bestaande, aanhoudende Docker-databasis loop
+    sonder om insidente of ander bestaande data uit te vee.
+    """
+    conn = sqlite3.connect(DB_PAD)
+    try:
+        conn.execute("PRAGMA foreign_keys = ON")
+        conn.executescript(SEED_PAD.read_text(encoding="utf-8"))
+        conn.commit()
+    finally:
+        conn.close()
+
+
 # ---------------------------------------------------------------------------
 # Toepassingslewensiklus
 # ---------------------------------------------------------------------------
@@ -237,13 +253,15 @@ async def lifespan(app: FastAPI):
 
     1. Bou (of herbou) die SQLite-databasis uit Skema.sql + SeedData.sql.
     2. Verseker dat insident-tabelle en nuwe kolomme bestaan.
-    3. Laai die hospitaalgrafiek eenmalig in geheue — alle roeteversoeke
+    3. Voeg ontbrekende standaardnodusse en -rande uit SeedData.sql by.
+    4. Laai die hospitaalgrafiek eenmalig in geheue — alle roeteversoeke
        hergebruik hierdie instansie. Toegangsregte en insidente word apart gelees.
     """
     DB_PAD.parent.mkdir(parents=True, exist_ok=True)
     if AUTO_HERBOU_DB or not DB_PAD.exists():
         bou_demo_db(str(DB_PAD), str(SKEMA_PAD), str(SEED_PAD))
     verseker_insident_skema()
+    verseker_seed_data()
     app.state.grafiek = HospitaalGrafiek(str(DB_PAD))
     app.state.dekking_pool = None
     app.state.dekking_slot = Lock()

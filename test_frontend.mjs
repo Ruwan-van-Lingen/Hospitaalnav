@@ -56,6 +56,11 @@ const bestemming = (node_id, etiket = node_id) => ({
   node_id, etiket, gebou_naam: "Hoofgebou", vloer_naam: "Grondvloer",
 });
 const wagVirAntwoorde = () => new Promise((klaar) => setImmediate(klaar));
+const alleAfstammelinge = (element) => element.children.flatMap(
+  (kind) => [kind, ...alleAfstammelinge(kind)],
+);
+const kaartNodusse = (plan) => alleAfstammelinge(plan)
+  .filter((kind) => kind.naam === "g" && kind.dataset.nodeId);
 
 async function koppelvlak(bronkode = bron, fetchFunksie = null) {
   const elemente = new Map();
@@ -176,26 +181,104 @@ test("ouer bestemmingsoektogte kan nie nuwer resultate oorskryf nie", async () =
 
 test("opeenvolgende kaartklikke kies begin en bestemming op verskillende nodusse", async () => {
   const { element, lees } = await koppelvlak();
-  const nodusse = () => element("plan").children.filter((kind) => kind.naam === "g");
-  nodusse()[0].onclick();
+  const kryNodus = (id) => kaartNodusse(element("plan"))
+    .find((kind) => kind.dataset.nodeId === id);
+  kryNodus(lees("nodes[0].id")).onclick();
   assert.equal(element("beginNode").value, lees("nodes[0].id"));
   assert.equal(element("beginSoek").value, lees("nodes[0].etiket"));
+  assert.match(element("beginNode").selectedOptions[0].textContent, /Hoofhospitaalgebou, Grondvloer \(MAIN-G-ENT\)/);
   assert.match(element("status").textContent, /Klik nou op 'n bestemming/);
-  nodusse()[1].onclick();
+  kryNodus(lees("nodes[1].id")).onclick();
   assert.equal(element("beginNode").value, lees("nodes[0].id"));
   assert.equal(element("endNode").value, lees("nodes[1].id"));
   assert.equal(element("eindSoek").value, lees("nodes[1].etiket"));
+  assert.match(element("endNode").selectedOptions[0].textContent, /Hoofhospitaalgebou, Grondvloer \(MAIN-G-AMB\)/);
   assert.match(element("status").textContent, /Bestemming gekies/);
 });
 
 test("dieselfde tweede kaartklik kan nie ook die bestemming wees nie", async () => {
-  const { element } = await koppelvlak();
-  const nodusse = () => element("plan").children.filter((kind) => kind.naam === "g");
-  nodusse()[0].onclick();
+  const { element, lees } = await koppelvlak();
+  const nodus = kaartNodusse(element("plan"))
+    .find((kind) => kind.dataset.nodeId === lees("nodes[0].id"));
+  nodus.onclick();
   const vorigeBestemming = element("endNode").value;
-  nodusse()[0].onclick();
+  nodus.onclick();
   assert.equal(element("endNode").value, vorigeBestemming);
   assert.match(element("status").textContent, /ander nodus/);
+});
+
+test("al 50 SQL-nodusse word in die oorsig en korrekte vloeraansigte geteken", async () => {
+  const { element, lees } = await koppelvlak();
+  const getekendeNodusse = () => kaartNodusse(element("plan"));
+
+  assert.equal(lees("nodes.length"), 50);
+  assert.equal(getekendeNodusse().length, 50);
+
+  const verwagtePerVloer = {
+    "MAIN-G": 12,
+    "MAIN-1": 11,
+    "MAIN-2": 9,
+    "SYGEBOU-G": 9,
+    "SYGEBOU-1": 9,
+  };
+  for (const [vloer, verwag] of Object.entries(verwagtePerVloer)) {
+    lees(`huidigeVloer = "${vloer}"; renderAll()`);
+    assert.equal(getekendeNodusse().length, verwag, `${vloer} se nodustelling verskil`);
+  }
+});
+
+test("vertikale hysbak- en traphuisnodusse vorm klikbare oorsiggroepe", async () => {
+  const { element, lees } = await koppelvlak();
+  const groepe = lees(
+    "JSON.stringify(vertikaleGroepe.map((groep) => groep.nodusse.map((nodus) => nodus.id)))",
+  );
+  assert.equal(
+    groepe,
+    JSON.stringify([
+      ["MAIN-G-ELV", "MAIN-1-ELV", "MAIN-2-ELV"],
+      ["MAIN-G-STA", "MAIN-1-STA", "MAIN-2-STA"],
+      ["SYGEBOU-G-ELV", "SYGEBOU-1-ELV"],
+    ]),
+  );
+
+  const getekendeNodusse = kaartNodusse(element("plan"));
+  const gegroepeer = getekendeNodusse.filter((kind) => kind.dataset.groepId);
+  assert.equal(gegroepeer.length, 8);
+
+  const leier = gegroepeer.find((kind) => kind.dataset.nodeId === "MAIN-G-ELV");
+  const verdiepingEen = gegroepeer.find((kind) => kind.dataset.nodeId === "MAIN-1-ELV");
+  const houer = alleAfstammelinge(element("plan"))
+    .find((kind) => kind.dataset.vertikaleGroep === "VERTIKAAL-MAIN-G-ELV");
+  assert.equal(leier.dataset.groepGrootte, "3");
+  assert.match(
+    leier.children.find((kind) => kind.naam === "text").textContent,
+    /Hoofhysbakgroep\s*\(3\s*vloere\)/,
+  );
+  assert.equal(verdiepingEen.children.some((kind) => kind.naam === "text"), false);
+  assert.equal(houer.dataset.isOop, "false");
+  assert.equal(verdiepingEen.style.display, "none");
+  houer.onmouseenter();
+  assert.equal(houer.dataset.isOop, "true");
+  assert.equal(verdiepingEen.style.display, "");
+  verdiepingEen.onclick();
+  assert.equal(element("beginNode").value, "MAIN-1-ELV");
+  houer.onmouseleave();
+  assert.equal(verdiepingEen.style.display, "none");
+});
+
+test("oorsig versteek lang aansluitingetikette maar wys volle sweefbesonderhede", async () => {
+  const { element } = await koppelvlak();
+  const aansluiting = kaartNodusse(element("plan"))
+    .find((kind) => kind.dataset.nodeId === "MAIN-G-J01");
+  assert.equal(aansluiting.children.some((kind) => kind.naam === "text"), false);
+
+  aansluiting.onmouseenter();
+  const hulpmiddel = alleAfstammelinge(element("plan"))
+    .find((kind) => kind.dataset.hulpmiddel === "MAIN-G-J01");
+  assert.match(hulpmiddel.textContent, /Voorportaalaansluiting/);
+  assert.match(hulpmiddel.textContent, /Hoofhospitaalgebou/);
+  aansluiting.onmouseleave();
+  assert.equal(hulpmiddel.style.display, "none");
 });
 
 test("adminversoeke behou JSON-opskrifte en vertaal netwerkfoute", async () => {

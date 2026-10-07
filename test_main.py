@@ -74,6 +74,64 @@ def test_nooddienste_is_beskikbaar_as_beginpunt():
     assert response.json()["bestemmings"][0]["node_id"] == "MAIN-G-ER"
 
 
+def test_fisioterapie_het_volledige_metadata_en_werk_as_bestemming():
+    """Die nuwe Fisioterapie-nodus moet soekbaar en roeteerbaar wees."""
+    with TestClient(app) as client:
+        soektog = client.get("/destinations", params={"q": "Fisioterapie"})
+        roete = client.get(
+            "/route",
+            params={
+                "begin": "MAIN-G-ENT",
+                "doel": "SYGEBOU-G-PHY",
+                "gebruiker_tipe": "PUBLIEK",
+            },
+        )
+
+    assert soektog.status_code == 200
+    assert soektog.json()["bestemmings"] == [
+        {
+            "node_id": "SYGEBOU-G-PHY",
+            "etiket": "Fisioterapie",
+            "tipe_kode": "DEPARTEMENT",
+            "beperkte_groep": None,
+            "vloer_id": "SYGEBOU-G",
+            "vloer_naam": "Grondvloer",
+            "gebou_id": "SYGEBOU",
+            "gebou_naam": "Sygebou",
+        }
+    ]
+    assert roete.status_code == 200
+    assert roete.json()["pad"][-1] == "SYGEBOU-G-PHY"
+
+
+def test_ou_aanhoudende_databasis_kry_ontbrekende_seed_data(monkeypatch):
+    """AUTO_HERBOU_DB=false moet ontbrekende SQL-nodusse veilig byvoeg."""
+    bou_demo_db(str(main.DB_PAD), str(main.SKEMA_PAD), str(main.SEED_PAD))
+    with closing(sqlite3.connect(main.DB_PAD)) as conn:
+        conn.execute(
+            "DELETE FROM rande WHERE van_node = ? OR na_node = ?",
+            ("SYGEBOU-G-PHY", "SYGEBOU-G-PHY"),
+        )
+        conn.execute("DELETE FROM nodes WHERE node_id = ?", ("SYGEBOU-G-PHY",))
+        conn.commit()
+
+    monkeypatch.setattr(main, "AUTO_HERBOU_DB", False)
+    with TestClient(app) as client:
+        soektog = client.get("/destinations", params={"q": "Fisioterapie"})
+        roete = client.get(
+            "/route",
+            params={
+                "begin": "MAIN-G-ENT",
+                "doel": "SYGEBOU-G-PHY",
+                "gebruiker_tipe": "PUBLIEK",
+            },
+        )
+
+    assert soektog.status_code == 200
+    assert soektog.json()["bestemmings"][0]["node_id"] == "SYGEBOU-G-PHY"
+    assert roete.status_code == 200
+
+
 # ---------------------------------------------------------------------------
 # Roeteberekening
 # ---------------------------------------------------------------------------
