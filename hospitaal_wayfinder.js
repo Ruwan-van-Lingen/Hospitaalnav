@@ -7,13 +7,15 @@
  *   • Kaartdata (nodusse, rande, vloere, geboue) wat by opstart van die
  *     bediener se GET /kaart gelaai word (die databasis is die enigste bron)
  *     en kliëntkant gebruik word vir SVG-tekening.
- *   • Roeteberekening via die FastAPI-agterkant (/route of /route/ontruim).
+ *   • Roeteberekening via die FastAPI-agterkant (/route). Tydens ontruiming
+ *     skakel die bediener self oor na die naaste nooduitgang.
  *     A* loop bedienerkant (HospitaalGrafiek.py) — hierdie lêer stuur
  *     slegs die versoek en vertoon die resultaat.
  *   • SVG-vloerplan-tekening: nodusse, rande, paduitligging, etiketplasing.
  *   • Vloer-oortjies en die hysbak-styl vloerindikator (sykolom).
  *   • Soekveld-integrasie met /destinations vir mensleesbare bestemmings.
- *   • Ontruimingsmodus-ondersteuning: die waarskuwingsbanier en /route/ontruim-aanroep.
+ *   • Ontruimingsmodus-ondersteuning: die waarskuwingsbanier, die gedeaktiveerde
+ *     bestemmingskeuse en die nooduitgang-blokkie in die roetepaneel.
  *
  * Kaart-oorsigmodus (OORSIG_ID)
  * --------------------------------
@@ -179,12 +181,13 @@ async function laaiKaart() {
 async function fetchRoute(apiBase, beginId, eindeId, gebruikerTipe) {
   const basis = apiBase.replace(/\/$/, "");
 
-  // Tydens ontruimingsmodus word die bestemming geïgnoreer en word die
-  // naaste nooduitgang via 'n afsonderlike eindpunt bepaal.
-  const ontruim = aktieweInsident.active && aktieweInsident.ontruimings_modus;
-  const url = ontruim
-    ? `${basis}/route/ontruim?begin=${encodeURIComponent(beginId)}&gebruiker_tipe=${encodeURIComponent(gebruikerTipe)}`
-    : `${basis}/route?begin=${encodeURIComponent(beginId)}&doel=${encodeURIComponent(eindeId)}&gebruiker_tipe=${encodeURIComponent(gebruikerTipe)}`;
+  // Die bediener besluit self of dit 'n gewone roete of 'n ontruiming is, op
+  // grond van die insident wat op daardie oomblik aktief is. Tydens ontruiming
+  // word die bestemming geïgnoreer; ons stuur dan die beginpunt as plekhouer,
+  // omdat die bestemmingskeuse gedeaktiveer en dalk leeg is maar /route 'n
+  // doel vereis.
+  const doel = eindeId || beginId;
+  const url = `${basis}/route?begin=${encodeURIComponent(beginId)}&doel=${encodeURIComponent(doel)}&gebruiker_tipe=${encodeURIComponent(gebruikerTipe)}`;
 
   let resp;
   try {
