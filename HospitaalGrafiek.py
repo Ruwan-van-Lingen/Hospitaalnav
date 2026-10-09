@@ -68,7 +68,9 @@ class HospitaalGrafiek:
 
     Die grafiek word eenmalig by toepassingsopstart in geheue gelaai
     (via FastAPI se lifespan-hanteerder in main.py) en word dan vir alle
-    versoeke hergebruik. Toegangsregte word steeds uit SQLite gelees.
+    versoeke hergebruik. Dit geld ook vir die toegangsregte: dit word saam
+    met die nodusse en rande eenmalig gelees. 'n Verandering aan die databasis
+    vereis dus 'n herbegin van die toepassing.
     """
 
     def __init__(self, db_pad: str):
@@ -77,6 +79,8 @@ class HospitaalGrafiek:
         self.nodes: dict[str, dict] = {}
         # Aangrensingsstruktuur: elke node-ID word gekoppel aan sy lys uitgaande rande.
         self.adjacency: dict[str, list[Rand]] = {}
+        # Elke gebruikerstipe word gekoppel aan die beperkte groepe wat hy mag betree.
+        self.toegang: dict[str, set[str]] = {}
         self._load()
         self._skaal_heuristiek()
 
@@ -129,6 +133,17 @@ class HospitaalGrafiek:
                     self.adjacency[row["na_node"]].append(e_rev)
 
 
+            # Laai toegangsregte eenmalig, sodat toegelate_groepe() nie vir elke
+            # algoritme-aanroep (of elke nodus in die dekkingskontrole) weer na
+            # die databasis hoef te gaan nie. Elke tipe begin met 'n leë stel,
+            # want PUBLIEK mag geen beperkte area betree nie.
+            cur.execute("SELECT gebruiker_tipe FROM gebruiker_tipes")
+            self.toegang = {ry[0]: set() for ry in cur.fetchall()}
+            cur.execute("SELECT gebruiker_tipe, beperkte_groep FROM toegang_toestemmings")
+            for tipe, groep in cur.fetchall():
+                if tipe in self.toegang:
+                    self.toegang[tipe].add(groep)
+
         # Geordende bestemmingsmetadata vir die boomsoektog.
         self.herbou_bestemmingsindeks()
 
@@ -176,24 +191,14 @@ class HospitaalGrafiek:
         Byvoorbeeld: 'PERSONEEL' kry {'SLEGS_PERSONEEL', 'SLEGS_ICU'}, terwyl
         'PUBLIEK' 'n leë stel kry (mag geen beperkte areas betree nie).
         Gooi ValueError as die gebruikerstipe nie in die databasis bestaan nie.
-        """
-        conn = sqlite3.connect(self.db_pad)
-        cur = conn.cursor()
-        cur.execute(
-            "SELECT 1 FROM gebruiker_tipes WHERE gebruiker_tipe = ?",
-            (gebruiker_tipe,),
-        )
-        if cur.fetchone() is None:
-            conn.close()
-            raise ValueError(f"Ongeldige gebruikerstipe: {gebruiker_tipe}")
 
-        cur.execute(
-            "SELECT beperkte_groep FROM toegang_toestemmings WHERE gebruiker_tipe = ?",
-            (gebruiker_tipe,),
-        )
-        groepe = {r[0] for r in cur.fetchall()}
-        conn.close()
-        return groepe
+        Die regte is in _load() gelees en bly in geheue, net soos die rande.
+        'n Kopie word teruggegee sodat 'n aanroeper nie per ongeluk die
+        gestoorde stel kan verander nie.
+        """
+        if gebruiker_tipe not in self.toegang:
+            raise ValueError(f"Ongeldige gebruikerstipe: {gebruiker_tipe}")
+        return set(self.toegang[gebruiker_tipe])
 
     def soek_bestemmings(self, soekterm: str = "", limiet: int = 20) -> list[dict]:
         """

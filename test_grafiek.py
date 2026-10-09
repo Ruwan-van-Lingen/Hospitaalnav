@@ -283,3 +283,22 @@ def test_lambda_funksies_word_deur_laaier_en_roetes_gebruik(voorbeeld_db, monkey
     assert grafiek.astar("MAIN-G-ENT", "SYGEBOU-1-RAD") is not None
     assert afstand_spioen.call_count > vorige_telling
     assert any(r.gewig_s == 33 for r in grafiek.adjacency["MAIN-G-ELV"] if r.rand_tipe == "HUISBAK")
+
+
+def test_toegelate_groepe_kom_uit_geheue_en_gee_kopie(voorbeeld_grafiek, monkeypatch):
+    """Toegangsregte word by laai gelees; daarna raak toegelate_groepe() nie die databasis nie."""
+    def geen_databasis(*args, **kwargs):
+        raise AssertionError("toegelate_groepe() mag nie weer die databasis oopmaak nie.")
+
+    monkeypatch.setattr(grafiek_module.sqlite3, "connect", geen_databasis)
+    assert voorbeeld_grafiek.toegelate_groepe("PUBLIEK") == set()
+    assert voorbeeld_grafiek.toegelate_groepe("PERSONEEL") == {"SLEGS_PERSONEEL", "SLEGS_ICU"}
+    assert voorbeeld_grafiek.toegelate_groepe("PASIENT_VERVOER") == {"SLEGS_PERSONEEL"}
+
+    # 'n Verandering aan die teruggegewe stel mag die gestoorde regte nie raak nie.
+    stel = voorbeeld_grafiek.toegelate_groepe("PUBLIEK")
+    stel.add("SLEGS_ICU")
+    assert voorbeeld_grafiek.toegelate_groepe("PUBLIEK") == set()
+
+    with pytest.raises(ValueError, match="Ongeldige gebruikerstipe"):
+        voorbeeld_grafiek.toegelate_groepe("ONBEKEND")
