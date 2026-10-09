@@ -4,9 +4,9 @@
  * Interaktiewe webkoppelvlak vir die Hospitaalnavigasiestelsel (/ui).
  *
  * Hierdie lêer bevat:
- *   • Statiese topologiese grafiekdata (nodusse, rande, vloere, geboue)
- *     wat direk vanuit Skema.sql + SeedData.sql afgelei is en kliëntkant
- *     gebruik word vir SVG-tekening.
+ *   • Kaartdata (nodusse, rande, vloere, geboue) wat by opstart van die
+ *     bediener se GET /kaart gelaai word (die databasis is die enigste bron)
+ *     en kliëntkant gebruik word vir SVG-tekening.
  *   • Roeteberekening via die FastAPI-agterkant (/route of /route/ontruim).
  *     A* loop bedienerkant (HospitaalGrafiek.py) — hierdie lêer stuur
  *     slegs die versoek en vertoon die resultaat.
@@ -30,265 +30,14 @@
  */
 
 
-const geboue = [
-  { id: "MAIN", naam: "Hoofhospitaalgebou" },
-  { id: "SYGEBOU", naam: "Sygebou" },
-];
-
-const vloere = [
-  { id: "MAIN-G", gebou: "MAIN", level: 0, naam: "Grondvloer" },
-  { id: "MAIN-1", gebou: "MAIN", level: 1, naam: "Vlak 1 — Sale" },
-  {
-    id: "MAIN-2",
-    gebou: "MAIN",
-    level: 2,
-    naam: "Vlak 2 — Intensiewe sorg / Operasieteaters",
-  },
-  { id: "SYGEBOU-G", gebou: "SYGEBOU", level: 0, naam: "Grondvloer" },
-  {
-    id: "SYGEBOU-1",
-    gebou: "SYGEBOU",
-    level: 1,
-    naam: "Vlak 1 — Radiologie",
-  },
-];
-
-const nodes = [
-  ["MAIN-G-ENT", "MAIN-G", "INGANG", "Hoofingang", 0, 0, null],
-  ["MAIN-G-AMB", "MAIN-G", "INGANG", "Ambulansbaai", 0, 20, null],
-  [
-    "MAIN-G-J01",
-    "MAIN-G",
-    "AANSLUITING",
-    "Voorportaalaansluiting",
-    10,
-    0,
-    null,
-  ],
-  ["MAIN-G-ELV", "MAIN-G", "HUISBAK_GROEP", "Hoofhysbakgroep", 15, 5, null],
-  ["MAIN-G-STA", "MAIN-G", "TRAPHUIS", "Hooftraphuis", 15, 10, null],
-  ["MAIN-G-ER", "MAIN-G", "DEPARTEMENT", "Nooddienste", 5, 20, null],
-  ["MAIN-G-TUN", "MAIN-G", "TONNEL", "Tonnel na Sygebou", 10, 30, null],
-  ["MAIN-G-J02", "MAIN-G", "AANSLUITING", "Westelike gangaansluiting", 20, 0, null],
-  ["MAIN-G-ADM", "MAIN-G", "DEPARTEMENT", "Pasiënttoelatings", 25, -5, null],
-  ["MAIN-G-PHA", "MAIN-G", "DEPARTEMENT", "Hoofapteek", 25, 5, null],
-  ["MAIN-G-BLO", "MAIN-G", "DEPARTEMENT", "Bloedbank", 30, -5, null],
-  ["MAIN-G-SEC", "MAIN-G", "DEPARTEMENT", "Sekuriteitskantoor", 30, 5, null],
-
-  [
-    "MAIN-1-ELV",
-    "MAIN-1",
-    "HUISBAK_GROEP",
-    "Hysbakgroep Vlak 1",
-    15,
-    5,
-    null,
-  ],
-  ["MAIN-1-STA", "MAIN-1", "TRAPHUIS", "Traphuis Vlak 1", 15, 10, null],
-  [
-    "MAIN-1-J01",
-    "MAIN-1",
-    "AANSLUITING",
-    "Saalgangaansluiting",
-    20,
-    5,
-    null,
-  ],
-  ["MAIN-1-WARDA", "MAIN-1", "DEPARTEMENT", "Saal A", 25, 0, null],
-  ["MAIN-1-WARDB", "MAIN-1", "DEPARTEMENT", "Saal B", 25, 10, null],
-  [
-    "MAIN-1-BRIDGE",
-    "MAIN-1",
-    "LUGBRUG",
-    "Lugbrug na Sygebou",
-    30,
-    20,
-    null,
-  ],
-  ["MAIN-1-J02", "MAIN-1", "AANSLUITING", "Westelike saalaansluiting", 30, 5, null],
-  ["MAIN-1-WARDC", "MAIN-1", "DEPARTEMENT", "Saal C", 35, 0, null],
-  ["MAIN-1-PED", "MAIN-1", "DEPARTEMENT", "Pediatriese saal", 35, 10, null],
-  ["MAIN-1-MAT", "MAIN-1", "DEPARTEMENT", "Kraamsaal", 40, 0, null],
-  ["MAIN-1-FAM", "MAIN-1", "DEPARTEMENT", "Familie-wagarea", 40, 10, null],
-
-  [
-    "MAIN-2-ELV",
-    "MAIN-2",
-    "HUISBAK_GROEP",
-    "Hysbakgroep Vlak 2",
-    15,
-    5,
-    null,
-  ],
-  ["MAIN-2-STA", "MAIN-2", "TRAPHUIS", "Traphuis Vlak 2", 15, 10, null],
-  [
-    "MAIN-2-J01",
-    "MAIN-2",
-    "AANSLUITING",
-    "Intensiewesorgaansluiting",
-    20,
-    5,
-    "SLEGS_ICU",
-  ],
-  ["MAIN-2-ICU", "MAIN-2", "DEPARTEMENT", "Intensiewe sorg", 25, 0, "SLEGS_ICU"],
-  [
-    "MAIN-2-OR",
-    "MAIN-2",
-    "DEPARTEMENT",
-    "Operasieteater",
-    25,
-    10,
-    "SLEGS_PERSONEEL",
-  ],
-  ["MAIN-2-REC", "MAIN-2", "DEPARTEMENT", "Herstelkamer", 35, 10, "SLEGS_PERSONEEL"],
-  ["MAIN-2-STER", "MAIN-2", "DEPARTEMENT", "Steriele voorraad", 35, 15, "SLEGS_PERSONEEL"],
-  ["MAIN-2-NICU", "MAIN-2", "DEPARTEMENT", "Neonatale intensiewe sorg", 35, 0, "SLEGS_ICU"],
-  ["MAIN-2-NUR", "MAIN-2", "DEPARTEMENT", "Personeelstasie", 30, 15, "SLEGS_PERSONEEL"],
-
-  ["SYGEBOU-G-ENT", "SYGEBOU-G", "INGANG", "Sygebou-ingang", 40, 0, null],
-  [
-    "SYGEBOU-G-J01",
-    "SYGEBOU-G",
-    "AANSLUITING",
-    "Sygebou-voorportaalaansluiting",
-    40,
-    10,
-    null,
-  ],
-  [
-    "SYGEBOU-G-ELV",
-    "SYGEBOU-G",
-    "HUISBAK_GROEP",
-    "Sygebou-hysbak",
-    40,
-    15,
-    null,
-  ],
-  [
-    "SYGEBOU-G-TUN",
-    "SYGEBOU-G",
-    "TONNEL",
-    "Tonnel na Hoofgebou",
-    10,
-    30,
-    null,
-  ],
-  [
-    "SYGEBOU-G-OUT",
-    "SYGEBOU-G",
-    "DEPARTEMENT",
-    "Uitpasiëntontvangs",
-    45,
-    10,
-    null,
-  ],
-  ["SYGEBOU-G-LAB", "SYGEBOU-G", "DEPARTEMENT", "Patologielaboratorium", 50, 5, null],
-  ["SYGEBOU-G-CAF", "SYGEBOU-G", "DEPARTEMENT", "Kafeteria", 50, 15, null],
-  ["SYGEBOU-G-PHY", "SYGEBOU-G", "DEPARTEMENT", "Fisioterapie", 55, 5, null],
-  ["SYGEBOU-G-BIL", "SYGEBOU-G", "DEPARTEMENT", "Rekeninge-afdeling", 55, 15, null],
-
-  [
-    "SYGEBOU-1-ELV",
-    "SYGEBOU-1",
-    "HUISBAK_GROEP",
-    "Sygebou-hysbak Vlak 1",
-    40,
-    15,
-    null,
-  ],
-  [
-    "SYGEBOU-1-BRIDGE",
-    "SYGEBOU-1",
-    "LUGBRUG",
-    "Lugbrug na Hoofgebou",
-    30,
-    20,
-    null,
-  ],
-  ["SYGEBOU-1-RAD", "SYGEBOU-1", "DEPARTEMENT", "Radiologie", 45, 20, null],
-  ["SYGEBOU-1-J01", "SYGEBOU-1", "AANSLUITING", "Beeldvormingsaansluiting", 50, 20, null],
-  ["SYGEBOU-1-CT", "SYGEBOU-1", "DEPARTEMENT", "CT-skandering", 55, 15, null],
-  ["SYGEBOU-1-MRI", "SYGEBOU-1", "DEPARTEMENT", "MRI-eenheid", 55, 25, null],
-  ["SYGEBOU-1-US", "SYGEBOU-1", "DEPARTEMENT", "Ultraklank", 60, 15, null],
-  ["SYGEBOU-1-XRAY", "SYGEBOU-1", "DEPARTEMENT", "X-straaleenheid", 60, 20, null],
-  ["SYGEBOU-1-NUC", "SYGEBOU-1", "DEPARTEMENT", "Kerngeneeskunde", 60, 25, null],
-].map(([id, vloer, tipe, etiket, x, y, beperkte_groep]) => ({
-  id,
-  vloer,
-  tipe,
-  etiket,
-  x,
-  y,
-  beperkte: beperkte_groep,
-}));
-
-// Volgorde: begin, einde, randtipe, afstand, basistyd, wagtyd, vloerverskil, tweerigting.
-const randRye = [
-  ["MAIN-G-ENT", "MAIN-G-J01", "GANG", 10, 8, 0, 0, 1],
-  ["MAIN-G-J01", "MAIN-G-ELV", "GANG", 6, 5, 0, 0, 1],
-  ["MAIN-G-J01", "MAIN-G-STA", "GANG", 10, 8, 0, 0, 1],
-  ["MAIN-G-J01", "MAIN-G-ER", "GANG", 22, 18, 0, 0, 1],
-  ["MAIN-G-AMB", "MAIN-G-ER", "GANG", 6, 5, 0, 0, 1],
-  ["MAIN-G-J01", "MAIN-G-TUN", "GANG", 32, 27, 0, 0, 1],
-  ["MAIN-G-J01", "MAIN-G-J02", "GANG", 10, 8, 0, 0, 1],
-  ["MAIN-G-J02", "MAIN-G-ADM", "GANG", 7, 6, 0, 0, 1],
-  ["MAIN-G-J02", "MAIN-G-PHA", "GANG", 7, 6, 0, 0, 1],
-  ["MAIN-G-ADM", "MAIN-G-BLO", "GANG", 5, 4, 0, 0, 1],
-  ["MAIN-G-PHA", "MAIN-G-SEC", "GANG", 5, 4, 0, 0, 1],
-  ["MAIN-G-BLO", "MAIN-G-SEC", "GANG", 10, 8, 0, 0, 1],
-
-  ["MAIN-G-ELV", "MAIN-1-ELV", "HUISBAK", 0, 8, 25, 1, 1],
-  ["MAIN-1-ELV", "MAIN-2-ELV", "HUISBAK", 0, 8, 25, 1, 1],
-  ["MAIN-G-ELV", "MAIN-2-ELV", "HUISBAK", 0, 14, 25, 2, 1],
-  ["MAIN-G-STA", "MAIN-1-STA", "TRAPPE", 0, 15, 0, 1, 1],
-  ["MAIN-1-STA", "MAIN-2-STA", "TRAPPE", 0, 15, 0, 1, 1],
-
-  ["MAIN-1-ELV", "MAIN-1-J01", "GANG", 6, 5, 0, 0, 1],
-  ["MAIN-1-STA", "MAIN-1-J01", "GANG", 6, 5, 0, 0, 1],
-  ["MAIN-1-J01", "MAIN-1-WARDA", "GANG", 6, 5, 0, 0, 1],
-  ["MAIN-1-J01", "MAIN-1-WARDB", "GANG", 6, 5, 0, 0, 1],
-  ["MAIN-1-J01", "MAIN-1-BRIDGE", "GANG", 16, 13, 0, 0, 1],
-  ["MAIN-1-J01", "MAIN-1-J02", "GANG", 10, 8, 0, 0, 1],
-  ["MAIN-1-J02", "MAIN-1-WARDC", "GANG", 7, 6, 0, 0, 1],
-  ["MAIN-1-J02", "MAIN-1-PED", "GANG", 7, 6, 0, 0, 1],
-  ["MAIN-1-WARDC", "MAIN-1-MAT", "GANG", 5, 4, 0, 0, 1],
-  ["MAIN-1-PED", "MAIN-1-FAM", "GANG", 5, 4, 0, 0, 1],
-  ["MAIN-1-MAT", "MAIN-1-FAM", "GANG", 10, 8, 0, 0, 1],
-
-  ["MAIN-2-ELV", "MAIN-2-J01", "GANG", 6, 5, 0, 0, 1],
-  ["MAIN-2-STA", "MAIN-2-J01", "GANG", 6, 5, 0, 0, 1],
-  ["MAIN-2-J01", "MAIN-2-ICU", "GANG", 6, 5, 0, 0, 1],
-  ["MAIN-2-J01", "MAIN-2-OR", "GANG", 6, 5, 0, 0, 1],
-  ["MAIN-2-OR", "MAIN-2-REC", "GANG", 10, 8, 0, 0, 1],
-  ["MAIN-2-REC", "MAIN-2-STER", "GANG", 6, 5, 0, 0, 1],
-  ["MAIN-2-ICU", "MAIN-2-NICU", "GANG", 10, 8, 0, 0, 1],
-  ["MAIN-2-OR", "MAIN-2-NUR", "GANG", 7, 6, 0, 0, 1],
-  ["MAIN-2-NUR", "MAIN-2-STER", "GANG", 5, 4, 0, 0, 1],
-
-  ["SYGEBOU-G-ENT", "SYGEBOU-G-J01", "GANG", 10, 8, 0, 0, 1],
-  ["SYGEBOU-G-J01", "SYGEBOU-G-ELV", "GANG", 6, 5, 0, 0, 1],
-  ["SYGEBOU-G-J01", "SYGEBOU-G-OUT", "GANG", 6, 5, 0, 0, 1],
-  ["SYGEBOU-G-J01", "SYGEBOU-G-TUN", "GANG", 30, 25, 0, 0, 1],
-  ["SYGEBOU-G-J01", "SYGEBOU-G-LAB", "GANG", 11, 9, 0, 0, 1],
-  ["SYGEBOU-G-J01", "SYGEBOU-G-CAF", "GANG", 11, 9, 0, 0, 1],
-  ["SYGEBOU-G-LAB", "SYGEBOU-G-PHY", "GANG", 5, 4, 0, 0, 1],
-  ["SYGEBOU-G-CAF", "SYGEBOU-G-BIL", "GANG", 5, 4, 0, 0, 1],
-  ["SYGEBOU-G-PHY", "SYGEBOU-G-BIL", "GANG", 10, 8, 0, 0, 1],
-
-  ["SYGEBOU-G-ELV", "SYGEBOU-1-ELV", "HUISBAK", 0, 8, 25, 1, 1],
-
-  ["SYGEBOU-1-ELV", "SYGEBOU-1-BRIDGE", "GANG", 10, 8, 0, 0, 1],
-  ["SYGEBOU-1-ELV", "SYGEBOU-1-RAD", "GANG", 6, 5, 0, 0, 1],
-  ["SYGEBOU-1-RAD", "SYGEBOU-1-J01", "GANG", 6, 5, 0, 0, 1],
-  ["SYGEBOU-1-J01", "SYGEBOU-1-CT", "GANG", 7, 6, 0, 0, 1],
-  ["SYGEBOU-1-J01", "SYGEBOU-1-MRI", "GANG", 7, 6, 0, 0, 1],
-  ["SYGEBOU-1-CT", "SYGEBOU-1-US", "GANG", 5, 4, 0, 0, 1],
-  ["SYGEBOU-1-J01", "SYGEBOU-1-XRAY", "GANG", 10, 8, 0, 0, 1],
-  ["SYGEBOU-1-MRI", "SYGEBOU-1-NUC", "GANG", 5, 4, 0, 0, 1],
-
-  ["MAIN-1-BRIDGE", "SYGEBOU-1-BRIDGE", "LUGBRUG", 25, 21, 0, 0, 1],
-  ["MAIN-G-TUN", "SYGEBOU-G-TUN", "TONNEL", 18, 15, 0, 0, 1],
-];
+// Kaartdata word by opstart deur laaiKaart() uit die bediener (GET /kaart) gevul.
+// Dit is doelbewus nie hier ingetik nie: die databasis is die enigste bron,
+// sodat die kaart en die roete-algoritmes nooit verskillende data sien nie.
+let geboue = [];
+let vloere = [];
+let nodes = [];
+// Volgorde: begin, einde, randtipe (die kaart het net dit nodig om te teken).
+let randRye = [];
 
 const gebruikerTipeEtikette = {
   PUBLIEK: "Publiek / Besoeker",
@@ -320,16 +69,16 @@ const OORSIG_ID = "OORSIG";
 // Elke vloer kry sy eie kleur in oorsigmodus, sodat gelaagde nodusse (bv.
 // hysbakke wat doelbewus dieselfde x/y oor vloere heen deel) onderskei kan word.
 const VLOER_KLEURE_PALET = ["#2E8B57", "#1E6FA8", "#D97706", "#6D5DD3", "#E14B4B", "#C7A008"];
-const VLOER_KLEURE = Object.fromEntries(
-  vloere.map((f, i) => [f.id, VLOER_KLEURE_PALET[i % VLOER_KLEURE_PALET.length]]),
-);
+// Word in bouKaartIndekse() gevul sodra die vloere gelaai is.
+let VLOER_KLEURE = {};
 
 /* ============================================================
    NODUS- EN VLOERINDEKSE — slegs vir die tekening van die vloerplan.
    Die FastAPI-roete-eindpunt bereken die roete op die bediener.
    ============================================================ */
-const nodeById = Object.fromEntries(nodes.map((n) => [n.id, n]));
-const vloerById = Object.fromEntries(vloere.map((f) => [f.id, f]));
+// Word in bouKaartIndekse() gevul nadat die kaart gelaai is.
+let nodeById = {};
+let vloerById = {};
 
 /**
  * Bou groepe uit werklike vertikale rande eerder as uit soortgelyke name.
@@ -374,12 +123,58 @@ function bouVertikaleGroepe() {
   return groepe;
 }
 
-const vertikaleGroepe = bouVertikaleGroepe();
-const vertikaleGroepByNode = Object.fromEntries(
-  vertikaleGroepe.flatMap((groep) =>
-    groep.nodusse.map((nodus) => [nodus.id, groep]),
-  ),
-);
+let vertikaleGroepe = [];
+let vertikaleGroepByNode = {};
+
+/**
+ * Bou al die naslaantabelle uit die gelaaide kaartdata. Moet elke keer loop
+ * nadat nodes, vloere en randRye gevul is, want hulle hang almal daarvan af.
+ */
+function bouKaartIndekse() {
+  nodeById = Object.fromEntries(nodes.map((n) => [n.id, n]));
+  vloerById = Object.fromEntries(vloere.map((f) => [f.id, f]));
+  VLOER_KLEURE = Object.fromEntries(
+    vloere.map((f, i) => [f.id, VLOER_KLEURE_PALET[i % VLOER_KLEURE_PALET.length]]),
+  );
+  vertikaleGroepe = bouVertikaleGroepe();
+  vertikaleGroepByNode = Object.fromEntries(
+    vertikaleGroepe.flatMap((groep) =>
+      groep.nodusse.map((nodus) => [nodus.id, groep]),
+    ),
+  );
+}
+
+/**
+ * Haal die kaart van die bediener en vul die kaartveranderlikes.
+ * Gooi 'n fout as die bediener nie bereik kan word of 'n fout terugstuur nie;
+ * die aanroeper wys dan 'n foutboodskap.
+ */
+async function laaiKaart() {
+  const apiBase = document.getElementById("apiUrl").value.trim();
+  const response = await fetch(`${apiBase.replace(/\/$/, "")}/kaart`);
+  if (!response.ok) throw new Error(`HTTP ${response.status}`);
+  const data = await response.json();
+
+  // Hernoem die databasiskolomme na die kort name wat die tekenkode gebruik.
+  geboue = data.geboue.map((g) => ({ id: g.gebou_id, naam: g.naam }));
+  vloere = data.vloere.map((v) => ({
+    id: v.vloer_id,
+    gebou: v.gebou_id,
+    level: v.level_nommer,
+    naam: v.naam,
+  }));
+  nodes = data.nodes.map((n) => ({
+    id: n.node_id,
+    vloer: n.vloer_id,
+    tipe: n.tipe_kode,
+    etiket: n.etiket,
+    x: n.pos_x,
+    y: n.pos_y,
+    beperkte: n.beperkte_groep,
+  }));
+  randRye = data.rande.map((r) => [r.van_node, r.na_node, r.rand_tipe]);
+  bouKaartIndekse();
+}
 
 async function fetchRoute(apiBase, beginId, eindeId, gebruikerTipe) {
   const basis = apiBase.replace(/\/$/, "");
@@ -1556,7 +1351,15 @@ document.getElementById("clearBtn").onclick = () => {
   });
 });
 document.getElementById("gebruikerTipe").addEventListener("change", wisRoete);
-document.getElementById("apiUrl").addEventListener("change", () => {
+document.getElementById("apiUrl").addEventListener("change", async () => {
+  // 'n Ander bediener het dalk 'n ander kaart, so laai dit weer.
+  try {
+    await laaiKaart();
+    huidigeVloer = OORSIG_ID;
+  } catch (_) {
+    wysBestemmingFout("⚠ Kon nie die hospitaalkaart van hierdie bediener laai nie.");
+    return;
+  }
   wisRoete();
   laaiBestemmings(document.getElementById("beginSoek").value, "beginNode");
   laaiBestemmings(document.getElementById("eindSoek").value, "endNode");
@@ -1567,11 +1370,22 @@ document.getElementById("apiUrl").addEventListener("change", () => {
 if (/^https?:$/.test(window.location.protocol)) {
   document.getElementById("apiUrl").value = window.location.origin;
 }
-renderLegend();
-renderAll();
-populateSelects();
-laaiInsident();
-// Hou reeds oop kaarte op datum nadat 'n administrateur 'n insident verander.
-setInterval(() => {
-  if (!document.hidden && !roeteBesig) laaiInsident();
-}, 15000);
+
+/** Laai eers die kaart; slegs daarna kan die kaart, legende en lyste geteken word. */
+async function begin() {
+  try {
+    await laaiKaart();
+  } catch (_) {
+    wysBestemmingFout("⚠ Kon nie die hospitaalkaart laai nie. Herlaai asseblief die bladsy.");
+    return;
+  }
+  renderLegend();
+  renderAll();
+  populateSelects();
+  laaiInsident();
+  // Hou reeds oop kaarte op datum nadat 'n administrateur 'n insident verander.
+  setInterval(() => {
+    if (!document.hidden && !roeteBesig) laaiInsident();
+  }, 15000);
+}
+begin();

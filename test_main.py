@@ -133,6 +133,32 @@ def test_ou_aanhoudende_databasis_kry_ontbrekende_seed_data(monkeypatch):
 
 
 # ---------------------------------------------------------------------------
+# Kaartdata vir die webkoppelvlak
+# ---------------------------------------------------------------------------
+
+def test_kaart_kom_uit_die_databasis():
+    """/kaart moet presies dieselfde nodusse en rande as die grafiek bevat."""
+    with TestClient(app) as client:
+        antwoord = client.get("/kaart")
+        grafiek = app.state.grafiek
+
+    assert antwoord.status_code == 200
+    kaart = antwoord.json()
+    assert {n["node_id"] for n in kaart["nodes"]} == set(grafiek.nodes)
+    # Elke rand verbind twee nodusse wat op die kaart bestaan.
+    node_ids = {n["node_id"] for n in kaart["nodes"]}
+    assert all(r["van_node"] in node_ids and r["na_node"] in node_ids for r in kaart["rande"])
+    # Vloere kom per gebou van onder na bo, soos die webkoppelvlak se oortjies.
+    assert [v["vloer_id"] for v in kaart["vloere"]] == [
+        "MAIN-G", "MAIN-1", "MAIN-2", "SYGEBOU-G", "SYGEBOU-1",
+    ]
+    assert [g["gebou_id"] for g in kaart["geboue"]] == ["MAIN", "SYGEBOU"]
+    # Die nodus waarvan die JS-kopie ooit verskil het: die databasis is die waarheid.
+    ry = next(n for n in kaart["nodes"] if n["node_id"] == "MAIN-1-J01")
+    assert ry["tipe_kode"] == "DEPARTEMENT"
+
+
+# ---------------------------------------------------------------------------
 # Roeteberekening
 # ---------------------------------------------------------------------------
 

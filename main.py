@@ -18,6 +18,7 @@ Eindpunte
   GET  /admin             — Adminblad (admin.html).
   GET  /destinations      — Soek navigeerbare bestemmings.
   GET  /incident          — Huidige aktiewe sluiting (openbaar).
+  GET  /kaart             — Geboue, vloere, nodusse en rande vir die SVG-kaart (openbaar).
   POST /admin/login       — Adminaanmelding.
   POST /admin/logout      — Adminafmelding.
   GET  /admin/map         — Volledige grafieksstruktuur vir die adminblad.
@@ -538,6 +539,45 @@ def lees_insident():
       • Ontruimingsmodus te aktiveer (verander /route-aanroep na /route/ontruim).
     """
     return kry_insident()
+
+
+@app.get("/kaart")
+def lees_kaart():
+    """
+    Gee die hospitaalkaart (geboue, vloere, nodusse en rande) uit die databasis.
+
+    Die webkoppelvlak teken sy SVG-vloerplan hiermee, sodat die kaart net op
+    een plek (die databasis) gestoor word en nie ook in die JavaScript nie.
+    Dit bevat net wat nodig is om te teken; reistyd en kapasiteit bly bedienerkant.
+    """
+    with db_verbinding() as conn:
+        # Klein lyste (2 geboue, 5 vloere): invoegsortering soos in /admin/map.
+        geboue = insertion_sort(
+            conn.execute("SELECT gebou_id, naam FROM geboue").fetchall(),
+            sleutel="gebou_id",
+        )
+        # Eers per gebou, dan van onder na bo, sodat die vloere in kaartvolgorde is.
+        vloere = insertion_sort(
+            conn.execute(
+                "SELECT vloer_id, gebou_id, level_nommer, naam FROM vloere"
+            ).fetchall(),
+            sleutel=("gebou_id", "level_nommer"),
+        )
+        # ORDER BY rowid behou die invoegvolgorde van SeedData.sql, sodat die
+        # etiketplasing op die kaart nie van een versoek tot die volgende verskuif nie.
+        nodes = conn.execute(
+            """SELECT node_id, vloer_id, tipe_kode, etiket, pos_x, pos_y, beperkte_groep
+               FROM nodes ORDER BY rowid"""
+        ).fetchall()
+        rande = conn.execute(
+            "SELECT van_node, na_node, rand_tipe FROM rande ORDER BY rand_id"
+        ).fetchall()
+    return {
+        "geboue": [dict(g) for g in geboue],
+        "vloere": [dict(v) for v in vloere],
+        "nodes": [dict(n) for n in nodes],
+        "rande": [dict(r) for r in rande],
+    }
 
 
 @app.get("/route")
