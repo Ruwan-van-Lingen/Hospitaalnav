@@ -166,6 +166,7 @@ def _merge_sorteer_pare(pare, drempel):
 
     # Stopvoorwaarde 1: 'n lys van 0 of 1 item is al gesorteer. Sonder die
     # sou die rekursie nooit ophou nie.
+    """Saamsmeltsortering op (sleutel, waarde)-pare; klein stukke gaan na invoegsortering (sien drempel)."""
     if len(pare) <= 1:
         return pare
 

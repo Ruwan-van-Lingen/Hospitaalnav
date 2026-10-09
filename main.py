@@ -244,6 +244,8 @@ async def lifespan(app: FastAPI):
     verseker_insident_skema()
     verseker_seed_data()
     app.state.grafiek = HospitaalGrafiek(str(DB_PAD))
+    # Die werkprosespoel word eers by die eerste dekkingskontrole geskep (sien kry_dekking_pool). Die slot
+    # keer dat twee gelyktydige eerste versoeke elk 'n eie poel skep.
     app.state.dekking_pool = None
     app.state.dekking_slot = Lock()
     try:
@@ -475,6 +477,7 @@ def vereis_admin(hospitaal_admin_sessie: str | None = Cookie(default=None)) -> s
 
 @app.get("/")
 def tuisblad():
+    """Verwelkomingsboodskap met 'n verwysing na die API-dokumentasie."""
     return {"boodskap": "Welkom by die Hospitaal Navigasie API. Gaan na /docs vir die dokumentasie."}
 
 
@@ -506,11 +509,13 @@ def admin_ui():
 
 @app.get("/admin.css", include_in_schema=False)
 def admin_css():
+    """Bedien die adminblad se stylblad."""
     return bedien_leer("admin.css", "text/css")
 
 
 @app.get("/admin.js", include_in_schema=False)
 def admin_javascript():
+    """Bedien die adminblad se JavaScript."""
     return bedien_leer("admin.js", "text/javascript")
 
 

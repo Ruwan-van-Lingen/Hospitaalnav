@@ -31,6 +31,7 @@ from Sorteer import insertion_sort, merge_sort
 # ---------------------------------------------------------------------------
 
 def is_geordend(lys, sleutel=None):
+    """Kyk of die lys in nie-dalende volgorde is, met dieselfde sleutelreëls as Sorteer.py."""
     def waarde(item):
         if sleutel is None:
             return item
@@ -47,10 +48,12 @@ def is_geordend(lys, sleutel=None):
 
 
 def is_volledig(voor, na):
+    """Kyk of albei lyste presies dieselfde items bevat (niks verlore of bygevoeg nie)."""
     return Counter(voor) == Counter(na)
 
 
 def is_korrek_gesorteer(voor, na):
+    """Gesorteer EN volledig."""
     return is_geordend(na) and is_volledig(voor, na)
 
 
@@ -103,6 +106,7 @@ def test_albei_algoritmes_stem_ooreen(invoer):
 # ---------------------------------------------------------------------------
 
 def test_randgevalle_leeg_en_een():
+    """'n Leë lys en 'n lys van een item bly soos hulle is."""
     assert insertion_sort([]) == []
     assert merge_sort([]) == []
     assert insertion_sort(["MAIN-G-ENT"]) == ["MAIN-G-ENT"]
@@ -191,10 +195,12 @@ VLOERE = [
 
 
 def test_sleutel_is_none():
+    """Sonder sleutel is die item sy eie sleutel."""
     assert insertion_sort([3, 1, 2]) == [1, 2, 3]
 
 
 def test_sleutel_is_veldnaam():
+    """'n Teksnaam sorteer op daardie veld van elke woordeboek."""
     resultaat = insertion_sort(GEBOUE, sleutel="naam")
     assert [g["gebou_id"] for g in resultaat] == ["MAIN", "SYGEBOU"]
 

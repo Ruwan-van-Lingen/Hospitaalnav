@@ -41,6 +41,8 @@ let nodes = [];
 // Volgorde: begin, einde, randtipe (die kaart het net dit nodig om te teken).
 let randRye = [];
 
+// Vertoonname vir die gebruikerstipe-keuselys. Die sleutels moet ooreenstem met
+// gebruiker_tipes in Skema.sql, want die sleutel word as gebruiker_tipe na die API gestuur.
 const gebruikerTipeEtikette = {
   PUBLIEK: "Publiek / Besoeker",
   PERSONEEL: "Personeel",
@@ -48,6 +50,8 @@ const gebruikerTipeEtikette = {
   NOODGEVAL: "Noodgeval",
 };
 
+// Kleur per nodustipe (tipe_kode) vir nodusse op die kaart en in die legende.
+// Dit gebruik dieselfde nodustipes as VloerPlan.py, wat die PNG-weergawe teken.
 const NODE_KLEURE = {
   AANSLUITING: "#7C8B99",
   HUISBAK_GROEP: "#D97706",
@@ -58,6 +62,8 @@ const NODE_KLEURE = {
   TONNEL: "#6D5DD3",
   DEPARTEMENT: "#1E6FA8",
 };
+// Kleur per randtipe (rand_tipe): gange is ligblou-grys, hysbakke en trappe oranje,
+// en lugbrûe en tonnels (die verbindings tussen geboue) pers.
 const RAND_KLEURE = {
   GANG: "#AFC2CB",
   HUISBAK: "#D97706",
@@ -88,6 +94,7 @@ let vloerById = {};
  * saamgegroepeer; toevallige gelyke koördinate bly aparte plekke.
  */
 function bouVertikaleGroepe() {
+  // Aangrensingslys net uit die vertikale rande (hysbak en trappe); gewone gange tel nie hier nie.
   const bure = new Map();
   randRye.forEach(([van, na, tipe]) => {
     if (tipe !== "HUISBAK" && tipe !== "TRAPPE") return;
@@ -97,6 +104,7 @@ function bouVertikaleGroepe() {
     bure.get(na).push(van);
   });
 
+  // Diepte-eerste soektog: elke saamhangende stel nodusse is een fisiese hysbak of traphuis wat oor vloere loop.
   const besoek = new Set();
   const groepe = [];
   bure.forEach((_, beginId) => {
@@ -111,6 +119,7 @@ function bouVertikaleGroepe() {
       (bure.get(id) || []).forEach((buurId) => stapel.push(buurId));
     }
 
+    // Laagste vloer eerste, sodat die 'leier' van die groep (wat die etiket dra) altyd op die laagste vloer is.
     nodusse.sort(
       (a, b) => vloerById[a.vloer].level - vloerById[b.vloer].level,
     );
@@ -125,6 +134,8 @@ function bouVertikaleGroepe() {
   return groepe;
 }
 
+// Die vertikale groepe, en 'n opsoektabel van nodus-ID na sy groep.
+// Albei word in bouKaartIndekse() gevul.
 let vertikaleGroepe = [];
 let vertikaleGroepByNode = {};
 
@@ -178,6 +189,13 @@ async function laaiKaart() {
   bouKaartIndekse();
 }
 
+/**
+ * Vra die bediener vir 'n roete en gee 'n eenvormige resultaat terug.
+ *
+ * Sukses: { path, cost, formattedCost, distance, formattedDistance, nodeCount, uitgang }.
+ * Fout:   { error: 'network' | 'blocked' | 'invalid', message }.
+ * Die funksie gooi self nie 'n fout nie; die aanroeper hoef net die resultaat te vertoon.
+ */
 async function fetchRoute(apiBase, beginId, eindeId, gebruikerTipe) {
   const basis = apiBase.replace(/\/$/, "");
 
@@ -207,6 +225,8 @@ async function fetchRoute(apiBase, beginId, eindeId, gebruikerTipe) {
   }
 
   if (!resp.ok) {
+    // Die bediener se foutboodskap (detail) word aan die gebruiker getoon. 403 en 409 beteken die roete is
+    // geblokkeer (geen toegang of 'n aktiewe sluiting); enige ander status is 'n ongeldige versoek.
     const detail = typeof body?.detail === "string"
       ? body.detail
       : `Die roeteversoek het misluk (HTTP ${resp.status}).`;
@@ -236,12 +256,20 @@ async function fetchRoute(apiBase, beginId, eindeId, gebruikerTipe) {
 /* ============================================================
                         KOPPELVLAKTOESTAND
 ============================================================ */
+// Die vloer (of OORSIG_ID) wie se plan tans getoon word.
 let huidigeVloer = OORSIG_ID;
+// Die jongste roete-uitslag of fout van fetchRoute(); null as daar geen roete is nie.
 let laasteResultaat = null;
+// Die jongste insident van /incident; bepaal die geslote nodusse en ontruimingsmodus.
 let aktieweInsident = { active: false, blocked_node_ids: [] };
+// Volgnommers vir lopende versoeke: 'n antwoord word slegs gebruik as sy nommer nog die jongste is.
+// Andersins het 'n nuwer versoek dit verouder (dit keer dat 'n stadige antwoord nuwer data oorskryf).
 let insidentVersoek = 0;
+// Volgnommer vir roeteversoeke, op dieselfde manier as insidentVersoek.
 let roeteVersoek = 0;
+// Waar terwyl 'n roete bereken word; die periodieke insident-herlaai slaan dan oor.
 let roeteBesig = false;
+// Watter keuselys die volgende kaartklik vul: eers die bron, dan die bestemming.
 let volgendeKaartKeuse = "beginNode";
 
 /** Formateer 'n kaartnodus presies soos 'n bestemming wat vanaf die API kom. */
@@ -299,6 +327,11 @@ function kiesNodusOpKaart(nodus, isGeblokkeer = false) {
   status.className = "status ok";
 }
 
+/**
+ * Haal die huidige insident van die bediener en werk die banier, die geslote bestemmings en die
+ * bestemmingskeuse by. Met herteken = false word die kaart nie hertekem nie (die aanroeper doen dit self).
+ * Gee true by sukses en false by 'n fout of 'n verouderde antwoord.
+ */
 async function laaiInsident(herteken = true) {
   const apiBase = document.getElementById("apiUrl").value.trim();
   const versoek = ++insidentVersoek;
@@ -306,7 +339,10 @@ async function laaiInsident(herteken = true) {
     const response = await fetch(`${apiBase.replace(/\/$/, "")}/incident`);
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     const insident = await response.json();
+    // 'n Nuwer versoek, of 'n ander bedieneradres, het hierdie antwoord verouder; ignoreer dit.
     if (versoek !== insidentVersoek || apiBase !== document.getElementById("apiUrl").value.trim()) return false;
+    // Net as die insident werklik verander het, word die kaart hertekem en die ou roete weggegooi,
+    // want dit is dalk om 'n sluiting beplan wat nie meer geld nie.
     const verander = JSON.stringify(insident) !== JSON.stringify(aktieweInsident);
     aktieweInsident = insident;
     if (verander) laasteResultaat = null;
@@ -322,12 +358,14 @@ async function laaiInsident(herteken = true) {
     }
     // Werk bestaande opsies by sonder om die gebruiker se soekterme te verloor.
     merkGesloteBestemmings();
+    // In ontruimingsmodus word die bestemming geïgnoreer, dus word sy keuse en soekveld gedeaktiveer.
     document.getElementById("endNode").disabled = Boolean(insident.active && insident.ontruimings_modus);
     document.getElementById("eindSoek").disabled = document.getElementById("endNode").disabled;
     if (herteken && verander) renderAll();
     return true;
   } catch (_) {
     if (versoek === insidentVersoek) {
+      // Sonder 'n bevestigde sluitingstatus kan 'n roete verouderd wees, dus word 'n fout getoon.
       laasteResultaat = { error: "network", message: "Kon nie die huidige sluitings bevestig nie. Probeer asseblief weer." };
       if (herteken) renderAll();
     }
@@ -335,12 +373,17 @@ async function laaiInsident(herteken = true) {
   }
 }
 
+/**
+ * Skakel nodusse wat deur die insident gesluit is in albei keuselyste af en voeg [GESLUIT] by hul etiket.
+ * Dit werk bestaande opsies by, sodat die gebruiker se soekterme en keuses behoue bly.
+ */
 function merkGesloteBestemmings() {
   const gesluit = new Set(aktieweInsident.active ? aktieweInsident.blocked_node_ids || [] : []);
   ["beginNode", "endNode"].forEach((id) => {
     const lys = document.getElementById(id);
     [...lys.options].forEach((opsie) => {
       opsie.disabled = gesluit.has(opsie.value);
+      // Verwyder eers 'n ou [GESLUIT]-etiket sodat dit nie dubbel bygevoeg word nie.
       opsie.textContent = opsie.textContent.replace(/ \[GESLUIT\]$/, "") + (opsie.disabled ? " [GESLUIT]" : "");
     });
     if (lys.selectedOptions[0]?.disabled) {
@@ -350,6 +393,9 @@ function merkGesloteBestemmings() {
   });
 }
 
+/**
+ * Formateer 'n /destinations-resultaat as keuselysteks: etiket, gebou, vloer en node-ID.
+ */
 function bestemmingEtiket(item) {
   return `${item.etiket} — ${item.gebou_naam}, ${item.vloer_naam} (${item.node_id})`;
 }
@@ -357,6 +403,11 @@ function bestemmingEtiket(item) {
 // Slegs die jongste versoek per keuselys mag sy resultate vertoon.
 const bestemmingVersoeke = new Map();
 
+/**
+ * Soek bestemmings by die bediener en vul die gegewe keuselys daarmee (hoogstens 100 resultate).
+ * gekoseId (opsioneel) is die opsie wat ná die laai gekies moet bly, as dit in die resultate is.
+ * Slegs die jongste versoek per keuselys mag die lys verander (sien bestemmingVersoeke).
+ */
 async function laaiBestemmings(soekterm, selectId, gekoseId = null) {
   const apiBase = document.getElementById("apiUrl").value.trim();
   const versoek = (bestemmingVersoeke.get(selectId) || 0) + 1;
@@ -402,6 +453,10 @@ function wysBestemmingFout(boodskap) {
   el.className = "status blocked";
 }
 
+/**
+ * Laat 'n soekveld sy keuselys vul terwyl die gebruiker tik. Die 200 ms-vertraging (debounce) keer dat
+ * elke toetsaanslag 'n API-oproep veroorsaak; 'n nuwe tik wis ook die ou roete.
+ */
 function koppelBestemmingSoektog(inputId, selectId) {
   const invoer = document.getElementById(inputId);
   let timer;
@@ -412,10 +467,17 @@ function koppelBestemmingSoektog(inputId, selectId) {
   });
 }
 
+/**
+ * Gee die gekose node-ID van 'n keuselys, of null as niks gekies is nie (bv. 'Geen bestemmings gevind nie').
+ */
 function bestemmingId(inputId) {
   return document.getElementById(inputId).value || null;
 }
 
+/**
+ * Vul die gebruikerstipe-keuselys, koppel die soekvelde en laai die eerste bestemmings.
+ * Die voorafgekose begin (Hoofingang) en bestemming (Radiologie) is net 'n handige verstek vir die demonstrasie.
+ */
 function populateSelects() {
   const utSel = document.getElementById("gebruikerTipe");
   Object.keys(gebruikerTipeEtikette).forEach((k) => {
@@ -437,6 +499,10 @@ function kryRoeterVloere() {
   return new Set(laasteResultaat.path.map((id) => nodeById[id]?.vloer).filter(Boolean));
 }
 
+/**
+ * Teken die vloeroortjies: 'Oorsig' eerste, dan een per vloer. 'n Oortjie met 'n amber kolletjie lê op die roete;
+ * die oorsig-oortjie kry dit slegs as die roete oor meer as een vloer loop.
+ */
 function renderTabs() {
   const tabsEl = document.getElementById("tabs");
   tabsEl.innerHTML = "";
@@ -471,6 +537,10 @@ function renderTabs() {
   });
 }
 
+/**
+ * Teken die hysbakstyl-vloerindikator in die sykolom; 'n klik wissel na daardie vloer.
+ * CSS keer die volgorde om (column-reverse), sodat hoër vloere bo verskyn, soos in 'n hysbak.
+ */
 function renderIndicator() {
   const el = document.getElementById("indicator");
   el.innerHTML = "";
@@ -504,6 +574,9 @@ function renderIndicator() {
   el.appendChild(oorsigRow);
 }
 
+/**
+ * Teken die legende: eers die kleur van elke nodustipe, dan (ná die kolletjie) die kleur van elke vloer.
+ */
 function renderLegend() {
   const el = document.getElementById("legend");
   el.innerHTML = "";
@@ -530,7 +603,10 @@ const KAART_HOOGTE = 560;
 const KAART_MARGE_X = 115;
 const KAART_BO_MARGE = 78;
 const KAART_ONDER_MARGE = 62;
+// Boonste grens vir die skaal (SVG-eenhede per meter), sodat 'n vloer met min nodusse nie tot 'n absurde grootte uitgerek word nie.
 const MAKS_SKaal = 14;
+// Klein verskuiwings per vloer-indeks in die oorsig, sodat nodusse met dieselfde x/y op verskillende
+// vloere (buiten hysbakke en trappe) nie presies bo-op mekaar lê nie.
 const OORSIG_VERSKUIWINGS = [
   { x: -28, y: -22 },
   { x: 0, y: -30 },
@@ -561,6 +637,7 @@ function breekEtiketLyne(teks, maksimumKarakters = 20, maksimumLyne = 3) {
 function vertikaleGroepVerskuiwing(groep, nodus) {
   const indeks = groep.nodusse.findIndex((item) => item.id === nodus.id);
   const totaal = groep.nodusse.length;
+  // Versprei die vloerlede eweredig op 'n klein sirkel; die eerste lid (laagste vloer) is heel bo (-90°).
   const hoek = -Math.PI / 2 + (2 * Math.PI * indeks) / totaal;
   const radius = totaal === 2 ? 8 : 10;
   return {
@@ -684,23 +761,33 @@ const lynKruisReghoek = (lyn, b) => {
   );
 };
 
+/**
+ * Teken die SVG-plan vir die gekose vloer of die oorsig. Volgorde: rande, vertikale groepe, nodusse met
+ * etikette (waar die beste etiketposisie gekies word) en laastens die opskrif. Alles word uit die
+ * toestandveranderlikes (huidigeVloer, laasteResultaat, aktieweInsident) hertekem, dus is dit veilig om
+ * dit enige tyd weer te roep.
+ */
 function renderPlan() {
   const svg = document.getElementById("plan");
   const NS = "http://www.w3.org/2000/svg";
   svg.innerHTML = "";
 
+  // Oorsigmodus teken alle vloere op een kaart; andersins net die gekose vloer.
   const oorsigModus = huidigeVloer === OORSIG_ID;
   // In oorsigmodus word ALLE nodusse geteken. Vertikale vervoer word visueel
   // gegroepeer; ander gelaagde nodusse kry klein vloerverskuiwings.
   const vloerNodes = oorsigModus
     ? nodes
     : nodes.filter((n) => n.vloer === huidigeVloer);
+  // Hou by wat reeds geteken is (ganglyne en geplaasde etikette), sodat die etiketplasing botsings kan toets.
   const vloerLyne = [];
   const geplaasdeEtikette = [];
+  // Nodusse op die berekende roete (uitgelig) en nodusse wat deur die insident gesluit is (rooi).
   const highlightSet = new Set(
     laasteResultaat && laasteResultaat.path ? laasteResultaat.path : [],
   );
   const blockedSet = new Set(aktieweInsident.blocked_node_ids || []);
+  // Rande op die roete, in albei rigtings gestoor, want 'n gang kan in albei rigtings geloop word.
   const verligRande = new Set();
   if (laasteResultaat && laasteResultaat.path) {
     const p = laasteResultaat.path;
@@ -730,11 +817,15 @@ function renderPlan() {
   const inhoudHoogte = spanY * skaal;
   const oorsprongX = KAART_MARGE_X + (beskikbareBreedte - inhoudBreedte) / 2;
   const oorsprongY = KAART_BO_MARGE + (beskikbareHoogte - inhoudHoogte) / 2;
+  // Vloer-ID na indeks; die indeks bepaal watter oorsigverskuiwing 'n nodus kry.
   const vloerIndeks = Object.fromEntries(vloere.map((vloer, indeks) => [vloer.id, indeks]));
+  // Skaal en sentreer 'n nodus se koördinate (meter) na SVG-koördinate.
   const basisPosisie = (n) => ({
     x: oorsprongX + (n.x - minimumX) * skaal,
     y: oorsprongY + (n.y - minimumY) * skaal,
   });
+  // Die basisposisie plus 'n verskuiwing in oorsigmodus: vertikale groepe sirkel om een punt,
+  // ander nodusse kry 'n klein verskuiwing volgens hul vloer.
   const vertoonPosisie = (n) => {
     const groep = vertikaleGroepByNode[n.id];
     const verskuiwing = !oorsigModus
@@ -807,6 +898,7 @@ function renderPlan() {
         leierPunte: [],
         saamgevouElemente: [],
       };
+      // Oop: wys elke vloerlid met sy eie punt. Toe: wys net die leier se gesamentlike punt met die aantal vloere.
       const stelOop = (isOop) => {
         toestand.lede.forEach((lid, indeks) => {
           lid.style.display = isOop || indeks === 0 ? "" : "none";
@@ -833,6 +925,7 @@ function renderPlan() {
   const verbergHulpmiddel = () => {
     if (aktieweHulpmiddel) aktieweHulpmiddel.style.display = "none";
   };
+  // Teken 'n klein inligtingskaartjie (naam, gebou/vloer, toegang) langs die nodus terwyl die muis daarop sweef.
   const wysHulpmiddel = (n, groep, cx, cy) => {
     verbergHulpmiddel();
     const vloer = vloerById[n.vloer];
@@ -847,11 +940,13 @@ function renderPlan() {
       ...breekEtiketLyne(besonderhede, 38, 2),
       ...(n.beperkte ? [`Toegang: ${n.beperkte.replaceAll("_", " ")}`] : []),
     ];
+    // Skat die kaartjie se breedte uit die langste teksreël (ongeveer 5.7 eenhede per karakter).
     const breedte = Math.min(
       260,
       Math.max(150, Math.max(...lyne.map((lyn) => lyn.length)) * 5.7 + 20),
     );
     const hoogte = 18 + lyne.length * 13;
+    // Hou die kaartjie binne die SVG se grense.
     const x = Math.max(8, Math.min(cx + 14, KAART_BREEDTE - breedte - 8));
     const y = Math.max(44, Math.min(cy - hoogte - 12, KAART_HOOGTE - hoogte - 8));
     const kaart = document.createElementNS(NS, "g");
@@ -913,6 +1008,7 @@ function renderPlan() {
     if (isBlocked) g.classList.add("blocked-node");
     if (isBegin) g.classList.add("bron-node");
     if (isEinde) g.classList.add("bestemming-node");
+    // 'n Klik kies die nodus as bron of bestemming; geslote nodusse word geïgnoreer.
     g.onclick = () => kiesNodusOpKaart(n, isBlocked);
     g.onmouseenter = () => wysHulpmiddel(n, groep, cx, cy);
     g.onmouseleave = verbergHulpmiddel;
@@ -925,6 +1021,7 @@ function renderPlan() {
 
     if (groep && isGroepLeier) {
       const middel = basisPosisie(n);
+      // Stippelsirkel om die groep se gesamentlike middelpunt.
       const groepHalo = document.createElementNS(NS, "circle");
       groepHalo.setAttribute("cx", middel.x);
       groepHalo.setAttribute("cy", middel.y);
@@ -937,6 +1034,7 @@ function renderPlan() {
     }
 
     if (oorsigModus) {
+      // Ring in die vloer se kleur, sodat 'n mens in die oorsig kan sien op watter vloer 'n nodus is.
       const vloerHalo = document.createElementNS(NS, "circle");
       vloerHalo.setAttribute("cx", cx);
       vloerHalo.setAttribute("cy", cy);
@@ -952,6 +1050,7 @@ function renderPlan() {
       }
     }
 
+    // Stippelring om nodusse in 'n beperkte area: rooi vir ICU, pers vir personeel.
     if (n.beperkte) {
       const ring = document.createElementNS(NS, "circle");
       ring.setAttribute("cx", cx);
@@ -967,6 +1066,7 @@ function renderPlan() {
       svg.appendChild(ring);
     }
 
+    // Die nodus self: groter as dit op die roete of die begin/einde is, rooi as dit gesluit is.
     const circle = document.createElementNS(NS, "circle");
     circle.setAttribute("cx", cx);
     circle.setAttribute("cy", cy);
@@ -983,6 +1083,7 @@ function renderPlan() {
       groepToestand.leierPunte.push(circle);
 
       const middel = basisPosisie(n);
+      // Die saamgevoude groep: een punt met die aantal vloere daarin; dit verdwyn wanneer die groep oopvou.
       const saamgevouPunt = document.createElementNS(NS, "circle");
       saamgevouPunt.setAttribute("cx", middel.x);
       saamgevouPunt.setAttribute("cy", middel.y);
@@ -1029,12 +1130,14 @@ function renderPlan() {
     }
 
     // Probeer verskeie posisies en kies die een met die minste botsings.
+    // Wissel die eerste kandidaat-etiketposisie per nodus (i % 4), sodat bure nie almal dieselfde posisie probeer nie.
     const beginPosisie = i % 4;
     const kandidaatPosisies = [
       ...ETIKET_POSISIES.slice(beginPosisie, 4),
       ...ETIKET_POSISIES.slice(0, beginPosisie),
       ...ETIKET_POSISIES.slice(4),
     ];
+    // Groepstatus: [GESLUIT] as al die vloerlede gesluit is, [DEELS GESLUIT] as net sommige.
     const groepGeblokkeer = groep
       ? groep.nodusse.filter((item) => blockedSet.has(item.id)).length
       : 0;
@@ -1053,8 +1156,10 @@ function renderPlan() {
         : n.beperkte && !oorsigModus
           ? ` [${n.beperkte}]`
           : "");
+    // Lang etikette word in tot drie reëls gebreek (korter reëls in oorsigmodus, waar dit nouer is).
     const etiketLyne = breekEtiketLyne(etiket, oorsigModus ? 18 : 24, 3);
 
+    // paint-order=stroke gee die teks 'n ligte buitelyn agter die letters, sodat dit leesbaar bly bo-op lyne.
     const text = document.createElementNS(NS, "text");
     text.setAttribute("font-size", "9");
     text.setAttribute("font-family", "Inter, sans-serif");
@@ -1164,6 +1269,7 @@ function renderPlan() {
     geplaasdeEtikette.push(beste.boks);
   });
 
+  // Opskrif links bo: gebou en vloer, of die oorsigopskrif.
   const title = document.createElementNS(NS, "text");
   const f = vloerById[huidigeVloer];
   title.setAttribute("x", 20);
@@ -1188,6 +1294,10 @@ function renderPlan() {
   }
 }
 
+/**
+ * Vul die roetepaneel in die sykolom: 'n boodskap by 'n fout of geen roete, 'n nooduitgang-blokkie by
+ * ontruiming, die roetepunte in volgorde en onderaan die totale tyd en afstand (soos die bediener dit bereken het).
+ */
 function renderRoutePanel() {
   const el = document.getElementById("routePanel");
   el.innerHTML = "";
@@ -1227,6 +1337,7 @@ function renderRoutePanel() {
     vloer.className = "t";
     vloer.textContent = n ? `${vloerById[n.vloer].gebou} Vlak ${vloerById[n.vloer].level}` : "";
     li.append(etiket, vloer);
+    // 'n Klik op 'n roetepunt spring na daardie nodus se vloer.
     li.onclick = () => {
       if (!n) return;
       huidigeVloer = n.vloer;
@@ -1235,6 +1346,7 @@ function renderRoutePanel() {
     ul.appendChild(li);
   });
   el.appendChild(ul);
+  // Twee opsommingsrye onderaan; 'Onbekend' as die bediener nie die waarde teruggestuur het nie.
   [
     ["Totale tyd", laasteResultaat.formattedCost],
     ["Totale afstand", laasteResultaat.formattedDistance],
@@ -1250,6 +1362,10 @@ function renderRoutePanel() {
   });
 }
 
+/**
+ * Wys die statusreël bo die plan: rooi (blocked) vir 'n geblokkeerde of ongeldige roete of 'n netwerkfout,
+ * amber (ok) vir 'n gevonde roete, met die nodustelling, tyd en afstand.
+ */
 function renderStatus() {
   const el = document.getElementById("status");
   if (!laasteResultaat) {
@@ -1275,6 +1391,9 @@ function renderStatus() {
   }
 }
 
+/**
+ * Herteken alle dele van die skerm uit die huidige toestand (oortjies, indikator, plan, roetepaneel en status).
+ */
 function renderAll() {
   renderTabs();
   renderIndicator();
@@ -1283,6 +1402,10 @@ function renderAll() {
   renderStatus();
 }
 
+/**
+ * Gooi die huidige roete weg, herstel die Vind Roete-knoppie en herteken. Word geroep wanneer 'n keuse
+ * verander, want 'n ou roete pas dan nie meer by die keuse nie.
+ */
 function wisRoete() {
   // Laat antwoorde vir 'n vorige keuse mag nie 'n nuwe keuse of herstel oorskryf nie.
   roeteVersoek++;
@@ -1294,6 +1417,8 @@ function wisRoete() {
   renderAll();
 }
 
+// Vind Roete: herbevestig eers die sluitings, vra dan die bediener vir die roete en wys die uitslag.
+// Elke klik kry 'n volgnommer; verander die keuse of begin 'n nuwer versoek, word hierdie antwoord geïgnoreer.
 document.getElementById("findBtn").onclick = async () => {
   const versoek = ++roeteVersoek;
   roeteBesig = true;
@@ -1312,6 +1437,7 @@ document.getElementById("findBtn").onclick = async () => {
     const end = bestemmingId("endNode");
     const ut = document.getElementById("gebruikerTipe").value;
     const apiBase = document.getElementById("apiUrl").value.trim();
+    // In ontruimingsmodus is 'n bestemming nie nodig nie; die bediener kies die naaste nooduitgang.
     const ontruimModus = aktieweInsident.active && aktieweInsident.ontruimings_modus;
     if (!begin || (!end && !ontruimModus)) {
       laasteResultaat = {
@@ -1325,6 +1451,7 @@ document.getElementById("findBtn").onclick = async () => {
     const resultaat = await fetchRoute(apiBase, begin, end, ut);
     if (versoek !== roeteVersoek) return;
     laasteResultaat = resultaat;
+    // Spring na die vloer waar die roete begin.
     if (resultaat.path && nodeById[begin]) huidigeVloer = nodeById[begin].vloer;
   } catch (_) {
     if (versoek === roeteVersoek) {
@@ -1332,6 +1459,7 @@ document.getElementById("findBtn").onclick = async () => {
     }
   } finally {
     if (versoek === roeteVersoek) {
+      // Herstel die knoppie slegs as hierdie nog die jongste versoek is.
       roeteBesig = false;
       btn.disabled = false;
       btn.textContent = "Vind Roete";
@@ -1339,11 +1467,13 @@ document.getElementById("findBtn").onclick = async () => {
     }
   }
 };
+// Herstel: wis die roete; die volgende kaartklik kies weer 'n bron.
 document.getElementById("clearBtn").onclick = () => {
   volgendeKaartKeuse = "beginNode";
   wisRoete();
 };
 
+// Wanneer een keuselys verander, gaan die volgende kaartklik na die ander een, en die ou roete word gewis.
 [
   ["beginNode", "endNode"],
   ["endNode", "beginNode"],
@@ -1353,7 +1483,9 @@ document.getElementById("clearBtn").onclick = () => {
     wisRoete();
   });
 });
+// 'n Ander gebruikerstipe het ander toegang, dus is die ou roete nie meer geldig nie.
 document.getElementById("gebruikerTipe").addEventListener("change", wisRoete);
+// As die bedieneradres verander, laai die kaart, bestemmings en insident van daardie bediener.
 document.getElementById("apiUrl").addEventListener("change", async () => {
   // 'n Ander bediener het dalk 'n ander kaart, so laai dit weer.
   try {
@@ -1391,4 +1523,5 @@ async function begin() {
     if (!document.hidden && !roeteBesig) laaiInsident();
   }, 15000);
 }
+// Begin die toepassing.
 begin();

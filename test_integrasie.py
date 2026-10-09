@@ -26,12 +26,14 @@ def meld_aan(client):
     "/analise/spanboom", "/analise/maks_vloei?bron=MAIN-G-ER", "/admin/dekking-kontrole",
 ])
 def test_ontleding_vereis_admin(eindpunt):
+    """Die analise-eindpunte gee 401 sonder aanmelding en skep nie eers die werkprosespoel nie."""
     with TestClient(main.app) as client:
         assert client.get(eindpunt).status_code == 401
         assert main.app.state.dekking_pool is None
 
 
 def test_spanboom_en_maksimumvloei():
+    """Spanboom en maksimum vloei lewer konsekwente syfers; Kode Pink (alles gesluit) gee 409."""
     with TestClient(main.app) as client:
         meld_aan(client)
         antwoord = client.get("/analise/spanboom")
@@ -65,6 +67,7 @@ def test_spanboom_en_maksimumvloei():
     ("/admin/dekking-kontrole", {"gebruiker_tipe": "ONBEKEND"}),
 ])
 def test_ontleding_verwerp_ongeldige_invoer(eindpunt, parameters):
+    """'n Onbekende nodus of gebruikerstipe gee 400, sonder om die poel te skep."""
     with TestClient(main.app) as client:
         meld_aan(client)
         assert client.get(eindpunt, params=parameters).status_code == 400
@@ -127,6 +130,7 @@ def test_kode_rooi_dwing_json_en_prent_na_uitgang(monkeypatch):
 
 
 def test_prent_roete_respekteer_sluiting():
+    """Die PNG-roete volg dieselfde sluitingsreëls as die JSON-roete (409 by Kode Pink)."""
     with TestClient(main.app) as client:
         meld_aan(client)
         assert client.post("/admin/incident", json={"kode_id": "PINK"}).status_code == 200
@@ -135,6 +139,7 @@ def test_prent_roete_respekteer_sluiting():
 
 
 def test_tekenfout_laat_geen_tydelike_prent_agter(tmp_path, monkeypatch):
+    """As die teken misluk, word die tydelike PNG-lêer steeds uitgevee."""
     oorspronklike_tydelik = tempfile.NamedTemporaryFile
 
     def tydelike_leer(**kwargs):
@@ -152,6 +157,7 @@ def test_tekenfout_laat_geen_tydelike_prent_agter(tmp_path, monkeypatch):
 
 
 def test_unicode_aanmeldbewyse_word_korrek_hanteer(monkeypatch):
+    """Aanmelding werk met nie-ASCII-bewyse (bv. â en ë), en afmelding beëindig die sessie."""
     with TestClient(main.app) as client:
         assert client.post("/admin/login", json={"gebruikersnaam": "Jân", "wagwoord": "geheimë"}).status_code == 401
         monkeypatch.setattr(main, "ADMIN_GEBRUIKERSNAAM", "Jân")
@@ -177,6 +183,7 @@ def test_ongeldige_sessie_inhoud_word_verwerp(inhoud):
 
 
 def test_sessie_verval_presies_op_vervaltydstip(monkeypatch):
+    """Op die vervaltydstip self is die sessie nie meer geldig nie."""
     with TestClient(main.app) as client:
         meld_aan(client)
         verval = int(time.time()) + main.SESSIE_SEKONDES

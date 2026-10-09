@@ -111,6 +111,8 @@ class HospitaalGrafiek:
                 self.adjacency[row["node_id"]] = []
 
             # Laai alle rande en voeg ook omgekeerde rande by vir tweerigtingverbindings.
+            # Ouer databasisse het dalk nog nie die kapasiteit-kolom nie. Toets daarvoor met PRAGMA table_info en
+            # gebruik NULL as plekhouer, sodat dieselfde SELECT altyd werk (NULL word VERSTEK_KAPASITEIT).
             kapasiteit_kolom = "kapasiteit" in {
                 ry[1] for ry in cur.execute("PRAGMA table_info(rande)")
             }

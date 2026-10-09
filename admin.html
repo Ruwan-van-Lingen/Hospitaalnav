@@ -58,6 +58,10 @@ admin.html
           <button class="danger" id="clearIncidentBtn">Kanselleer sluiting</button>
         </div>
 
+        <!--
+          Veiligheids- en netwerkanalise (leesalleen): twee keuses, drie opsommingskaarte (infrastruktuur,
+          ontruimingsdekking, deurvloei) en twee detaillyste. admin.js (laaiVeiligheidsanalise) vul dit in.
+        -->
         <section class="card analise-paneel" aria-labelledby="analiseTitel">
           <div class="analise-kop">
             <div>
@@ -77,6 +81,7 @@ admin.html
                 <option value="NOODGEVAL">Noodgeval</option>
               </select>
             </label>
+            <!-- Die bronlys word met al die nodusse gevul deur vulAnaliseBronne() in admin.js. -->
             <label>Bron vir deurvloei
               <select id="analiseBron"></select>
             </label>
@@ -115,6 +120,10 @@ admin.html
           <p class="analise-voetnota">Die deurvloeisyfers is demonstrasiewaardes en vervang nie ’n gevalideerde hospitaalveiligheidsplan nie.</p>
         </section>
 
+        <!--
+          Sluitingsvorm: stap 01 beskryf die insident, stap 02 kies die geslote nodusse.
+          Die keuseboom (#boom) word deur renderBoom() in admin.js gebou.
+        -->
         <form id="incidentForm" class="workspace">
           <section class="card details">
             <p class="step">01</p>
@@ -146,6 +155,7 @@ admin.html
             <div id="boom" class="tree"></div>
           </section>
 
+          <!-- Onderaan die vorm: foutboodskap (links) en die Aktiveer-knoppie (regs). -->
           <section class="actions">
             <p id="boodskap" role="status"></p>
             <button type="submit" class="activate">Aktiveer sluiting</button>

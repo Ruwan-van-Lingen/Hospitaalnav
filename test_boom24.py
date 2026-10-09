@@ -1,3 +1,5 @@
+"""Toetse vir die 2-4-boom: invoeging, soek, metadata-soektog en die valideerder."""
+
 import random
 
 import pytest
@@ -7,6 +9,7 @@ from Boom24 import Boom24, BoomNodus
 
 @pytest.mark.parametrize("volgorde", ["stygend", "dalend", "deurmekaar"])
 def test_invoeging_balanseer_en_behou_waardes(volgorde):
+    """Invoeging in stygende, dalende en deurmekaar volgorde hou die boom geldig; herinvoeging vervang net die waarde."""
     sleutels = list(range(120))
     if volgorde == "dalend":
         sleutels.reverse()
@@ -29,6 +32,7 @@ def test_invoeging_balanseer_en_behou_waardes(volgorde):
 
 
 def test_lee_boom_en_onafhanklike_nodusse():
+    """'n Leë boom is geldig en soek niks; elke nodus kry sy eie lyste (geen gedeelde verstekwaardes nie)."""
     boom = Boom24()
     assert boom.valideer()
     assert boom.soek(1) is None
@@ -40,6 +44,7 @@ def test_lee_boom_en_onafhanklike_nodusse():
 
 
 def test_metadata_duplikaatname_unicode_en_limiete():
+    """soek_metadata hanteer duplikaatname, hoof-/kleinletters (casefold), spasies, die limiet en 'n negatiewe limiet."""
     boom = Boom24()
     data = [("Saal A", "S"), ("Radiologie", "B"), ("Ontvangs", "O"),
             ("Radiologie", "A"), ("Radiologie-ontvangs", "C"),
@@ -61,6 +66,7 @@ def test_metadata_duplikaatname_unicode_en_limiete():
 
 @pytest.mark.parametrize("veld", ["etiket", "node_id", "tipe_kode", "gebou_naam", "vloer_naam"])
 def test_metadata_soek_binne_elke_veld(veld):
+    """Elke metadata-veld word deursoek, % en _ is letterlike karakters, en die hele term moet binne een veld pas."""
     boom = Boom24()
     item = {"etiket": "Ontvangs", "node_id": "N1", "tipe_kode": None}
     item[veld] = "Voor_TREF%Agter"
@@ -74,6 +80,7 @@ def test_metadata_soek_binne_elke_veld(veld):
 
 
 def test_naamtreffers_kom_voor_metadata_selfs_met_limiet():
+    """Naamtreffers kom altyd voor ander treffers, ook wanneer die limiet dit sou afsny."""
     boom = Boom24()
     for naam in ["A", "B", "Z Kliniek", "Y Kliniek"]:
         item = {"etiket": naam, "node_id": naam, "gebou_naam": "Kliniek"}
@@ -84,6 +91,7 @@ def test_naamtreffers_kom_voor_metadata_selfs_met_limiet():
 
 @pytest.mark.parametrize("fout", ["volgorde", "waardes", "kindtelling", "grense", "diepte"])
 def test_valideerder_verwerp_ongeldige_bome(fout):
+    """valideer() gooi ValueError by elke reëlbreuk: volgorde, waardes, kindtelling, sleutelgrense en blaardiepte."""
     boom = Boom24()
     boom.wortel = BoomNodus([20], [20], [BoomNodus([10], [10]), BoomNodus([30], [30])])
     if fout == "volgorde":

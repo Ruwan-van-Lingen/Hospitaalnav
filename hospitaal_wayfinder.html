@@ -1,110 +1,115 @@
 <!--==================================================================================
-  hospitaal_wayfinder.html
-  =========================
-  Interaktiewe webkoppelvlak vir die hospitaalnavigasiestelsel (/ui).
+hospitaal_wayfinder.html
+=========================
+Interaktiewe webkoppelvlak vir die hospitaalnavigasiestelsel (/ui).
 
-  Hierdie bladsy stel besoekers en personeel in staat om:
-    • 'n Beginpunt en bestemming volgens naam of node-ID te soek.
-    • 'n Gebruikerstipe te kies (Publiek, Personeel, Pasiëntvervoer, Noodgeval).
-    • Die tydoptimale toegelate roete te bereken via die FastAPI-agterkant.
-    • Die roete op 'n interaktiewe SVG-vloerplan te sien, met vloer-oortjies.
-    • Vloere te wissel via die hysbakstyl-vloerindikator in die sykantpaneel.
-    • Roetepunte in volgorde en die beraamde reistyd en afstand te lees.
+Hierdie bladsy stel besoekers en personeel in staat om:
+  • 'n Beginpunt en bestemming volgens naam of node-ID te soek.
+  • 'n Gebruikerstipe te kies (Publiek, Personeel, Pasiëntvervoer, Noodgeval).
+  • Die tydoptimale toegelate roete te bereken via die FastAPI-agterkant.
+  • Die roete op 'n interaktiewe SVG-vloerplan te sien, met vloer-oortjies.
+  • Vloere te wissel via die hysbakstyl-vloerindikator in die sykantpaneel.
+  • Roetepunte in volgorde en die beraamde reistyd en afstand te lees.
 
-  Wanneer 'n aktiewe sluiting of ontruimingsmodus op die bediener bestaan,
-  verskyn 'n rooi insidentbanier bo-aan die bladsy en word geslote nodusse
-  in die seleksielys onaktief gemaak. In ontruimingsmodus word die bestemming
-  geïgnoreer en word die naaste nooduitgang outomaties bepaal.
+Wanneer 'n aktiewe sluiting of ontruimingsmodus op die bediener bestaan,
+verskyn 'n rooi insidentbanier bo-aan die bladsy en word geslote nodusse
+in die seleksielys onaktief gemaak. In ontruimingsmodus word die bestemming
+geïgnoreer en word die naaste nooduitgang outomaties bepaal.
 
-  Alle roeteberekening word op die bediener uitgevoer.
-  Die webkoppelvlak stuur slegs die versoek en vertoon die resultaat — die
-  SVG-vloerplan self word kliëntkant geteken deur hospitaal_wayfinder.js.
+Alle roeteberekening word op die bediener uitgevoer.
+Die webkoppelvlak stuur slegs die versoek en vertoon die resultaat — die
+SVG-vloerplan self word kliëntkant geteken deur hospitaal_wayfinder.js.
 -->
 <!doctype html>
 <html lang="af">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Hospitaalnavigasie</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap"
-      rel="stylesheet"
-    />
-    <link rel="stylesheet" href="hospitaal_wayfinder.css" />
-  </head>
-  <body>
-    <header>
-      <div>
-        <h1>Hospitaalnavigasie</h1>
-        <p id="apiStatusLine">
-          Roetebeplanning vir hospitaalbesoekers en personeel. Kies 'n beginpunt en bestemming en klik "Vind Roete".
-        </p>
-      </div>
-      <a class="admin-link" href="/admin">Adminaanmelding</a>
-    </header>
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Hospitaalnavigasie</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap"
+    rel="stylesheet"
+  />
+  <link rel="stylesheet" href="hospitaal_wayfinder.css" />
+</head>
+<body>
+  <header>
+    <div>
+      <h1>Hospitaalnavigasie</h1>
+      <p id="apiStatusLine">
+        Roetebeplanning vir hospitaalbesoekers en personeel. Kies 'n beginpunt en bestemming en klik "Vind Roete".
+      </p>
+    </div>
+    <a class="admin-link" href="/admin">Adminaanmelding</a>
+  </header>
 
-    <div id="incidentBanner" class="incident-banner" role="status" hidden>
-      <strong id="incidentTitle"></strong>
-      <span id="incidentDescription"></span>
+  <div id="incidentBanner" class="incident-banner" role="status" hidden>
+    <strong id="incidentTitle"></strong>
+    <span id="incidentDescription"></span>
+  </div>
+
+  <div class="layout">
+    <div class="main-col">
+      <div class="controls">
+        <div class="field">
+          <!-- Word met hierdie bladsy se eie adres ingevul; 'n ander bediener kan hier ingetik word. -->
+          <label for="apiUrl">Bedieneradres</label>
+          <input
+            type="text"
+            id="apiUrl"
+            placeholder="Gebruik hierdie blad se bediener"
+          />
+        </div>
+        <div class="field">
+          <label for="gebruikerTipe">Gebruikerstipe</label>
+          <select id="gebruikerTipe"></select>
+        </div>
+        <div class="field">
+          <label for="beginSoek">Vanaf</label>
+          <input class="bestemming-soek" id="beginSoek" placeholder="Soek beginpunte..." autocomplete="off" />
+          <select id="beginNode" aria-label="Kies beginpunt"></select>
+        </div>
+        <div class="field">
+          <label for="eindSoek">Na</label>
+          <input class="bestemming-soek" id="eindSoek" placeholder="Soek bestemmings..." autocomplete="off" />
+          <select id="endNode" aria-label="Kies bestemming"></select>
+        </div>
+        <button class="primary" id="findBtn">Vind Roete</button>
+        <button class="ghost" id="clearBtn">Herstel</button>
+      </div>
+
+      <div class="status" id="status" role="status"></div>
+
+      <!-- Vloeroortjies, deur renderTabs() gevul. -->
+      <div class="tabs" id="tabs"></div>
+
+      <div class="plan-wrap">
+        <!-- Die vloerplan; die inhoud word deur renderPlan() geteken. -->
+        <svg id="plan" viewBox="0 0 780 560" role="img" aria-label="Hospitaalvloerplan met nodusse en roetes"></svg>
+      </div>
+
+      <!-- Kleurlegende, deur renderLegend() gevul. -->
+      <div class="legend" id="legend"></div>
     </div>
 
-    <div class="layout">
-      <div class="main-col">
-        <div class="controls">
-          <div class="field">
-            <label for="apiUrl">Bedieneradres</label>
-            <input
-              type="text"
-              id="apiUrl"
-              placeholder="Gebruik hierdie blad se bediener"
-            />
-          </div>
-          <div class="field">
-            <label for="gebruikerTipe">Gebruikerstipe</label>
-            <select id="gebruikerTipe"></select>
-          </div>
-          <div class="field">
-            <label for="beginSoek">Vanaf</label>
-            <input class="bestemming-soek" id="beginSoek" placeholder="Soek beginpunte..." autocomplete="off" />
-            <select id="beginNode" aria-label="Kies beginpunt"></select>
-          </div>
-          <div class="field">
-            <label for="eindSoek">Na</label>
-            <input class="bestemming-soek" id="eindSoek" placeholder="Soek bestemmings..." autocomplete="off" />
-            <select id="endNode" aria-label="Kies bestemming"></select>
-          </div>
-          <button class="primary" id="findBtn">Vind Roete</button>
-          <button class="ghost" id="clearBtn">Herstel</button>
-        </div>
-
-        <div class="status" id="status" role="status"></div>
-
-        <div class="tabs" id="tabs"></div>
-
-        <div class="plan-wrap">
-          <svg id="plan" viewBox="0 0 780 560" role="img" aria-label="Hospitaalvloerplan met nodusse en roetes"></svg>
-        </div>
-
-        <div class="legend" id="legend"></div>
+    <div class="side">
+      <div class="panel">
+        <h2>Vloer- en hysbakaanwyser</h2>
+        <div class="indicator" id="indicator"></div>
       </div>
-
-      <div class="side">
-        <div class="panel">
-          <h2>Vloer- en hysbakaanwyser</h2>
-          <div class="indicator" id="indicator"></div>
-        </div>
-        <div class="panel">
-          <h2>Roete</h2>
-          <div id="routePanel">
-            <div class="empty-note">
-              Kies "Vanaf" en "Na", dan klik Vind Roete.
-            </div>
+      <div class="panel">
+        <h2>Roete</h2>
+        <div id="routePanel">
+          <div class="empty-note">
+            Kies "Vanaf" en "Na", dan klik Vind Roete.
           </div>
         </div>
       </div>
     </div>
+  </div>
 
-    <script src="/hospitaal_wayfinder.js?v=leesbare-oorsig"></script>
-  </body>
+  <!-- Die ?v=-parameter is 'n kas-breker: verander dit wanneer die skrif verander, sodat blaaiers nie 'n ou kopie hou nie. -->
+  <script src="/hospitaal_wayfinder.js?v=leesbare-oorsig"></script>
+</body>
 </html>

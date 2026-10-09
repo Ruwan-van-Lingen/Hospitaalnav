@@ -24,6 +24,7 @@ def voorbeeld_db(tmp_path):
 
 @pytest.fixture
 def voorbeeld_grafiek(voorbeeld_db):
+    """Laai 'n HospitaalGrafiek uit die tydelike voorbeelddatabasis."""
     return HospitaalGrafiek(str(voorbeeld_db))
 
 
@@ -102,6 +103,7 @@ def test_astar_alle_noduspare_stem_ooreen_met_dijkstra(voorbeeld_grafiek, gebrui
 
 
 def test_heuristiek_is_konsekwent_vir_elke_rand_en_doel(voorbeeld_grafiek):
+    """Konsekwentheid: h(van) is hoogstens randkoste + h(na), en h(doel) is 0. Dit hou A* korrek."""
     grafiek = voorbeeld_grafiek
     for doel in grafiek.nodes:
         assert grafiek._heuristic(doel, doel) == 0
@@ -112,6 +114,7 @@ def test_heuristiek_is_konsekwent_vir_elke_rand_en_doel(voorbeeld_grafiek):
 
 
 def test_astar_kostelose_rand_en_misleidende_koordinate():
+    """Met 'n kostelose rand en koördinate wat die heuristiek mislei, vind A* steeds die goedkoopste pad."""
     grafiek = bou_klein_grafiek("ABC", [
         ("A", "C", 10, 1, "GANG"),
         ("A", "B", 0, 1, "GANG"),
@@ -124,6 +127,7 @@ def test_astar_kostelose_rand_en_misleidende_koordinate():
 
 @pytest.mark.parametrize("gebruiker", ["PUBLIEK", "PERSONEEL", "PASIENT_VERVOER", "NOODGEVAL"])
 def test_ontruiming_stem_ooreen_met_voorwaartse_dijkstra(voorbeeld_grafiek, gebruiker):
+    """Die omgekeerde multibron-Dijkstra gee dieselfde minimum tyd as 'n gewone Dijkstra vanaf elke beginpunt."""
     grafiek = voorbeeld_grafiek
     geblokkeer = {"MAIN-G-ENT", "MAIN-1-STA"}
     groepe = grafiek.toegelate_groepe(gebruiker)
@@ -140,6 +144,7 @@ def test_ontruiming_stem_ooreen_met_voorwaartse_dijkstra(voorbeeld_grafiek, gebr
 
 
 def test_ontruiming_behou_eenrigting_en_parallelle_rande():
+    """Ontruiming volg slegs werklike randrigtings en kies die goedkoopste van parallelle rande."""
     grafiek = bou_klein_grafiek("ABU", [
         ("A", "U", 9, 1, "GANG"),
         ("A", "U", 2, 1, "GANG"),
@@ -151,6 +156,7 @@ def test_ontruiming_behou_eenrigting_en_parallelle_rande():
 
 
 def test_ontruiming_geen_hysbak_of_geblokkeerde_uitgang():
+    """Hysbakke word by ontruiming uitgesluit, en 'n geblokkeerde uitgang of beginpunt gee None."""
     grafiek = bou_klein_grafiek("AU", [("A", "U", 1, 5, "HUISBAK")], uitgange={"U"})
     assert grafiek.astar("A", "U") is not None
     assert grafiek.naaste_veilige_uitgang("A") is None
@@ -160,6 +166,7 @@ def test_ontruiming_geen_hysbak_of_geblokkeerde_uitgang():
 
 
 def test_mst_kies_goedkoopste_parallelle_en_omgekeerde_rand():
+    """Kruskal behandel die grafiek as ongerig en gebruik die goedkoopste rand per noduspaar; 'n afgesnyde nodus gee 'n spanwoud."""
     grafiek = bou_klein_grafiek("ABCD", [
         ("A", "B", 20, 1, "GANG"),
         ("A", "B", 6, 1, "GANG"),
@@ -178,6 +185,7 @@ def test_mst_kies_goedkoopste_parallelle_en_omgekeerde_rand():
 
 
 def test_maks_vloei_bekende_netwerk_minimumsnit_en_geen_mutasie():
+    """'n Klein netwerk met 'n bekende antwoord (vloei 5, min-snit by die bron); die grafiek word nie verander nie."""
     grafiek = bou_klein_grafiek("SABU", [
         ("S", "A", 1, 3, "GANG"),
         ("S", "B", 1, 2, "GANG"),
@@ -193,6 +201,7 @@ def test_maks_vloei_bekende_netwerk_minimumsnit_en_geen_mutasie():
 
 
 def test_maks_vloei_sluit_hysbakke_en_ontoeganklike_snitrande_uit():
+    """Hysbakke, geblokkeerde nodusse en beperkte areas bly buite die vloeinetwerk."""
     grafiek = bou_klein_grafiek("SABXHU", [
         ("S", "A", 1, 5, "GANG"),
         ("A", "U", 1, 2, "GANG"),
@@ -210,6 +219,7 @@ def test_maks_vloei_sluit_hysbakke_en_ontoeganklike_snitrande_uit():
 
 
 def test_maks_vloei_meer_uitgange_parallelle_rande_en_teenrigtings():
+    """Meer as een uitgang, parallelle rande en teenrigtingrande tel korrek saam; die snit se kapasiteit is gelyk aan die vloei."""
     grafiek = bou_klein_grafiek(["S", "A", "U", "__SUPERPUT__"], [
         ("S", "A", 1, 2, "GANG"),
         ("S", "A", 1, 3, "GANG"),
@@ -223,6 +233,7 @@ def test_maks_vloei_meer_uitgange_parallelle_rande_en_teenrigtings():
 
 
 def test_maks_vloei_grensgevalle():
+    """Geen uitgang, bron is self die uitgang, geblokkeerde bron en onbekende bron."""
     grafiek = bou_klein_grafiek("SAU", [("S", "A", 1, 1, "GANG")], uitgange={"U"})
     assert grafiek.maks_vloei_na_uitgange("S") is None
     assert grafiek.maks_vloei_na_uitgange("U") == (0.0, [])
@@ -237,6 +248,7 @@ def test_maks_vloei_grensgevalle():
 @pytest.mark.parametrize("veld", ["gewig_s", "afstand_m", "kapasiteit"])
 @pytest.mark.parametrize("waarde", [-1.0, math.inf, -math.inf, math.nan])
 def test_rand_verwerp_negatiewe_en_nie_eindige_waardes(veld, waarde):
+    """Rand weier negatiewe, oneindige en NaN-waardes."""
     waardes = dict(na_node="U", gewig_s=1, rand_tipe="GANG", vloer_verander=0, afstand_m=1, kapasiteit=1)
     waardes[veld] = waarde
     with pytest.raises(ValueError):
@@ -244,10 +256,12 @@ def test_rand_verwerp_negatiewe_en_nie_eindige_waardes(veld, waarde):
 
 
 def test_rand_laat_nulwaardes_toe():
+    """Nul is 'n geldige gewig, afstand en kapasiteit."""
     assert Rand("U", 0, "GANG", 0, 0, 0).kapasiteit == 0
 
 
 def test_laaier_lees_kapasiteit_en_verstek(voorbeeld_db):
+    """Die kapasiteit-kolom word gelees; NULL val terug op VERSTEK_KAPASITEIT."""
     with sqlite3.connect(voorbeeld_db) as conn:
         if "kapasiteit" not in {ry[1] for ry in conn.execute("PRAGMA table_info(rande)")}:
             conn.execute("ALTER TABLE rande ADD COLUMN kapasiteit REAL")
@@ -260,6 +274,7 @@ def test_laaier_lees_kapasiteit_en_verstek(voorbeeld_db):
 
 
 def test_laaier_aanvaar_ouer_skema_sonder_kapasiteit(voorbeeld_db):
+    """'n Ouer databasis sonder die kapasiteit-kolom laai steeds, met die verstek."""
     with sqlite3.connect(voorbeeld_db) as conn:
         if "kapasiteit" in {ry[1] for ry in conn.execute("PRAGMA table_info(rande)")}:
             conn.execute("ALTER TABLE rande DROP COLUMN kapasiteit")
@@ -268,6 +283,7 @@ def test_laaier_aanvaar_ouer_skema_sonder_kapasiteit(voorbeeld_db):
 
 
 def test_lambda_funksies_word_deur_laaier_en_roetes_gebruik(voorbeeld_db, monkeypatch):
+    """Spioene bewys dat die laaier en A* werklik die twee lambda-funksies aanroep."""
     afstand = grafiek_module.BEREKEN_AFSTAND
     gewig = grafiek_module.BEREKEN_GEWIG
     assert afstand.__name__ == gewig.__name__ == "<lambda>"

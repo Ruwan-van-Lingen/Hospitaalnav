@@ -100,6 +100,10 @@ header p {
 .main-col {
   padding: 20px 24px;
 }
+/*
+   Beheerpaneel in ses kolomme: gebruikerstipe (190px), bedieneradres (190px), twee buigsame soekkolomme
+   ('Vanaf' en 'Na') en twee outomatiese kolomme vir die knoppies.
+*/
 .controls {
   display: grid;
   grid-template-columns:
@@ -184,6 +188,7 @@ button.ghost:hover {
   margin-bottom: 10px;
   min-height: 16px;
 }
+/* Statuskleure: rooi vir 'n geblokkeerde roete of fout, amber vir 'n suksesvolle roete. */
 .status.blocked {
   color: var(--red);
 }
@@ -259,7 +264,9 @@ svg {
   border-radius: 50%;
   display: inline-block;
 }
+/* Geslote nodusse kry 'n 'nie toegelaat'-wyser. !important is nodig, want renderPlan() stel 'n inline cursor. */
 .blocked-node { cursor: not-allowed !important; }
+/* Blou gloed om die gekose beginpunt en (volgende reël) groen gloed om die gekose bestemming op die kaart. */
 .bron-node { filter: drop-shadow(0 0 4px rgba(21, 101, 192, 0.75)); }
 .bestemming-node { filter: drop-shadow(0 0 4px rgba(46, 125, 50, 0.75)); }
 
@@ -310,6 +317,7 @@ svg {
   background: #33475a;
   flex: none;
 }
+/* Toestande van 'n vloerry: current = die vloer wat tans getoon word (papierkleur), onroute = die roete gaan daardeur (amber). */
 .ind-row.current {
   color: #0e1b24;
   background: var(--paper);
@@ -333,6 +341,7 @@ svg {
   background: #1b1200;
 }
 
+/* Sigbare fokusomtrek vir sleutelbordgebruikers. */
 button:focus-visible,
 select:focus-visible,
 input:focus-visible {
@@ -380,6 +389,7 @@ input:focus-visible {
   font-family: "IBM Plex Mono", monospace;
 }
 
+/* Smal skerms: die sykolom skuif onder die kaart. */
 @media (max-width: 880px) {
   .layout {
     grid-template-columns: 1fr;
@@ -389,6 +399,7 @@ input:focus-visible {
   }
 }
 
+/* Medium skerms: die beheerpaneel gaan na twee kolomme (die 600px-reël hieronder maak dit een kolom). */
 @media (max-width: 1100px) {
   .controls {
     grid-template-columns: repeat(2, minmax(240px, 1fr));

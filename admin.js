@@ -318,6 +318,7 @@ function stelMetriek(kaartId, statusId, detailId, status, detail, toestand) {
 function vulAnaliseLys(lysId, items, leëBoodskap, formateer) {
   const lys = document.getElementById(lysId);
   lys.innerHTML = "";
+  // 'n Leë lys wys een reël met die leë-boodskap; null is die merker daarvoor.
   const waardes = items.length ? items : [null];
   waardes.forEach((item) => {
     const ry = document.createElement("li");
@@ -355,14 +356,17 @@ async function laaiVeiligheidsanalise() {
   analiseBoodskap.className = "analise-boodskap";
   analiseBoodskap.textContent = "Veiligheids- en netwerkdata word bereken…";
 
+  // encodeURIComponent maak die waardes veilig vir gebruik in die URL se navraagdeel.
   const gebruikerParameter = encodeURIComponent(gebruiker);
   const bronParameter = encodeURIComponent(bron);
+  // allSettled wag vir al drie oproepe, ook as een misluk, sodat elke kaart onafhanklik opgedateer kan word.
   const [spanUitslag, dekkingUitslag, vloeiUitslag] = await Promise.allSettled([
     api("/analise/spanboom"),
     api(`/admin/dekking-kontrole?gebruiker_tipe=${gebruikerParameter}`),
     api(`/analise/maks_vloei?bron=${bronParameter}&gebruiker_tipe=${gebruikerParameter}`),
   ]);
 
+  // Kaart 1, infrastruktuur: is al die nodusse verbind? (minimum spanboom met Kruskal)
   if (spanUitslag.status === "fulfilled") {
     const data = spanUitslag.value;
     stelMetriek(
@@ -378,6 +382,7 @@ async function laaiVeiligheidsanalise() {
     );
   }
 
+  // Kaart 2, ontruimingsdekking: kan elke nodus nog 'n nooduitgang bereik? (parallelle kontrole)
   if (dekkingUitslag.status === "fulfilled") {
     const data = dekkingUitslag.value;
     const veilig = data.onbereikbaar_telling === 0;
@@ -401,6 +406,7 @@ async function laaiVeiligheidsanalise() {
     vulAnaliseLys("onbereikbaarLys", [], dekkingUitslag.reason.message, () => "");
   }
 
+  // Kaart 3, deurvloei: hoeveel persone per sekonde kan na die uitgange beweeg, en waar is die bottelnekke? (Edmonds-Karp)
   if (vloeiUitslag.status === "fulfilled") {
     const data = vloeiUitslag.value;
     stelMetriek(
@@ -427,6 +433,7 @@ async function laaiVeiligheidsanalise() {
     vulAnaliseLys("bottelnekLys", [], vloeiUitslag.reason.message, () => "");
   }
 
+  // Tel hoeveel ontledings misluk het, vir die opsommingsboodskap onderaan.
   const foutTelling = [spanUitslag, dekkingUitslag, vloeiUitslag]
     .filter((uitslag) => uitslag.status === "rejected").length;
   analiseBoodskap.className = `analise-boodskap${foutTelling ? " fout" : ""}`;

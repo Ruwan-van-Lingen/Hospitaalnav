@@ -19,16 +19,21 @@ class UnionFind:
     """Help-klas vir Kruskal: hou by watter nodusse reeds verbind is."""
 
     def __init__(self, nodusse):
+        """Elke nodus begin in sy eie stel (sy eie ouer, rang 0)."""
         nodusse = list(nodusse)
         self.ouer = {n: n for n in nodusse}
         self.rang = {n: 0 for n in nodusse}
 
     def vind(self, x):
+        """Vind die wortel van x se stel; pad-kompressie maak latere soektogte vinniger."""
         if self.ouer[x] != x:
             self.ouer[x] = self.vind(self.ouer[x])  # pad-kompressie
         return self.ouer[x]
 
     def unie(self, x, y):
+        """Voeg die stelle van x en y saam (die laer rang kom onder die hoër een).
+        Gee False as hulle reeds saam is, dit wil sê die rand sou 'n siklus vorm.
+        """
         wortel_x, wortel_y = self.vind(x), self.vind(y)
         if wortel_x == wortel_y:
             return False  # sou 'n siklus vorm - moet nie by MST kom nie
@@ -48,8 +53,11 @@ def bereken_min_spanboom(nodusse, kante):
     Gee terug: (mst_kante, totale_gewig)
         mst_kante is 'n lys (nodus_a, nodus_b, gewig) wat die MST vorm
     """
+    # Kruskal: gaan deur die rande van die kleinste na die grootste gewig en neem 'n rand net as dit twee
+    # dele verbind wat nog nie met mekaar verbind is nie (UnionFind keer sikluste).
     uf = UnionFind(nodusse)
     gesorteerde_kante = sorted(kante, key=lambda k: k[2])
+    # Valideer alle rande eers, sodat 'n slegte rand nie 'n gedeeltelike resultaat laat nie.
     for a, b, gewig in gesorteerde_kante:
         if a not in uf.ouer or b not in uf.ouer:
             raise ValueError("Elke rand se eindpunte moet in die noduslys voorkom.")
@@ -58,6 +66,7 @@ def bereken_min_spanboom(nodusse, kante):
     mst_kante = []
     totale_gewig = 0
 
+    # Neem die rand slegs as dit nie 'n siklus vorm nie (unie gee dan True).
     for a, b, gewig in gesorteerde_kante:
         if uf.unie(a, b):
             mst_kante.append((a, b, gewig))
@@ -90,12 +99,17 @@ def edmonds_karp(kante, bron, put):
             raise ValueError("Kapasiteite moet eindig en nie-negatief wees.")
     if bron == put:
         return 0, []
+    # Residuele grafiek: kapasiteit[a][b] is wat nog van a na b deurgestuur kan word. Elke rand kry ook 'n
+    # terugkant met kapasiteit 0; wanneer vloei gestuur word, groei die terugkant sodat latere paaie dit kan 'ontdoen'.
     kapasiteit = defaultdict(dict)
     for a, b, kap in kante:
         kapasiteit[a][b] = kapasiteit[a].get(b, 0) + kap
         kapasiteit[b].setdefault(a, 0)  # residuele kant
 
     def bfs_vind_pad():
+        """Breedte-eerste soektog van bron na put oor rande met oorblywende kapasiteit.
+        Gee die pad as 'n lys (van, na)-pare, of None as die put nie meer bereikbaar is nie.
+        """
         voorganger = {bron: None}
         wagry = deque([bron])
         while wagry:
@@ -114,12 +128,16 @@ def edmonds_karp(kante, bron, put):
                     wagry.append(buur)
         return None
 
+    # Edmonds-Karp: vind herhaaldelik die pad met die minste rande en oorblywende kapasiteit, en stuur soveel
+    # as die pad se kleinste kapasiteit (sy bottelnek) toelaat, totdat geen pad meer bestaan nie.
     maks_vloei = 0
     while True:
         pad = bfs_vind_pad()
         if pad is None:
             break
+        # Die pad se bottelnek bepaal hoeveel vloei ons kan stuur.
         vloei_langs_pad = min(kapasiteit[a][b] for a, b in pad)
+        # Trek die gestuurde vloei van die vorentoe-kapasiteit af en tel dit by die terugkant.
         for a, b in pad:
             kapasiteit[a][b] -= vloei_langs_pad
             kapasiteit[b][a] += vloei_langs_pad
@@ -135,6 +153,8 @@ def edmonds_karp(kante, bron, put):
                 bereikbaar.add(buur)
                 wagry.append(buur)
 
+    # Min-snit: oorspronklike rande van die bereikbare kant na die onbereikbare kant. Hulle is vol
+    # (die maksimum vloei is die som van hul kapasiteite) en is dus die bottelnekke.
     min_snit_kante = [
         (a, b, kap) for a, b, kap in kante
         if a in bereikbaar and b not in bereikbaar
