@@ -13,6 +13,7 @@ geskryf; hierdie lêer stel net hul invoer saam. Geen van hierdie demonstrasies
 vervang 'n professioneel goedgekeurde ontruimingsplan nie.
 """
 
+import os
 import sqlite3
 import math
 import heapq
@@ -695,7 +696,6 @@ def bou_demo_db(db_pad: str, skema_pad: str, seed_pad: str):
       • In eenheidstoetse om 'n skoon databasis te verseker.
       • Wanneer 'n nuwe omgewing vir die eerste keer ingestel word.
     """
-    import os
     if os.path.exists(db_pad):
         os.remove(db_pad)
     with closing(sqlite3.connect(db_pad)) as conn:

@@ -162,7 +162,8 @@ def teken_vloer_plan(db_pad: str, uit_pad: str, verlig_pad: list[str] | None = N
     plt.tight_layout(rect=[0, 0.05, 1, 0.95])  # Maak ruimte vir die legende onderaan.
     plt.savefig(uit_pad, dpi=150, bbox_inches="tight")
     plt.close()  # Sluit die figuur om geheue vry te stel (belangrik in 'n bedieneromgewing).
-    print(f"Vloerplan gestoor: {uit_pad}")
+    # Geen print hier nie: hierdie funksie word per versoek deur /route/image
+    # aangeroep, en die aanroeper besluit of 'n boodskap nodig is.
 
 
 # ---------------------------------------------------------------------------
@@ -176,9 +177,11 @@ if __name__ == "__main__":
 
     # Genereer 'n basiese diagram sonder 'n uitgeligte roete.
     teken_vloer_plan("hospitaal.db", "vloer_plan.png")
+    print("Vloerplan gestoor: vloer_plan.png")
 
     # Genereer 'n diagram met die PUBLIEK-roete na Radiologie uitgelig.
     result = g.astar("MAIN-G-ENT", "SYGEBOU-1-RAD", gebruiker_tipe="PUBLIEK")
     if result:
         pad, _, _ = result
         teken_vloer_plan("hospitaal.db", "vloer_plan_met_roete.png", verlig_pad=pad)
+        print("Vloerplan gestoor: vloer_plan_met_roete.png")
