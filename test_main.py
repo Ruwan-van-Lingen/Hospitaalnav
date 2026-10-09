@@ -158,6 +158,32 @@ def test_kaart_kom_uit_die_databasis():
     assert ry["tipe_kode"] == "DEPARTEMENT"
 
 
+def test_ou_databasis_kry_noodkodes_en_kolomme_terug(monkeypatch):
+    """
+    'n Databasis van voor die noodkodes (geen kodes, geen vooraf-tabel, geen
+    outomaties_modus-kolom) moet by opstart volledig opgegradeer word:
+    verseker_insident_skema() herstel die struktuur en SeedData.sql die kodes.
+    """
+    bou_demo_db(str(main.DB_PAD), str(main.SKEMA_PAD), str(main.SEED_PAD))
+    with closing(sqlite3.connect(main.DB_PAD)) as conn:
+        conn.execute("DROP TABLE noodkode_vooraf_nodes")
+        conn.execute("DELETE FROM noodkodes")
+        conn.execute("ALTER TABLE noodkodes DROP COLUMN outomaties_modus")
+        conn.commit()
+
+    monkeypatch.setattr(main, "AUTO_HERBOU_DB", False)
+    with TestClient(app) as client:
+        client.post("/admin/login", json={"gebruikersnaam": "admin", "wagwoord": "admin"})
+        kaart = client.get("/admin/map").json()
+
+    kodes = {k["kode_id"]: k for k in kaart["noodkodes"]}
+    assert set(kodes) == {"ONDERHOUD", "SKOONMAAK", "ROOI", "PINK"}
+    assert kodes["ROOI"]["outomaties_modus"] == "ONTRUIM_ALMAL"
+    assert kodes["PINK"]["outomaties_modus"] == "SLUIT_ALLES"
+    assert "MAIN-G-ELV" in kodes["ONDERHOUD"]["vooraf_node_ids"]
+    assert "MAIN-2-OR" in kodes["SKOONMAAK"]["vooraf_node_ids"]
+
+
 # ---------------------------------------------------------------------------
 # Roeteberekening
 # ---------------------------------------------------------------------------

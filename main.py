@@ -126,6 +126,11 @@ def verseker_insident_skema():
     Skep insident-tabelle indien hulle nog nie bestaan nie, en voeg ontbrekende
     kolomme by vir databasis-weergawes wat voor die ontruimingsmodus-funksie
     geskep is. Idempotent — veilig om by elke opstart te roep.
+
+    Hierdie funksie verander slegs die STRUKTUUR (tabelle en kolomme). Die
+    noodkodes en voorafgekose nodusse word deur verseker_seed_data() uit
+    SeedData.sql gevul, wat ná hierdie funksie moet loop omdat die seed
+    kolomme soos outomaties_modus gebruik wat hier eers bygevoeg word.
     """
     conn = sqlite3.connect(DB_PAD)
     try:
@@ -149,29 +154,16 @@ def verseker_insident_skema():
                 node_id TEXT NOT NULL REFERENCES nodes (node_id),
                 PRIMARY KEY (insident_id, node_id)
             );
-
-            INSERT OR IGNORE INTO noodkodes (kode_id, naam) VALUES
-                ('ONDERHOUD',  'Onderhoud'),
-                ('SKOONMAAK',  'Skoonmaak');
             """
         )
 
         # Migrasiestap: voeg outomaties_modus-kolom by noodkodes as dit in 'n
         # ouer databasisskema ontbreek (sien Skema.sql vir die betekenis van
-        # 'ONTRUIM_ALMAL' en 'SLUIT_ALLES').
+        # 'ONTRUIM_ALMAL' en 'SLUIT_ALLES'). Die kodes self (ROOI, PINK, ens.)
+        # kom uit SeedData.sql en word nie hier ingevoeg nie.
         kode_cols = {row[1] for row in conn.execute("PRAGMA table_info(noodkodes)")}
         if "outomaties_modus" not in kode_cols:
             conn.execute("ALTER TABLE noodkodes ADD COLUMN outomaties_modus TEXT")
-
-        # Voeg die twee outomatiese noodkodes by (idempotent) — dit gebeur
-        # hier eerder as net in SeedData.sql sodat produksiedatabasisse wat
-        # AUTO_HERBOU_DB=false gebruik (en dus SeedData.sql nooit weer
-        # uitvoer nie) hulle ook by 'n opstart-migrasie kry.
-        conn.execute(
-            """INSERT OR IGNORE INTO noodkodes (kode_id, naam, outomaties_modus) VALUES
-                ('ROOI', 'Kode Rooi — Brand (ontruim almal)', 'ONTRUIM_ALMAL'),
-                ('PINK', 'Kode Pink — Ontvoering (algehele grendel)', 'SLUIT_ALLES')"""
-        )
 
         # Verwyder afgetrede noodkodes, insluitend enige ou aktiewe insident
         # wat nog daarna verwys, sodat hulle nie via die API gebruik kan word nie.
@@ -187,20 +179,6 @@ def verseker_insident_skema():
                    PRIMARY KEY (kode_id, node_id)
                )"""
         )
-        conn.executemany(
-            "INSERT OR IGNORE INTO noodkode_vooraf_nodes (kode_id, node_id) VALUES (?, ?)",
-            [
-                ("ONDERHOUD", "MAIN-G-ELV"),
-                ("ONDERHOUD", "MAIN-1-ELV"),
-                ("ONDERHOUD", "MAIN-2-ELV"),
-                ("ONDERHOUD", "SYGEBOU-G-ELV"),
-                ("ONDERHOUD", "SYGEBOU-1-ELV"),
-                ("SKOONMAAK", "MAIN-1-WARDA"),
-                ("SKOONMAAK", "MAIN-1-WARDB"),
-                ("SKOONMAAK", "MAIN-2-OR"),
-            ],
-        )
-
         # Migrasiestap: voeg ontruimings_modus-kolom by as dit in 'n ouer
         # databasisskema ontbreek.
         cols = {row[1] for row in conn.execute("PRAGMA table_info(aktiewe_insident)")}
@@ -253,8 +231,10 @@ async def lifespan(app: FastAPI):
     FastAPI lifespan-hanteerder: voorbereiding voor die eerste versoek.
 
     1. Bou (of herbou) die SQLite-databasis uit Skema.sql + SeedData.sql.
-    2. Verseker dat insident-tabelle en nuwe kolomme bestaan.
-    3. Voeg ontbrekende standaardnodusse en -rande uit SeedData.sql by.
+    2. Verseker dat insident-tabelle en nuwe kolomme bestaan (struktuur).
+    3. Voeg ontbrekende standaarddata uit SeedData.sql by: nodusse, rande,
+       noodkodes en voorafkeuses. Moet NÁ stap 2 loop, want die seed
+       gebruik kolomme wat stap 2 dalk eers moet byvoeg.
     4. Laai die hospitaalgrafiek eenmalig in geheue — alle roeteversoeke
        hergebruik hierdie instansie. Toegangsregte en insidente word apart gelees.
     """
