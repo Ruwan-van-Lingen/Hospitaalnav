@@ -466,6 +466,23 @@ def test_geslote_bestemming_gee_konflik():
         assert "tydelik gesluit" in response.json()["detail"]
 
 
+def test_gewone_en_ontruimingsroete_deel_dieselfde_antwoordvelde():
+    """
+    Beide roete-eindpunte bou hul antwoord met bou_roete_antwoord(), so hulle
+    moet dieselfde velde hê; net die ontruimingsantwoord het uitgang_node.
+    """
+    with TestClient(app) as client:
+        gewoon = client.get("/route", params={"begin": "MAIN-G-ENT", "doel": "SYGEBOU-1-RAD"}).json()
+        ontruim = client.get("/route/ontruim", params={"begin": "MAIN-1-WARDA"}).json()
+
+    assert set(ontruim) - set(gewoon) == {"uitgang_node"}
+    assert set(gewoon) <= set(ontruim)
+    assert gewoon["ontruimings_modus"] is False
+    assert "uitgang_node" not in gewoon
+    assert ontruim["ontruimings_modus"] is True
+    assert ontruim["doel_node"] == ontruim["uitgang_node"] == ontruim["pad"][-1]
+
+
 # ---------------------------------------------------------------------------
 # Outomatiese noodkodes (Kode Rooi / Kode Pink)
 # ---------------------------------------------------------------------------

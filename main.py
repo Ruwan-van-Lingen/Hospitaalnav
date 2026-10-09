@@ -335,6 +335,45 @@ def db_verbinding():
         conn.close()
 
 
+def bou_roete_antwoord(
+    begin: str,
+    doel: str,
+    gebruiker_tipe: str,
+    resultaat: tuple[list[str], float, float],
+    insident: dict,
+    ontruim: bool,
+) -> dict:
+    """
+    Bou die JSON-antwoord wat /route en /route/ontruim deel.
+
+    resultaat is die (pad, tyd_sekondes, afstand_m)-tuple van astar() of
+    naaste_veilige_uitgang(). Vir 'n gewone roete is doel die bestemming wat
+    die gebruiker gevra het; vir ontruiming is dit die uitgang wat die
+    algoritme gekies het, en word dit ook as uitgang_node teruggegee.
+    Net die ontruimingsantwoord het uitgang_node: die webkoppelvlak gebruik
+    dit om die nooduitgang-blokkie te wys.
+    """
+    pad, tyd_sekondes, afstand_m = resultaat
+    antwoord = {
+        "begin_node":            begin,
+        "doel_node":             doel,
+        "gebruiker_tipe":        gebruiker_tipe,
+        "geskatte_tyd_sekondes": round(tyd_sekondes, 1),
+        "geskatte_tyd":          formateer_tyd(tyd_sekondes),
+        "geskatte_afstand_m":    round(afstand_m, 1),
+        "geskatte_afstand":      formateer_afstand(afstand_m),
+        "node_telling":          len(pad),
+        "pad":                   pad,
+        "incident_active":       insident["active"],
+        "incident_code":         insident.get("code"),
+        "avoided_nodes":         insident["blocked_node_ids"],
+        "ontruimings_modus":     ontruim,
+    }
+    if ontruim:
+        antwoord["uitgang_node"] = doel
+    return antwoord
+
+
 def kry_insident() -> dict:
     """
     Lees die huidige aktiewe insident uit die databasis.
@@ -604,22 +643,7 @@ def kry_roete(
                 ),
             )
 
-        pad, tyd_sekondes, afstand_m = resultaat
-        return {
-            "begin_node":            begin,
-            "doel_node":             doel,
-            "gebruiker_tipe":        gebruiker_tipe,
-            "geskatte_tyd_sekondes": round(tyd_sekondes, 1),
-            "geskatte_tyd":          formateer_tyd(tyd_sekondes),
-            "geskatte_afstand_m":    round(afstand_m, 1),
-            "geskatte_afstand":      formateer_afstand(afstand_m),
-            "node_telling":          len(pad),
-            "pad":                   pad,
-            "incident_active":       insident["active"],
-            "incident_code":         insident.get("code"),
-            "avoided_nodes":         insident["blocked_node_ids"],
-            "ontruimings_modus":     False,
-        }
+        return bou_roete_antwoord(begin, doel, gebruiker_tipe, resultaat, insident, ontruim=False)
 
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -671,25 +695,11 @@ def bereken_ontruimingsroete(begin: str, gebruiker_tipe: str, insident: dict) ->
                 ),
             )
 
-        pad, tyd_sekondes, afstand_m = resultaat
+        pad = resultaat[0]
         uitgang_node = pad[-1]  # Die laaste nodus in die pad is die bereikte nooduitgang.
 
-        return {
-            "begin_node":            begin,
-            "uitgang_node":          uitgang_node,
-            "doel_node":             uitgang_node,
-            "gebruiker_tipe":        gebruiker_tipe,
-            "geskatte_tyd_sekondes": round(tyd_sekondes, 1),
-            "geskatte_tyd":          formateer_tyd(tyd_sekondes),
-            "geskatte_afstand_m":    round(afstand_m, 1),
-            "geskatte_afstand":      formateer_afstand(afstand_m),
-            "node_telling":          len(pad),
-            "pad":                   pad,
-            "incident_active":       insident["active"],
-            "avoided_nodes":         insident["blocked_node_ids"],
-            "incident_code":         insident.get("code"),
-            "ontruimings_modus":     True,
-        }
+        # Die bestemming is hier die uitgang wat die algoritme self gekies het.
+        return bou_roete_antwoord(begin, uitgang_node, gebruiker_tipe, resultaat, insident, ontruim=True)
 
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
