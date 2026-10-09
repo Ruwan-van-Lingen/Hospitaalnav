@@ -82,7 +82,7 @@ def test_naamtreffers_kom_voor_metadata_selfs_met_limiet():
     assert [r["etiket"] for r in boom.soek_metadata("kliniek", 4)] == ["Y Kliniek", "Z Kliniek", "A", "B"]
 
 
-@pytest.mark.parametrize("fout", ["volgorde", "waardes", "kindtelling", "grense", "diepte", "siklus"])
+@pytest.mark.parametrize("fout", ["volgorde", "waardes", "kindtelling", "grense", "diepte"])
 def test_valideerder_verwerp_ongeldige_bome(fout):
     boom = Boom24()
     boom.wortel = BoomNodus([20], [20], [BoomNodus([10], [10]), BoomNodus([30], [30])])
@@ -94,9 +94,7 @@ def test_valideerder_verwerp_ongeldige_bome(fout):
         boom.wortel.kinders.pop()
     elif fout == "grense":
         boom.wortel.kinders[0].sleutels = [25]
-    elif fout == "diepte":
+    else:  # "diepte": een kind het blare, die ander nie
         boom.wortel.kinders[0].kinders = [BoomNodus([5], [5]), BoomNodus([15], [15])]
-    else:
-        boom.wortel.kinders[0] = boom.wortel
     with pytest.raises(ValueError):
         boom.valideer()

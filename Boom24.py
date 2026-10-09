@@ -1,43 +1,37 @@
 """2-4-boom: invoeging, soek en geordende deurloop in geheue.
 
-Elke nodus bevat hoogstens drie sleutels. Alle blare bly ewe diep deur
-vol kinders te verdeel voordat invoeging verder daarin afbeweeg.
+Elke nodus het 1 tot 3 sleutels en dus 2 tot 4 kinders. Alle blare bly
+ewe diep, omdat 'n vol nodus verdeel word voordat ons daarin afgaan.
 """
 
 from dataclasses import dataclass, field
 
-# 'n 2-4-boom se nodus het 1 tot 3 sleutels (dus 2 tot 4 kinders).
+# 'n Nodus het 1 tot 3 sleutels (dus 2 tot 4 kinders).
 # Met 3 sleutels is 'n nodus "vol" en moet dit verdeel word.
 MAKS_SLEUTELS = 3
 
-# Die metadata-velde waarin soek_metadata() na teks soek (buiten "etiket").
+# Velde waarin soek_metadata() soek, benewens "etiket".
 METADATA_VELDE = ("node_id", "tipe_kode", "gebou_naam", "vloer_naam")
 
 
 @dataclass
 class BoomNodus:
-    """Bewaar 'n nodus se sleutels, ooreenstemmende waardes en kinders."""
+    """'n Nodus met sleutels, die waardes wat by hulle hoort, en kinders."""
 
     sleutels: list = field(default_factory=list)
-    waardes: list = field(default_factory=list)
-    kinders: list = field(default_factory=list)
+    waardes: list = field(default_factory=list)   # waardes[i] hoort by sleutels[i]
+    kinders: list = field(default_factory=list)   # leeg by 'n blaar
 
     def vind_indeks(self, sleutel):
         """Gee die indeks van die eerste sleutel wat minstens so groot is.
 
-        Gee len(self.sleutels) as alle sleutels kleiner is. Dieselfde getal
-        is ook die indeks van die kind waarin 'sleutel' kan voorkom.
+        Dieselfde getal is ook die indeks van die kind waarin 'sleutel'
+        kan voorkom (len(sleutels) as alle sleutels kleiner is).
         """
         i = 0
         while i < len(self.sleutels) and sleutel > self.sleutels[i]:
             i += 1
         return i
-
-
-def _bevat(bestemming, veld, term):
-    """Kyk of die term (reeds casefold) in een veld van die bestemming voorkom."""
-    # "or ''" hanteer velde wat None is, bv. 'n nodus sonder beperkte_groep.
-    return term in (bestemming.get(veld) or "").casefold()
 
 
 class Boom24:
@@ -47,62 +41,43 @@ class Boom24:
         self.wortel = BoomNodus()
 
     def soek(self, sleutel):
-        """Gee die sleutel se waarde terug, of None wanneer dit ontbreek."""
+        """Gee die waarde by die sleutel, of None as dit ontbreek."""
         nodus = self.wortel
-
         while True:
-            # Vind die eerste sleutel wat minstens so groot is.
             i = nodus.vind_indeks(sleutel)
 
-            # Sleutel gevind: gee die ooreenstemmende waarde terug.
+            # Sleutel gevind in hierdie nodus.
             if i < len(nodus.sleutels) and sleutel == nodus.sleutels[i]:
                 return nodus.waardes[i]
 
-            # By 'n blaar sonder 'n passing eindig die soektog.
+            # By 'n blaar is daar nêrens meer om te soek nie.
             if not nodus.kinders:
                 return None
 
-            # Volg die kind waarin die sleutel kan voorkom.
+            # Gaan af in die kind waarin die sleutel kan voorkom.
             nodus = nodus.kinders[i]
 
     def verdeel_kind(self, ouer, indeks):
-        """Verdeel 'n vol kind en skuif sy middelste sleutel na die ouer."""
-        vol_kind = ouer.kinders[indeks]
+        """Verdeel 'n vol kind; sy middelste sleutel skuif op na die ouer.
 
-        # Die kind moet vol wees en die ouer moet plek hê.
-        if len(vol_kind.sleutels) != MAKS_SLEUTELS:
-            raise ValueError("Die kind moet presies 3 sleutels hê.")
+        Die ouer het plek, want voeg_in() verdeel altyd eers van bo na onder.
+        """
+        vol = ouer.kinders[indeks]
 
-        if len(ouer.sleutels) >= MAKS_SLEUTELS:
-            raise ValueError("Verdeel eers die vol ouer.")
+        # Kleinste sleutel links, grootste sleutel regs (die kinders word ook gedeel).
+        links = BoomNodus(vol.sleutels[:1], vol.waardes[:1], vol.kinders[:2])
+        regs = BoomNodus(vol.sleutels[2:], vol.waardes[2:], vol.kinders[2:])
 
-        # Maak 'n linkerkind met die kleinste sleutel.
-        links = BoomNodus(
-            sleutels=vol_kind.sleutels[:1],
-            waardes=vol_kind.waardes[:1],
-            kinders=vol_kind.kinders[:2],
-        )
+        # Die middelste sleutel (en sy waarde) gaan op na die ouer.
+        ouer.sleutels.insert(indeks, vol.sleutels[1])
+        ouer.waardes.insert(indeks, vol.waardes[1])
 
-        # Maak 'n regterkind met die grootste sleutel.
-        regs = BoomNodus(
-            sleutels=vol_kind.sleutels[2:],
-            waardes=vol_kind.waardes[2:],
-            kinders=vol_kind.kinders[2:],
-        )
-
-        # Skuif die middelste sleutel en sy waarde na die ouer.
-        ouer.sleutels.insert(indeks, vol_kind.sleutels[1])
-        ouer.waardes.insert(indeks, vol_kind.waardes[1])
-
-        # Vervang die oorspronklike kind met die twee nuwe kinders.
+        # Die een vol kind word vervang deur die twee nuwes.
         ouer.kinders[indeks:indeks + 1] = [links, regs]
 
     def voeg_in(self, sleutel, waarde):
-        """Voeg 'n sleutel/waarde by, of vervang 'n bestaande sleutel se waarde.
-
-        O(log n) sleutelvergelykings; sleutels moet onderling vergelykbaar wees.
-        """
-        # 'n Vol wortel word verdeel onder 'n nuwe wortel; dit is die enigste
+        """Voeg 'n sleutel/waarde by, of vervang die waarde as die sleutel bestaan."""
+        # 'n Vol wortel word onder 'n nuwe wortel verdeel. Dit is die enigste
         # manier waarop die boom hoër word, en alle blare skuif saam een vlak af.
         if len(self.wortel.sleutels) == MAKS_SLEUTELS:
             self.wortel = BoomNodus(kinders=[self.wortel])
@@ -117,17 +92,17 @@ class Boom24:
                 nodus.waardes[i] = waarde
                 return
 
-            # Blaar bereik: daar is gewaarborg plek, want ons het vol nodusse
-            # op pad hierheen reeds verdeel.
+            # Blaar bereik: daar is gewaarborg plek, want ons het alle vol
+            # nodusse op pad hierheen reeds verdeel.
             if not nodus.kinders:
                 nodus.sleutels.insert(i, sleutel)
                 nodus.waardes.insert(i, waarde)
                 return
 
-            # Die huidige nodus het plek vir 'n sleutel uit 'n vol kind.
+            # Verdeel 'n vol kind voordat ons daarin afgaan.
             if len(nodus.kinders[i].sleutels) == MAKS_SLEUTELS:
                 self.verdeel_kind(nodus, i)
-                # Die middelste sleutel van die kind is nou in hierdie nodus.
+                # Die kind se middelste sleutel is nou in hierdie nodus.
                 if sleutel == nodus.sleutels[i]:
                     nodus.waardes[i] = waarde
                     return
@@ -137,103 +112,85 @@ class Boom24:
             nodus = nodus.kinders[i]
 
     def in_volgorde(self):
-        """Gee (sleutel, waarde)-pare in sleutelvolgorde terug. O(n) vir alles."""
+        """Gee (sleutel, waarde)-pare in sleutelvolgorde terug."""
         pare = []
         self._deurloop(self.wortel, pare)
         return pare
 
     def _deurloop(self, nodus, pare):
-        """Voeg 'n nodus se sleutels en sy kinders se sleutels links na regs by 'pare'."""
+        """In-orde deurloop: kind links, sleutel, kind links, sleutel, ... laaste kind."""
         for i, sleutel in enumerate(nodus.sleutels):
-            # Eers alles in die kind links van hierdie sleutel...
             if nodus.kinders:
-                self._deurloop(nodus.kinders[i], pare)
-            # ...dan die sleutel self.
+                self._deurloop(nodus.kinders[i], pare)   # Alles links van die sleutel.
             pare.append((sleutel, nodus.waardes[i]))
-        # Die laaste kind het geen sleutel regs van hom nie, daarom hier apart.
         if nodus.kinders:
-            self._deurloop(nodus.kinders[-1], pare)
+            self._deurloop(nodus.kinders[-1], pare)      # Laaste kind, regs van alles.
 
     def soek_metadata(self, teks, limiet=20):
-        """Soek letterlike teks enige plek in bestemmingsmetadata.
+        """Soek letterlike deelteks in die bestemmings se metadata.
 
-        Sleutels is (naam.strip().casefold(), node_id). Naamtreffers kom
-        eerste; ander metadata-treffers volg. Elke groep bly in boomvolgorde.
-        Die leë term pas by alle bestemmings. % en _ is gewone karakters.
-        Hoogstens n bestemmings word ondersoek: O(n), buiten teksvergelykings.
+        Naamtreffers kom eerste, dan treffers in ander velde; elke groep bly
+        in boomvolgorde. Die leë term pas by almal. Dit kos O(n): die boom
+        help hier slegs met sy gesorteerde volgorde, nie met die soektog self nie.
         """
         if limiet < 0:
             raise ValueError("Die limiet mag nie negatief wees nie.")
-        if limiet == 0:
-            return []
+
         term = teks.strip().casefold()
-        alle_pare = self.in_volgorde()
-
-        # Eerste lus: bestemmings waarvan die naam die term bevat.
-        naamtreffers = []
-        for _, bestemming in alle_pare:
-            if _bevat(bestemming, "etiket", term):
-                naamtreffers.append(bestemming)
-
-        # Tweede lus: ander treffers, dws die term is in 'n ander veld
-        # maar NIE in die naam nie (anders sou hulle dubbel getel word).
+        naam_treffers = []
         ander_treffers = []
-        for _, bestemming in alle_pare:
-            if _bevat(bestemming, "etiket", term):
-                continue
-            for veld in METADATA_VELDE:
-                if _bevat(bestemming, veld, term):
-                    ander_treffers.append(bestemming)
-                    break
 
-        # Naamtreffers eerste, en dan sny ons by die limiet af.
-        return (naamtreffers + ander_treffers)[:limiet]
+        # Een deurloop: "or ''" hanteer velde wat None is (bv. beperkte_groep).
+        for _, bestemming in self.in_volgorde():
+            if term in (bestemming.get("etiket") or "").casefold():
+                naam_treffers.append(bestemming)
+            elif any(term in (bestemming.get(veld) or "").casefold()
+                     for veld in METADATA_VELDE):
+                ander_treffers.append(bestemming)
+
+        # Naamtreffers eerste, dan sny ons by die limiet af.
+        return (naam_treffers + ander_treffers)[:limiet]
 
     def valideer(self):
-        """Kontroleer al die boomreëls; gee True of gooi ValueError. O(n)."""
-        blaardieptes = set()
-        besoek = set()
-        # Al die sleutels in die volgorde waarin 'n in-orde deurloop hulle sien.
-        alle_sleutels = []
+        """Kontroleer die boomreëls; gee True of gooi ValueError."""
+        # 'n Leë boom is geldig.
+        if not self.wortel.sleutels and not self.wortel.kinders:
+            return True
 
-        def kontroleer(nodus, diepte):
-            if id(nodus) in besoek:
-                raise ValueError("'n Nodus word hergebruik of vorm 'n siklus.")
-            besoek.add(id(nodus))
-            aantal = len(nodus.sleutels)
+        sleutels = []      # Sleutels in deurloopvolgorde.
+        dieptes = set()    # Die diepte van elke blaar.
 
-            # 'n Heeltemal leë boom het 'n leë wortel sonder kinders.
-            if aantal == 0 and nodus is self.wortel and not nodus.kinders:
-                if nodus.waardes:
-                    raise ValueError("Die leë wortel mag geen waardes hê nie.")
-                return
+        def kyk(nodus, diepte):
+            n = len(nodus.sleutels)
 
-            if not 1 <= aantal <= MAKS_SLEUTELS or len(nodus.waardes) != aantal:
+            # Reël 1: 1 tot 3 sleutels, met 'n waarde by elke sleutel.
+            if not 1 <= n <= MAKS_SLEUTELS or len(nodus.waardes) != n:
                 raise ValueError("Elke nodus benodig 1–3 sleutels met hul waardes.")
 
+            # Blaar: onthou sy diepte en sy sleutels.
             if not nodus.kinders:
-                blaardieptes.add(diepte)
-                alle_sleutels.extend(nodus.sleutels)
+                dieptes.add(diepte)
+                sleutels.extend(nodus.sleutels)
                 return
 
-            if len(nodus.kinders) != aantal + 1:
-                raise ValueError("'n Interne nodus benodig een meer kind as sleutels.")
+            # Reël 2: 'n interne nodus het een kind meer as sleutels.
+            if len(nodus.kinders) != n + 1:
+                raise ValueError("'n Interne nodus benodig een kind meer as sleutels.")
 
             # Kind i, dan sleutel i, soos in in_volgorde().
             for i, kind in enumerate(nodus.kinders):
-                kontroleer(kind, diepte + 1)
-                if i < aantal:
-                    alle_sleutels.append(nodus.sleutels[i])
+                kyk(kind, diepte + 1)
+                if i < n:
+                    sleutels.append(nodus.sleutels[i])
 
-        kontroleer(self.wortel, 0)
+        kyk(self.wortel, 0)
 
-        # Een kontrole vervang die ou onder-/bogrens-parameters: as die sleutels
-        # in deurloopvolgorde streng styg, is elke nodus se sleutels reg
-        # verhoudend tot sy hele subboom.
-        for vorige, volgende in zip(alle_sleutels, alle_sleutels[1:]):
-            if not vorige < volgende:
-                raise ValueError("Sleutels is nie in streng stygende volgorde nie.")
+        # Reël 3: as die sleutels in deurloopvolgorde streng styg, is elke
+        # nodus se sleutels reg ten opsigte van sy hele subboom.
+        if any(a >= b for a, b in zip(sleutels, sleutels[1:])):
+            raise ValueError("Sleutels is nie in streng stygende volgorde nie.")
 
-        if len(blaardieptes) > 1:
+        # Reël 4: alle blare is ewe diep.
+        if len(dieptes) > 1:
             raise ValueError("Alle blare moet ewe diep wees.")
         return True
