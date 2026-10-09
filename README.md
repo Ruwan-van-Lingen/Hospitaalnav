@@ -29,10 +29,10 @@ of 'n gemete ontruimingsvermoë nie.
 | Lêer | Doel |
 |---|---|
 | `main.py` | FastAPI-eindpunte, sessies, insidente en werkprosesbestuur |
-| `HospitaalGrafiek.py` | Grafieklaai, lambda-formules, A*, Dijkstra, spanboom en maksimum vloei |
+| `HospitaalGrafiek.py` | Grafieklaai, lambda-formules, A*, Dijkstra, en die hospitaalreëls vir spanboom en maksimum vloei |
 | `Boom24.py` | 2-4-boom en geordende bestemmingsoektog |
 | `Sorteer.py` | Stabiele invoegsortering en hibriede saamsmeltsortering |
-| `mst_en_vloei.py` | Selfstandige leervoorbeelde; die API gebruik `HospitaalGrafiek.py` |
+| `mst_en_vloei.py` | Kruskal en Edmonds–Karp op gewone lyste; `HospitaalGrafiek.py` roep dit aan |
 | `VloerPlan.py` | PNG-vloerplan met Matplotlib se nie-interaktiewe `Agg`-agterkant |
 | `Skema.sql`, `SeedData.sql` | Databasisstruktuur en demonstrasiedata |
 | `hospitaal_wayfinder.html`, `hospitaal_wayfinder.css`, `hospitaal_wayfinder.js` | Openbare navigasiekoppelvlak |

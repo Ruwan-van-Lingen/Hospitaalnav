@@ -9,6 +9,7 @@ from unittest.mock import Mock
 import pytest
 from fastapi.testclient import TestClient
 
+import HospitaalGrafiek
 import main
 import VloerPlan
 from mst_en_vloei import bereken_min_spanboom, edmonds_karp
@@ -88,3 +89,17 @@ def test_selfstandige_vloei_bron_is_put_en_onbereikbare_put():
 def test_selfstandige_vloei_verwerp_ongeldige_kapasiteit(kapasiteit):
     with pytest.raises(ValueError):
         edmonds_karp([("S", "T", kapasiteit)], "S", "T")
+
+
+def test_grafiek_gebruik_die_algoritmes_in_mst_en_vloei(monkeypatch):
+    """Kruskal en Edmonds-Karp mag net in mst_en_vloei.py bestaan, nie ook in HospitaalGrafiek nie."""
+    kruskal = Mock(wraps=HospitaalGrafiek.kruskal_spanboom)
+    vloei = Mock(wraps=HospitaalGrafiek.edmonds_karp)
+    monkeypatch.setattr(HospitaalGrafiek, "kruskal_spanboom", kruskal)
+    monkeypatch.setattr(HospitaalGrafiek, "edmonds_karp", vloei)
+    with TestClient(main.app) as client:
+        assert client.post("/admin/login", json={"gebruikersnaam": "admin", "wagwoord": "admin"}).status_code == 200
+        assert client.get("/analise/spanboom").status_code == 200
+        assert client.get("/analise/maks_vloei", params={"bron": "MAIN-G-ER"}).status_code == 200
+    assert kruskal.call_count == 1
+    assert vloei.call_count == 1

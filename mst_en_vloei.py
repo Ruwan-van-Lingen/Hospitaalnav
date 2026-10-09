@@ -1,8 +1,9 @@
-"""Selfstandige leervoorbeelde van Kruskal en Edmonds-Karp.
+"""Kruskal (minimum spanboom) en Edmonds-Karp (maksimum vloei).
 
-Die hospitaaltoepassing gebruik die metodes in HospitaalGrafiek.py, waar
-toegangsregte, sluitings en nooduitgange ook in ag geneem word. Hierdie
-algoritmes werk op eenvoudige nodus- en randlyste, sonder hospitaalreëls.
+HospitaalGrafiek.py roep hierdie twee funksies aan. Dit voeg self die
+hospitaalreëls (toegangsregte, sluitings, nooduitgange, geen hysbakke) by
+voordat dit die nodus- en randlyste hierheen stuur. Die algoritmes hier ken
+dus geen hospitaalreëls nie en werk op gewone lyste van nodusse en rande.
 Voer hierdie lêer direk uit om die klein demonstrasienetwerke te toets.
 """
 

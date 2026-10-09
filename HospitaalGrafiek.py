@@ -8,19 +8,22 @@ randtyd en randmetriek. Só bly die skatting 'n geldige onderste tydgrens;
 Ontruiming gebruik omgekeerde multibron-Dijkstra vanaf alle toegelate
 nooduitgange. Slegs werklike randrigtings word gevolg en hysbakke word
 uitgesluit. Kruskal ontleed die ongerigte infrastruktuur; Edmonds-Karp
-bereken gemodelleerde maksimum vloei. Geen van hierdie demonstrasies
+bereken gemodelleerde maksimum vloei. Beide algoritmes is in mst_en_vloei.py
+geskryf; hierdie lêer stel net hul invoer saam. Geen van hierdie demonstrasies
 vervang 'n professioneel goedgekeurde ontruimingsplan nie.
 """
 
 import sqlite3
 import math
 import heapq
-from collections import defaultdict, deque
 from concurrent.futures import ProcessPoolExecutor
 from contextlib import closing
 from dataclasses import dataclass
 from typing import Optional
 from Boom24 import Boom24
+# Kruskal en Edmonds-Karp leef in een lêer; hierdie klas voeg net die
+# hospitaalreëls (toegang, sluitings, nooduitgange) by die invoer.
+from mst_en_vloei import bereken_min_spanboom as kruskal_spanboom, edmonds_karp
 
 # Skaal vir vloerverskille in die meetkundige metriek. Die metriek word
 # daarna volgens werklike randtye geskaal; 20 is dus nie 'n reistydwaarborg nie.
@@ -433,37 +436,8 @@ class HospitaalGrafiek:
                 )
         kante = [(a, b, gewig) for (a, b), gewig in kante_per_paar.items()]
 
-        gesorteerde_kante = sorted(kante, key=lambda k: k[2])
-
-        # Disjunkte-stelle-struktuur (Union-Find, met padkompressie en rangunie) om siklusse te vermy.
-        ouer: dict[str, str] = {n: n for n in self.nodes}
-        rang: dict[str, int] = {n: 0 for n in self.nodes}
-
-        def vind(x: str) -> str:
-            while ouer[x] != x:
-                ouer[x] = ouer[ouer[x]]  # pad-kompressie
-                x = ouer[x]
-            return x
-
-        def unie(x: str, y: str) -> bool:
-            wortel_x, wortel_y = vind(x), vind(y)
-            if wortel_x == wortel_y:
-                return False  # sou 'n siklus vorm — moet nie by MST kom nie
-            if rang[wortel_x] < rang[wortel_y]:
-                wortel_x, wortel_y = wortel_y, wortel_x
-            ouer[wortel_y] = wortel_x
-            if rang[wortel_x] == rang[wortel_y]:
-                rang[wortel_x] += 1
-            return True
-
-        mst_kante: list[tuple[str, str, float]] = []
-        totale_gewig = 0.0
-        for van_node, na_node, gewig in gesorteerde_kante:
-            if unie(van_node, na_node):
-                mst_kante.append((van_node, na_node, gewig))
-                totale_gewig += gewig
-
-        return mst_kante, totale_gewig
+        # Kruskal self (sortering + Union-Find) leef in mst_en_vloei.py.
+        return kruskal_spanboom(self.nodes, kante)
 
     def maks_vloei_na_uitgange(
         self,
@@ -510,89 +484,38 @@ class HospitaalGrafiek:
             return 0.0, []
         SUPERPUT = object()  # Kan nooit met 'n databasis-node-ID bots nie.
 
-        # Residuele kapasiteit as 'n geneste woordeboek:
-        # kapasiteit[a][b] = beskikbare kapasiteit van a na b.
-        kapasiteit: dict[object, dict[object, float]] = defaultdict(dict)
-
-        for van_node, rande in self.adjacency.items():
-            if not self._is_bruikbaar(van_node, toegelaat, geblokkeer):
-                continue
-            for rand in rande:
-                if rand.rand_tipe == "HUISBAK":
-                    continue  # Brandveiligheidsreël: geen hysbakke tydens ontruiming.
-                if not self._is_bruikbaar(rand.na_node, toegelaat, geblokkeer):
-                    continue
-                kapasiteit[van_node][rand.na_node] = (
-                    kapasiteit[van_node].get(rand.na_node, 0.0) + rand.kapasiteit
-                )
-                kapasiteit[rand.na_node].setdefault(van_node, 0.0)  # residuele kant
+        # Pas die hospitaalreëls HIER toe: slegs rande tussen bruikbare nodusse,
+        # en nooit 'n hysbak (brandveiligheidsreël). Edmonds-Karp self ken geen
+        # hospitaalreëls nie en sien net hierdie (van, na, kapasiteit)-lys.
+        kante = [
+            (van_node, rand.na_node, rand.kapasiteit)
+            for van_node, rande in self.adjacency.items()
+            if self._is_bruikbaar(van_node, toegelaat, geblokkeer)
+            for rand in rande
+            if rand.rand_tipe != "HUISBAK"
+            and self._is_bruikbaar(rand.na_node, toegelaat, geblokkeer)
+        ]
 
         # 'n Eindige boonste grens voorkom berekeninge met oneindigheid.
-        maksimum_kapasiteit = sum(sum(r.values()) for r in kapasiteit.values())
-        # Koppel elke toegelate nooduitgang aan die kunsmatige put.
-        het_uitgang = False
-        for node_id, data in self.nodes.items():
-            if data["is_nooduitgang"] and self._is_bruikbaar(node_id, toegelaat, geblokkeer):
-                kapasiteit[node_id][SUPERPUT] = maksimum_kapasiteit
-                kapasiteit[SUPERPUT].setdefault(node_id, 0.0)
-                het_uitgang = True
-
-        if not het_uitgang:
+        maksimum_kapasiteit = sum(kap for _, _, kap in kante)
+        uitgange = [
+            node_id for node_id, data in self.nodes.items()
+            if data["is_nooduitgang"] and self._is_bruikbaar(node_id, toegelaat, geblokkeer)
+        ]
+        if not uitgange:
             return None  # Geen nooduitgang beskikbaar of almal geblokkeer.
 
-        def bfs_vind_pad() -> Optional[list[tuple[object, object]]]:
-            """Vind 'n pad van bron na SUPERPUT met beskikbare kapasiteit (BFS)."""
-            voorganger: dict[object, Optional[object]] = {bron: None}
-            wagry = deque([bron])
-            while wagry:
-                huidig = wagry.popleft()
-                if huidig == SUPERPUT:
-                    pad = []
-                    node = SUPERPUT
-                    while voorganger[node] is not None:
-                        vorige = voorganger[node]
-                        pad.append((vorige, node))
-                        node = vorige
-                    return list(reversed(pad))
-                for buur, beskikbaar in kapasiteit[huidig].items():
-                    if beskikbaar > 0 and buur not in voorganger:
-                        voorganger[buur] = huidig
-                        wagry.append(buur)
-            return None
+        # Koppel elke toegelate nooduitgang aan die kunsmatige put. Hierdie
+        # rande se kapasiteit is groter as enige vloei, dus beperk hulle nooit
+        # die uitkoms nie en kom nie in die min-snit voor nie.
+        kante += [(uitgang, SUPERPUT, maksimum_kapasiteit) for uitgang in uitgange]
 
-        maks_vloei = 0.0
-        while True:
-            pad = bfs_vind_pad()
-            if pad is None:
-                break
-            vloei_langs_pad = min(kapasiteit[a][b] for a, b in pad)
-            for a, b in pad:
-                kapasiteit[a][b] -= vloei_langs_pad
-                kapasiteit[b][a] += vloei_langs_pad
-            maks_vloei += vloei_langs_pad
-
+        maks_vloei, bottelnek_kante = edmonds_karp(kante, bron, SUPERPUT)
         if maks_vloei == 0:
             return None
 
-        # Min-snit: nodusse steeds bereikbaar vanaf bron in die finale residuele graaf.
-        bereikbaar = {bron}
-        wagry = deque([bron])
-        while wagry:
-            huidig = wagry.popleft()
-            for buur, beskikbaar in kapasiteit[huidig].items():
-                if beskikbaar > 0 and buur not in bereikbaar:
-                    bereikbaar.add(buur)
-                    wagry.append(buur)
-
-        bottelnek_kante: list[tuple[str, str, float]] = []
-        for van_node in sorted(bereikbaar - {SUPERPUT}):
-            for rand in self.adjacency.get(van_node, []):
-                if rand.rand_tipe == "HUISBAK" or not self._is_bruikbaar(rand.na_node, toegelaat, geblokkeer):
-                    continue
-                if rand.na_node not in bereikbaar:
-                    bottelnek_kante.append((van_node, rand.na_node, rand.kapasiteit))
-
-        return maks_vloei, sorted(bottelnek_kante)
+        # sorted() gee die bottelnekke 'n vaste volgorde, ongeag die randvolgorde.
+        return float(maks_vloei), sorted(bottelnek_kante)
 
     @staticmethod
     def _reconstruct(kom_van: dict[str, str], huidig: str) -> list[str]:
