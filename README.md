@@ -13,6 +13,7 @@ reistye, afstande en toegangsbeperkings.
 - Vind die naaste bereikbare nooduitgang met multibron-Dijkstra; hysbakke word
   by ontruiming uitgesluit.
 - Wys roetes en sluitings op 'n interaktiewe SVG-kaart of laai 'n PNG-kaart af.
+  Die kaartdata kom uit die databasis (`GET /kaart`), nie uit die JavaScript nie.
 - Bestuur een aktiewe insident deur die beskermde administrasieblad.
 - Bekyk lewendige veiligheids- en netwerkanalise op die adminblad, insluitend
   infrastruktuurverbinding, ontruimingsdekking en deurvloei-bottelnekke.
@@ -28,16 +29,16 @@ of 'n gemete ontruimingsvermoë nie.
 
 | Lêer | Doel |
 |---|---|
-| `main.py` | FastAPI-eindpunte, sessies, insidente en werkprosesbestuur |
+| `main.py` | FastAPI-eindpunte, sessies, insidente, kaartdata en werkprosesbestuur |
 | `HospitaalGrafiek.py` | Grafieklaai, lambda-formules, A*, Dijkstra, en die hospitaalreëls vir spanboom en maksimum vloei |
 | `Boom24.py` | 2-4-boom en geordende bestemmingsoektog |
 | `Sorteer.py` | Stabiele invoegsortering en hibriede saamsmeltsortering |
 | `mst_en_vloei.py` | Kruskal en Edmonds–Karp op gewone lyste; `HospitaalGrafiek.py` roep dit aan |
 | `VloerPlan.py` | PNG-vloerplan met Matplotlib se nie-interaktiewe `Agg`-agterkant |
 | `Skema.sql`, `SeedData.sql` | Databasisstruktuur en demonstrasiedata |
-| `hospitaal_wayfinder.html`, `hospitaal_wayfinder.css`, `hospitaal_wayfinder.js` | Openbare navigasiekoppelvlak |
+| `hospitaal_wayfinder.html`, `hospitaal_wayfinder.css`, `hospitaal_wayfinder.js` | Openbare navigasiekoppelvlak (laai sy kaart van `GET /kaart`) |
 | `admin.html`, `admin.css`, `admin.js` | Administrasiekoppelvlak |
-| `test_*.py`, `conftest.py` | Toetse met afsonderlike tydelike databasisse |
+| `test_*.py`, `conftest.py` | Toetse met afsonderlike tydelike databasisse en 'n `admin_client`-fixture |
 | `Dockerfile`, `docker-compose.yml` | Houerbou en blywende databerging |
 
 ## Installasie en opstart
@@ -113,7 +114,9 @@ gebruik dit slegs wanneer jy die data doelbewus wil verwyder.
 `AUTO_HERBOU_DB`. Met `true` gaan bestaande insidente en ander
 databasisveranderinge by opstart verlore. Gebruik `false` om dit te behou.
 Veranderinge aan `SeedData.sql` verander nie outomaties etikette in 'n
-bestaande databasis nie.
+bestaande databasis nie. Nodusse, rande en toegangsregte word eenmalig by
+opstart in geheue gelaai; 'n handmatige verandering aan die databasis vereis
+dus 'n herbegin van die toepassing.
 
 Vervang die ontwikkelingsbewyse en sessiegeheim vir enige gedeelde ontplooiing.
 'n Werklike ontplooiing vereis ook gepaste HTTPS- en toegangsbeheeropstelling.
@@ -173,6 +176,19 @@ SQLite bly die permanente databron. Roep
 bestemmingsmetadata, of herbegin die toepassing met databasisbehoud.
 Direkte verwydering uit die boom word nie ondersteun nie.
 
+## Webkoppelvlak
+
+Die openbare blad (`/ui`) vra alles by die bediener; die JavaScript het geen
+eie kopie van die hospitaal nie:
+
+1. `GET /kaart` gee geboue, vloere, nodusse en rande, waaruit die SVG-vloerplan
+   teken word. Die blad teken eers nadat hierdie data aangekom het.
+2. `GET /incident` wys die sluitingsbanier en deaktiveer geslote nodusse. Die
+   blad herlaai dit elke 15 sekondes en weer voor elke roeteversoek.
+3. `GET /destinations` vul die soeklyste van die "Vanaf"- en "Na"-velde.
+4. `GET /route` bereken die roete. Die blad roep altyd hierdie een eindpunt;
+   die bediener besluit self of dit 'n gewone roete of 'n ontruiming is.
+
 ## API-eindpunte
 
 Geboue, vloere en noodkodes word met `insertion_sort()` georden; langer
@@ -189,10 +205,11 @@ Die eindpunte en versoekparameters is by `/docs` beskikbaar.
 | `GET /` | Verwelkomingsboodskap | Nee |
 | `GET /ui` | Navigasiekoppelvlak | Nee |
 | `GET /destinations?q=&limiet=20` | Soek bestemmings; limiet tussen 1 en 100 | Nee |
-| `GET /route?begin=&doel=&gebruiker_tipe=PUBLIEK` | Gewone roeteberekening | Nee |
+| `GET /route?begin=&doel=&gebruiker_tipe=PUBLIEK` | Roeteberekening; tydens 'n ontruimingsinsident word `doel` geïgnoreer en die ontruimingsroete teruggegee | Nee |
 | `GET /route/ontruim?begin=&gebruiker_tipe=PUBLIEK` | Roete na 'n bereikbare nooduitgang | Nee |
 | `GET /route/image?begin=&doel=&gebruiker_tipe=PUBLIEK` | Aflaaibare PNG-roetekaart | Nee |
 | `GET /incident` | Huidige insident en geblokkeerde nodusse | Nee |
+| `GET /kaart` | Geboue, vloere, nodusse en rande vir die SVG-kaart | Nee |
 | `GET /admin` | Administrasieblad met aanmeldvorm | Nee |
 | `POST /admin/login` | Skep 'n ondertekende sessiekoekie | Aanmeldbewyse |
 | `POST /admin/logout` | Verwyder die sessiekoekie | Nee |
@@ -218,6 +235,10 @@ Die `?` begin die navraagparameters en `&` skei die parameters.
 Gewone insidente sluit die gekose nodusse. Kode Rooi aktiveer ontruiming
 vir almal; Kode Pink sluit alle nodusse. Aktivering vervang die enkele
 bestaande insident.
+
+Die bediener dwing ontruiming self af: terwyl 'n ontruimingsinsident aktief
+is, gee ook 'n gewone `/route`- of `/route/image`-versoek die ontruimingsroete.
+`/route/ontruim` bly beskikbaar as 'n direkte eindpunt vir dieselfde berekening.
 
 Dekkingskontrole gebruik afsonderlike werkprosesse om nodusse te ondersoek
 en kombineer hul resultate. Prosesopstart en dataoordrag het koste;
@@ -261,15 +282,21 @@ dit herskep nie die plaaslike werkdatabasis nie. Die toetse dek onder meer
 die 2-4-boom, lambda-formules, toegang, A*, eenrigting-ontruiming,
 insidente, grafiekanalise, parallelle dekking en PNG-uitvoer.
 
-Voer die JavaScript-regressietoetse met Node.js uit:
+Toetse wat as administrateur moet optree, vra die `admin_client`-fixture uit
+`conftest.py`; dit is 'n `TestClient` wat reeds aangemeld is en die tydelike
+databasis gebruik. Toetse wat self die aanmelding of die opstart moet beheer,
+maak hul eie `TestClient`.
 
-```powershell
-node --test test_frontend.mjs
-```
+| Toetslêer | Dek |
+|---|---|
+| `test_main.py` | Roetes, bestemmingsoektog, kaartdata, PNG, admin-sessies, sluitings, ontruiming en outomatiese noodkodes |
+| `test_integrasie.py` | Analise-eindpunte, parallelle dekking, sessie-veiligheid en tydelike PNG-lêers |
+| `test_grafiek.py` | A*, ontruiming, spanboom en maksimum vloei teen onafhanklike verwysings |
+| `test_boom24.py`, `test_bestemmingsindeks.py` | 2-4-boom en bestemmingsoektog |
+| `test_sorteer.py` | Invoeg- en saamsmeltsortering |
+| `test_merge_integrasie.py` | Beskerming teen dubbele definisies en regressies ná 'n merge |
 
-Hierdie toetse gebruik 'n nagebootste blaaieromgewing en vervang nie 'n
-visuele blaaierkontrole nie. Die ontledingsfunksies is tans API-eindpunte;
-die adminblad self bestuur aanmelding en sluitings.
+Die toetse vervang nie 'n visuele blaaierkontrole van die webkoppelvlak nie.
 
 ## Git-werkvloei
 
