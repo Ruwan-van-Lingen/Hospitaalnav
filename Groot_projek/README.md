@@ -5,9 +5,9 @@ data (ongeveer 2000 nodusse) laat loop, sodat bottelnekke en tydsverskille
 duidelik word. Dit vergelyk sortering, Dijkstra en A\* (met verskillende
 prioriteitstoue), Kruskal, maksimum vloei en parallelle ontruimingsdekking.
 
-**Geen bestaande lêer van die hoofprojek is verander nie.** Die vertoning
-voer die bestaande kode net in (`HospitaalGrafiek.py`, `Sorteer.py`,
-`mst_en_vloei.py`) en voeg nuwe lêers by. Die hoofprojek se README bly geldig.
+Die vertoning hergebruik `HospitaalGrafiek.py`, `Sorteer.py` en
+`mst_en_vloei.py`. `groot_paaie.py` maak hierdie modules ook beskikbaar wanneer
+'n stap direk vanuit die hoofprojek of 'n ander werkgids begin word.
 
 ## Belangrik: lêernaam-hoofletters
 
@@ -80,12 +80,12 @@ moet `bou_grawe` in `groot_stap3.py` na `laai_csv` verwys.
 Vanuit die projekgids:
 
 ```powershell
-python groot_stap1.py                      # tellings en bottelnekke (geen tydmetings nie)
-python groot_stap2.py                      # sortering, roetes en Kruskal; stoor groot_resultate.json
-python groot_stap3.py --werkers 1,2,4      # lambda en parallel; stoor groot_resultate_stap3.json
-python groot_stap4a.py --uitgids grafieke  # bottelnekgrafieke
-python groot_stap4b.py --uitgids grafieke  # tydgrafieke
-python groot_stap4c.py --uitgids grafieke  # lambda-, parallel- en spanboomgrafieke
+python Groot_projek/groot_stap1.py                      # tellings, basiese tye en bottelnekke
+python Groot_projek/groot_stap2.py                      # sortering, roetes en Kruskal; stoor groot_resultate.json
+python Groot_projek/groot_stap3.py --werkers 1,2,4      # lambda en parallel; stoor groot_resultate_stap3.json
+python Groot_projek/groot_stap4a.py --uitgids grafieke  # bottelnekgrafieke
+python Groot_projek/groot_stap4b.py --uitgids grafieke  # tydgrafieke
+python Groot_projek/groot_stap4c.py --uitgids grafieke  # lambda-, parallel- en spanboomgrafieke
 ```
 
 Gebruik `--csv nodusse.csv rande.csv` by `groot_stap1.py`, `groot_stap2.py`,
@@ -109,13 +109,15 @@ Doen 'n voorbereidingslopie van stap 2 en 3 voor die aanbieding, sodat jy
 ## Hoe om die syfers te lees
 
 - **Tellings** (vergelykings, nodusse uitgebrei, tou-werk, vloei,
-  spanboomgewig) hang net van die data en die algoritme af. Hulle is elke
-  keer en op elke rekenaar dieselfde, en is dus die betroubaarste bewyse.
+  spanboomgewig) is vir vaste data en dieselfde implementasie meer
+  herhaalbaar as tye. Gelyke prioriteite of verskillende tie-breekreëls kan
+  die gekose pad en besoektellings verander sonder om die optimum te verander.
 - **Tye** hang van die rekenaar af. Elke tyd het 'n opwarmlopie en
   herhalings; die mediaan, minimum en maksimum word gewys.
 - **`oorgeslaan`** beteken die voorspelde tyd (vorige tyd × (n / vorige n)²)
-  was oor die tydgrens. Dit is self 'n resultaat: die metode is nie vir
-  daardie hoeveelheid data geskik nie.
+  was oor die tydgrens. Dit is 'n konserwatiewe voorspelling, nie 'n meting
+  van daardie grootte nie. Die kwadratiese aanname geld nie ewe goed vir elke
+  algoritme nie; die eerste meting het geen harde tydlimiet nie.
 - **Versnelling** is sekwensiële mediaan gedeel deur parallelle mediaan.
   Onder 1.0x is parallel stadiger.
 
@@ -124,11 +126,11 @@ Doen 'n voorbereidingslopie van stap 2 en 3 voor die aanbieding, sodat jy
 | Eksperiment     | Wat jy behoort te sien                                                                                                                                                 |
 | --------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Sortering       | Invoegsortering groei kwadraties op ewekansige en omgekeerde invoer en is vinnig op reeds gesorteerde invoer (n−1 vergelykings); saamsmeltsortering groei soos n log n |
-| Dijkstra en A\* | Altyd dieselfde minimum tyd; A\* brei minder nodusse uit; die woordeboek met `min()` doen die meeste tou-werk                                                          |
+| Dijkstra en A\* | Dieselfde minimum tyd; A\* kan minder nodusse uitbrei; die woordeboek met `min()` doen die meeste tou-werk                                                          |
 | Kruskal         | Dieselfde spanboomgewig met elke sorteermetode; met invoegsortering is byna al die tyd sortering                                                                       |
 | Maksimum vloei  | Die minimum snit se kapasiteite tel op tot die vloei; in die voorbeelddata is die trappe die bottelnek                                                                 |
 | Wat-as          | Breër trappe verhoog die vloei net tot gange ook beperk                                                                                                                |
-| Lambda          | `lambda` en `def` is ewe vinnig; inline spaar net die funksie-aanroep                                                                                                  |
+| Lambda          | `lambda` en `def` se tye is gewoonlik naby; inline vermy die funksie-aanroep                                                                                                  |
 | Parallel        | Die koste van prosesopstart en dataoordrag teenoor die wins van meer kerne                                                                                             |
 
 Voorbeelduitslae hierbo is op gegenereerde data en een kern gemeet; jou
@@ -159,8 +161,7 @@ syfers sal verskil, maar die tellings en die patrone behoort dieselfde te bly.
 
 ```powershell
 python -m pytest -q                     # die hele stel, hoofprojek en vertoning
-python -m pytest test_groot.py test_groot_meet.py test_groot_stap3.py `
-    test_groot_grafieke.py test_groot_tydgrafieke.py test_groot_grafieke_stap3.py -q
+python -m pytest Groot_projek -q
 ```
 
 Die toetse gebruik klein grafieke en tydelike lêers, en hulle verander nie die

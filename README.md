@@ -298,6 +298,17 @@ maak hul eie `TestClient`.
 
 Die toetse vervang nie 'n visuele blaaierkontrole van die webkoppelvlak nie.
 
+Die JavaScript-regressietoetse gebruik Node.js en Python se SQLite-module
+om hul kaart-fixture uit dieselfde SQL as die toepassing te bou:
+
+```powershell
+node --test test_frontend.mjs
+```
+
+Vir die groter datastelle en tydmetings, sien `Groot_projek/README.md`.
+Die stapopdragte kan direk vanuit die projekgids uitgevoer word, byvoorbeeld
+`python Groot_projek/groot_stap1.py --nodusse 2000`.
+
 ## Git-werkvloei
 
 Haal nuwe takke op en bekyk hulle:

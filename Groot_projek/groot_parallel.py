@@ -29,6 +29,10 @@ from pathlib import Path
 import random
 import time
 
+from groot_paaie import HOOF_GIDS, maak_hoofprojek_beskikbaar
+
+maak_hoofprojek_beskikbaar()
+
 import HospitaalGrafiek as hg
 from HospitaalGrafiek import (
     HospitaalGrafiek, init_werker, kontroleer_alle_nodusse_dekking,
@@ -36,7 +40,7 @@ from HospitaalGrafiek import (
 )
 from groot_meet import meet
 
-SKEMA_PAD = Path(__file__).with_name("Skema.sql")
+SKEMA_PAD = HOOF_GIDS / "Skema.sql"
 
 
 # ---------------------------------------------------------------------------

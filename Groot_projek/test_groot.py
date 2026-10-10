@@ -148,3 +148,14 @@ def test_csv_met_foute_gee_duidelike_boodskap(tmp_path):
     rande.write_text("van_node,na_node\n", encoding="utf-8")
     with pytest.raises(ValueError, match="ontbreek"):
         laai_csv(nodusse, rande)
+
+
+def test_kunsmatige_vloeipunte_bots_nie_met_nodusname_nie():
+    graf = GrootGrafiek()
+    for naam in ("__SUPER_BRON__", "__SUPER_PUT__", "U"):
+        graf.voeg_nodus_by(naam, naam, 0, 0, 0, is_nooduitgang=naam == "U")
+    graf.voeg_rand_by("__SUPER_BRON__", "__SUPER_PUT__", "GANG", 1, 1, 3)
+    graf.voeg_rand_by("__SUPER_PUT__", "U", "GANG", 1, 1, 2)
+    uit = maks_vloei_na_uitgange(graf, ["__SUPER_BRON__"])
+    assert uit.maks_vloei == 2
+    assert uit.bottelnekke == [("__SUPER_PUT__", "U", 2)]

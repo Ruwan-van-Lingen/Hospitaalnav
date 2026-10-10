@@ -40,6 +40,8 @@ let vloere = [];
 let nodes = [];
 // Volgorde: begin, einde, randtipe (die kaart het net dit nodig om te teken).
 let randRye = [];
+// Slegs die jongste kaartversoek mag 'n nuwe bediener se data vervang.
+let kaartVersoek = 0;
 
 // Vertoonname vir die gebruikerstipe-keuselys. Die sleutels moet ooreenstem met
 // gebruiker_tipes in Skema.sql, want die sleutel word as gebruiker_tipe na die API gestuur.
@@ -163,10 +165,24 @@ function bouKaartIndekse() {
  * die aanroeper wys dan 'n foutboodskap.
  */
 async function laaiKaart() {
+  const versoek = ++kaartVersoek;
   const apiBase = document.getElementById("apiUrl").value.trim();
-  const response = await fetch(`${apiBase.replace(/\/$/, "")}/kaart`);
-  if (!response.ok) throw new Error(`HTTP ${response.status}`);
-  const data = await response.json();
+  const isHuidig = () => versoek === kaartVersoek
+    && document.getElementById("apiUrl").value.trim() === apiBase;
+  let data;
+  try {
+    const response = await fetch(`${apiBase.replace(/\/$/, "")}/kaart`);
+    if (!isHuidig()) return false;
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    data = await response.json();
+  } catch (fout) {
+    if (!isHuidig()) return false;
+    throw fout;
+  }
+  if (!isHuidig()) return false;
+  if (!["geboue", "vloere", "nodes", "rande"].every((veld) => Array.isArray(data?.[veld]))) {
+    throw new Error("Ongeldige kaartdata van die bediener.");
+  }
 
   // Hernoem die databasiskolomme na die kort name wat die tekenkode gebruik.
   geboue = data.geboue.map((g) => ({ id: g.gebou_id, naam: g.naam }));
@@ -187,6 +203,7 @@ async function laaiKaart() {
   }));
   randRye = data.rande.map((r) => [r.van_node, r.na_node, r.rand_tipe]);
   bouKaartIndekse();
+  return true;
 }
 
 /**
@@ -1487,9 +1504,10 @@ document.getElementById("clearBtn").onclick = () => {
 document.getElementById("gebruikerTipe").addEventListener("change", wisRoete);
 // As die bedieneradres verander, laai die kaart, bestemmings en insident van daardie bediener.
 document.getElementById("apiUrl").addEventListener("change", async () => {
+  wisRoete();
   // 'n Ander bediener het dalk 'n ander kaart, so laai dit weer.
   try {
-    await laaiKaart();
+    if (!(await laaiKaart())) return;
     huidigeVloer = OORSIG_ID;
   } catch (_) {
     wysBestemmingFout("⚠ Kon nie die hospitaalkaart van hierdie bediener laai nie.");
@@ -1509,7 +1527,7 @@ if (/^https?:$/.test(window.location.protocol)) {
 /** Laai eers die kaart; slegs daarna kan die kaart, legende en lyste geteken word. */
 async function begin() {
   try {
-    await laaiKaart();
+    if (!(await laaiKaart())) return;
   } catch (_) {
     wysBestemmingFout("⚠ Kon nie die hospitaalkaart laai nie. Herlaai asseblief die bladsy.");
     return;

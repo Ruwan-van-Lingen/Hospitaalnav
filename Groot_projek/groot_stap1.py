@@ -12,6 +12,7 @@ die data af en is dus elke keer dieselfde. Tydmetings kom eers in stap 2.
 import argparse
 import math
 import random
+import statistics
 from collections import Counter
 
 from groot_algoritmes import (
@@ -47,7 +48,9 @@ def main():
     ids = list(graf.nodes)
     dijk = ster = 0
     pare = 0
-    while pare < 100:
+    pogings = 0
+    while len(ids) >= 2 and pare < 100 and pogings < 5000:
+        pogings += 1
         a, b = rng.sample(ids, 2)
         d, s = dijkstra(graf, a, b), astar(graf, a, b)
         if d is None:
@@ -56,15 +59,21 @@ def main():
         dijk += d.besoek_telling
         ster += s.besoek_telling
         pare += 1
-    print(f"Roetes (100 ewekansige pare): gemiddeld nodusse uitgebrei")
-    print(f"  Dijkstra {dijk / pare:8.1f}")
-    print(f"  A*       {ster / pare:8.1f}   ({ster / dijk:.0%} van Dijkstra se werk)\n")
+    if pare:
+        print(f"Roetes ({pare} ewekansige pare): gemiddeld nodusse uitgebrei")
+        print(f"  Dijkstra {dijk / pare:8.1f}")
+        print(f"  A*       {ster / pare:8.1f}   ({ster / dijk:.0%} van Dijkstra se werk)\n")
+    else:
+        print("Roetes: geen bereikbare pare gevind nie.\n")
 
     # --- 2. Ontruiming: een deurloop vir alle nodusse ---
     kaart = bereken_ontruimingskaart(graf)
     tye = sorted(kaart.tyd_s.values())
-    print(f"Ontruiming: {len(tye)} van {len(graf.nodes)} nodusse bereikbaar; "
-          f"mediaan {tye[len(tye) // 2]:.0f}s, langste {tye[-1]:.0f}s\n")
+    if tye:
+        print(f"Ontruiming: {len(tye)} van {len(graf.nodes)} nodusse bereikbaar; "
+              f"mediaan {statistics.median(tye):.0f}s, langste {tye[-1]:.0f}s\n")
+    else:
+        print("Ontruiming: geen bereikbare nooduitgang nie.\n")
 
     # --- 3. Kruskal: dieselfde spanboom, verskillende sorteerwerk ---
     kante = graf.ongerigte_kante()
@@ -78,6 +87,9 @@ def main():
     bo = max(d["vloer"] for d in graf.nodes.values())
     bronne = [n for n, d in graf.nodes.items() if d["vloer"] == bo]
     vloei = maks_vloei_na_uitgange(graf, bronne)
+    if vloei is None or vloei.maks_vloei == 0:
+        print(f"Maksimum vloei as vloer {bo} ontruim: geen positiewe deurvloei na 'n uitgang nie.")
+        return
     print(f"Maksimum vloei as vloer {bo} ({len(bronne)} nodusse) ontruim: {vloei.maks_vloei:g} persone/s")
     print(f"Bottelnekke (min-snit), kapasiteite tel op tot {sum(k for _, _, k in vloei.bottelnekke):g}:")
     for van, na, _ in vloei.bottelnekke:

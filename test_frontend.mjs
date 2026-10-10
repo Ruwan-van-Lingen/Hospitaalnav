@@ -1,11 +1,17 @@
 /** Koppelvlakregressietoetse sonder bykomende pakkette: node --test test_frontend.mjs. */
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
+import { execFileSync } from "node:child_process";
+import { fileURLToPath } from "node:url";
 import test from "node:test";
 import vm from "node:vm";
 
 const bron = readFileSync(new URL("./hospitaal_wayfinder.js", import.meta.url), "utf8");
 const adminBron = readFileSync(new URL("./admin.js", import.meta.url), "utf8");
+// Dieselfde SQL-bron as /kaart; geen tweede handgeskrewe hospitaalkaart nie.
+const kaart = JSON.parse(execFileSync(process.env.PYTHON || "python", [
+  fileURLToPath(new URL("./frontend_toetsdata.py", import.meta.url)),
+], { encoding: "utf8" }));
 
 // 'n Klein DOM-dubbel toets asinkrone gebruikersgedrag; visuele uitleg word apart nagegaan.
 class Element {
@@ -53,7 +59,7 @@ const roete = {
   node_telling: 2,
 };
 const bestemming = (node_id, etiket = node_id) => ({
-  node_id, etiket, gebou_naam: "Hoofgebou", vloer_naam: "Grondvloer",
+  node_id, etiket, gebou_naam: "Hoofhospitaalgebou", vloer_naam: "Grondvloer",
 });
 const wagVirAntwoorde = () => new Promise((klaar) => setImmediate(klaar));
 const alleAfstammelinge = (element) => element.children.flatMap(
@@ -85,9 +91,11 @@ async function koppelvlak(bronkode = bron, fetchFunksie = null) {
     window: { location: { protocol: "https:", origin: "https://hospitaal.voorbeeld" } },
     setTimeout, clearTimeout,
     setInterval() {},
-    fetch: fetchFunksie || (async (url) => url.endsWith("/incident")
-      ? antwoord(geenInsident)
-      : antwoord({ bestemmings: [bestemming("MAIN-G-ENT"), bestemming("SYGEBOU-1-RAD")] })),
+    fetch: fetchFunksie || (async (url) => {
+      if (url.endsWith("/kaart")) return antwoord(kaart);
+      if (url.endsWith("/incident")) return antwoord(geenInsident);
+      return antwoord({ bestemmings: kaart.bestemmings });
+    }),
   });
   vm.runInContext(bronkode, konteks);
   await wagVirAntwoorde();
@@ -97,6 +105,36 @@ async function koppelvlak(bronkode = bron, fetchFunksie = null) {
 test("gebruik die blad se bedieneradres vir 'n afgeleë ontplooiing", async () => {
   const { element } = await koppelvlak();
   assert.equal(element("apiUrl").value, "https://hospitaal.voorbeeld");
+});
+
+test("ouer kaartversoeke kan nie 'n nuwe bediener se kaart oorskryf nie", async () => {
+  const { konteks, element, lees } = await koppelvlak();
+  const hangend = [];
+  konteks.fetch = () => new Promise((klaar) => hangend.push(klaar));
+  element("apiUrl").value = "https://oud.voorbeeld";
+  const oud = lees("laaiKaart()");
+  element("apiUrl").value = "https://nuut.voorbeeld";
+  const nuut = lees("laaiKaart()");
+  const nuweKaart = structuredClone(kaart);
+  nuweKaart.nodes[0].etiket = "Nuwe ingang";
+  hangend[1](antwoord(nuweKaart));
+  assert.equal(await nuut, true);
+  hangend[0](antwoord(kaart));
+  assert.equal(await oud, false);
+  assert.equal(lees("nodes[0].etiket"), "Nuwe ingang");
+});
+
+test("ongeldige kaartdata behou die vorige volledige kaart", async () => {
+  const { konteks, lees } = await koppelvlak();
+  konteks.fetch = async () => antwoord({ geboue: [] });
+  await assert.rejects(lees("laaiKaart()"), /Ongeldige kaartdata/);
+  assert.equal(lees("nodes.length"), 50);
+});
+
+test("mislukte aanvanklike kaartlaai gee 'n leesbare fout", async () => {
+  const { element, lees } = await koppelvlak(bron, async () => { throw new Error("Netwerkfout"); });
+  assert.match(element("status").textContent, /Kon nie die hospitaalkaart laai nie/);
+  assert.equal(lees("nodes.length"), 0);
 });
 
 test("409 bly 409 en foutteks word nie as HTML uitgevoer nie", async () => {
@@ -251,7 +289,7 @@ test("vertikale hysbak- en traphuisnodusse vorm klikbare oorsiggroepe", async ()
     .find((kind) => kind.dataset.vertikaleGroep === "VERTIKAAL-MAIN-G-ELV");
   assert.equal(leier.dataset.groepGrootte, "3");
   assert.match(
-    leier.children.find((kind) => kind.naam === "text").textContent,
+    leier.children.find((kind) => kind.naam === "text" && kind.textContent.includes("Hoofhysbakgroep")).textContent,
     /Hoofhysbakgroep\s*\(3\s*vloere\)/,
   );
   assert.equal(verdiepingEen.children.some((kind) => kind.naam === "text"), false);

@@ -18,6 +18,10 @@ import math
 import operator
 import random
 
+from groot_paaie import maak_hoofprojek_beskikbaar
+
+maak_hoofprojek_beskikbaar()
+
 from HospitaalGrafiek import BEREKEN_AFSTAND, BEREKEN_GEWIG
 from groot_meet import meet
 from Sorteer import merge_sort

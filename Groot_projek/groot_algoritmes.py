@@ -27,16 +27,20 @@ import math
 import time
 from dataclasses import dataclass
 
+from groot_paaie import maak_hoofprojek_beskikbaar
+
+maak_hoofprojek_beskikbaar()
+
 # Dieselfde konstantes as die hoofprojek, sodat die metriek en kapasiteite
 # nooit stilweg verskil van wat in die res van die stelsel gebruik word nie.
 from HospitaalGrafiek import VERSTEK_KAPASITEIT, VLOER_VERANDER_PENALTY_S
 from mst_en_vloei import UnionFind, edmonds_karp
 from Sorteer import insertion_sort, merge_sort
 
-# Name vir die kunsmatige bron en put in die vloeinetwerk. Tekste eerder as
-# object(), sodat gesorteerde uitvoer nooit op 'n TypeError kan afskop nie.
-SUPER_BRON = "__SUPER_BRON__"
-SUPER_PUT = "__SUPER_PUT__"
+# Unieke voorwerpe kan nooit met CSV-nodusname bots nie. Die kunsmatige
+# rande word verwyder voordat die oorblywende teks-ID's gesorteer word.
+SUPER_BRON = object()
+SUPER_PUT = object()
 
 
 # ---------------------------------------------------------------------------

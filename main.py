@@ -236,7 +236,8 @@ async def lifespan(app: FastAPI):
        noodkodes en voorafkeuses. Moet NÁ stap 2 loop, want die seed
        gebruik kolomme wat stap 2 dalk eers moet byvoeg.
     4. Laai die hospitaalgrafiek eenmalig in geheue — alle roeteversoeke
-       hergebruik hierdie instansie. Toegangsregte en insidente word apart gelees.
+       hergebruik hierdie instansie. Toegangsregte bly ook in geheue;
+       die huidige insident word per versoek uit die databasis gelees.
     """
     DB_PAD.parent.mkdir(parents=True, exist_ok=True)
     if AUTO_HERBOU_DB or not DB_PAD.exists():
