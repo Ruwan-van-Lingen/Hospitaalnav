@@ -32,33 +32,31 @@ def test_ontleding_vereis_admin(eindpunt):
         assert main.app.state.dekking_pool is None
 
 
-def test_spanboom_en_maksimumvloei():
+def test_spanboom_en_maksimumvloei(admin_client):
     """Spanboom en maksimum vloei lewer konsekwente syfers; Kode Pink (alles gesluit) gee 409."""
-    with TestClient(main.app) as client:
-        meld_aan(client)
-        antwoord = client.get("/analise/spanboom")
-        assert antwoord.status_code == 200
-        boom = antwoord.json()
-        assert boom["is_verbind"] is True
-        assert boom["aantal_komponente"] == 1
-        assert boom["aantal_kante"] == len(main.app.state.grafiek.nodes) - 1
-        assert sum(rand["gewig_s"] for rand in boom["kante"]) == pytest.approx(boom["totale_gewig_s"])
+    antwoord = admin_client.get("/analise/spanboom")
+    assert antwoord.status_code == 200
+    boom = antwoord.json()
+    assert boom["is_verbind"] is True
+    assert boom["aantal_komponente"] == 1
+    assert boom["aantal_kante"] == len(main.app.state.grafiek.nodes) - 1
+    assert sum(rand["gewig_s"] for rand in boom["kante"]) == pytest.approx(boom["totale_gewig_s"])
 
-        vloei = client.get("/analise/maks_vloei", params={"bron": "MAIN-G-ER"})
-        assert vloei.status_code == 200
-        data = vloei.json()
-        assert data["maks_vloei_persone_per_s"] > 0
-        assert data["reeds_by_uitgang"] is False
-        assert sum(rand["kapasiteit"] for rand in data["bottelnek_kante"]) == pytest.approx(
-            data["maks_vloei_persone_per_s"]
-        )
-        uitgang = client.get("/analise/maks_vloei", params={"bron": "MAIN-G-ENT"}).json()
-        assert uitgang["reeds_by_uitgang"] is True
-        assert uitgang["maks_vloei_persone_per_s"] == 0
-        assert uitgang["bottelnek_kante"] == []
+    vloei = admin_client.get("/analise/maks_vloei", params={"bron": "MAIN-G-ER"})
+    assert vloei.status_code == 200
+    data = vloei.json()
+    assert data["maks_vloei_persone_per_s"] > 0
+    assert data["reeds_by_uitgang"] is False
+    assert sum(rand["kapasiteit"] for rand in data["bottelnek_kante"]) == pytest.approx(
+        data["maks_vloei_persone_per_s"]
+    )
+    uitgang = admin_client.get("/analise/maks_vloei", params={"bron": "MAIN-G-ENT"}).json()
+    assert uitgang["reeds_by_uitgang"] is True
+    assert uitgang["maks_vloei_persone_per_s"] == 0
+    assert uitgang["bottelnek_kante"] == []
 
-        assert client.post("/admin/incident", json={"kode_id": "PINK"}).status_code == 200
-        assert client.get("/analise/maks_vloei", params={"bron": "MAIN-G-ER"}).status_code == 409
+    assert admin_client.post("/admin/incident", json={"kode_id": "PINK"}).status_code == 200
+    assert admin_client.get("/analise/maks_vloei", params={"bron": "MAIN-G-ER"}).status_code == 409
 
 
 @pytest.mark.parametrize("eindpunt,parameters", [
@@ -66,16 +64,16 @@ def test_spanboom_en_maksimumvloei():
     ("/analise/maks_vloei", {"bron": "MAIN-G-ER", "gebruiker_tipe": "ONBEKEND"}),
     ("/admin/dekking-kontrole", {"gebruiker_tipe": "ONBEKEND"}),
 ])
-def test_ontleding_verwerp_ongeldige_invoer(eindpunt, parameters):
+def test_ontleding_verwerp_ongeldige_invoer(admin_client, eindpunt, parameters):
     """'n Onbekende nodus of gebruikerstipe gee 400, sonder om die poel te skep."""
-    with TestClient(main.app) as client:
-        meld_aan(client)
-        assert client.get(eindpunt, params=parameters).status_code == 400
-        assert main.app.state.dekking_pool is None
+    assert admin_client.get(eindpunt, params=parameters).status_code == 400
+    assert main.app.state.dekking_pool is None
 
 
 def test_parallelle_dekking_stem_ooreen_en_poel_word_hergebruik():
     """Gebruik werklike werkprosesse, ook ná 'n insidentverandering."""
+    # Eie client in plaas van admin_client: hierdie toets kyk ook of die werkprosespoel
+    # ná die afskakeling weg is, so dit moet self die with-blok beheer.
     with TestClient(main.app) as client:
         assert main.app.state.dekking_pool is None
         meld_aan(client)
@@ -102,7 +100,7 @@ def test_parallelle_dekking_stem_ooreen_en_poel_word_hergebruik():
     assert main.app.state.dekking_pool is None
 
 
-def test_kode_rooi_dwing_json_en_prent_na_uitgang(monkeypatch):
+def test_kode_rooi_dwing_json_en_prent_na_uitgang(admin_client, monkeypatch):
     """Selfs 'n gewone /route-versoek mag die noodmodus nie omseil nie."""
     getekende_paaie = []
     oorspronklike_teken = main.teken_vloer_plan
@@ -112,30 +110,26 @@ def test_kode_rooi_dwing_json_en_prent_na_uitgang(monkeypatch):
         return oorspronklike_teken(db_pad, uit_pad, verlig_pad=verlig_pad)
 
     monkeypatch.setattr(main, "teken_vloer_plan", teken)
-    with TestClient(main.app) as client:
-        meld_aan(client)
-        assert client.post("/admin/incident", json={"kode_id": "ROOI"}).status_code == 200
-        parameters = {"begin": "MAIN-1-WARDA", "doel": "SYGEBOU-1-RAD"}
-        antwoord = client.get("/route", params=parameters)
-        assert antwoord.status_code == 200
-        roete = antwoord.json()
-        assert roete["ontruimings_modus"] is True
-        assert roete["doel_node"] == roete["uitgang_node"] == roete["pad"][-1]
-        assert main.app.state.grafiek.nodes[roete["uitgang_node"]]["is_nooduitgang"]
-        assert roete["incident_code"] == "ROOI"
-        prent = client.get("/route/image", params=parameters)
-        assert prent.status_code == 200
-        assert prent.content.startswith(b"\x89PNG\r\n\x1a\n")
-        assert getekende_paaie == [roete["pad"]]
+    assert admin_client.post("/admin/incident", json={"kode_id": "ROOI"}).status_code == 200
+    parameters = {"begin": "MAIN-1-WARDA", "doel": "SYGEBOU-1-RAD"}
+    antwoord = admin_client.get("/route", params=parameters)
+    assert antwoord.status_code == 200
+    roete = antwoord.json()
+    assert roete["ontruimings_modus"] is True
+    assert roete["doel_node"] == roete["uitgang_node"] == roete["pad"][-1]
+    assert main.app.state.grafiek.nodes[roete["uitgang_node"]]["is_nooduitgang"]
+    assert roete["incident_code"] == "ROOI"
+    prent = admin_client.get("/route/image", params=parameters)
+    assert prent.status_code == 200
+    assert prent.content.startswith(b"\x89PNG\r\n\x1a\n")
+    assert getekende_paaie == [roete["pad"]]
 
 
-def test_prent_roete_respekteer_sluiting():
+def test_prent_roete_respekteer_sluiting(admin_client):
     """Die PNG-roete volg dieselfde sluitingsreëls as die JSON-roete (409 by Kode Pink)."""
-    with TestClient(main.app) as client:
-        meld_aan(client)
-        assert client.post("/admin/incident", json={"kode_id": "PINK"}).status_code == 200
-        antwoord = client.get("/route/image", params={"begin": "MAIN-G-ENT", "doel": "SYGEBOU-1-RAD"})
-        assert antwoord.status_code == 409
+    assert admin_client.post("/admin/incident", json={"kode_id": "PINK"}).status_code == 200
+    antwoord = admin_client.get("/route/image", params={"begin": "MAIN-G-ENT", "doel": "SYGEBOU-1-RAD"})
+    assert antwoord.status_code == 409
 
 
 def test_tekenfout_laat_geen_tydelike_prent_agter(tmp_path, monkeypatch):
@@ -182,10 +176,8 @@ def test_ongeldige_sessie_inhoud_word_verwerp(inhoud):
         assert client.get("/admin/map").status_code == 401
 
 
-def test_sessie_verval_presies_op_vervaltydstip(monkeypatch):
+def test_sessie_verval_presies_op_vervaltydstip(admin_client, monkeypatch):
     """Op die vervaltydstip self is die sessie nie meer geldig nie."""
-    with TestClient(main.app) as client:
-        meld_aan(client)
-        verval = int(time.time()) + main.SESSIE_SEKONDES
-        monkeypatch.setattr(main.time, "time", lambda: verval)
-        assert client.get("/admin/map").status_code == 401
+    verval = int(time.time()) + main.SESSIE_SEKONDES
+    monkeypatch.setattr(main.time, "time", lambda: verval)
+    assert admin_client.get("/admin/map").status_code == 401

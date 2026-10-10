@@ -7,7 +7,6 @@ from pathlib import Path
 from unittest.mock import Mock
 
 import pytest
-from fastapi.testclient import TestClient
 
 import HospitaalGrafiek
 import main
@@ -35,7 +34,7 @@ def test_geen_dubbele_funksiedefinisies(leer):
         assert len(name) == len(set(name)), leer
 
 
-def test_admin_en_vloerplan_gebruik_sorteeralgoritmes(monkeypatch):
+def test_admin_en_vloerplan_gebruik_sorteeralgoritmes(admin_client, monkeypatch):
     """Die admin-API en PNG-vloerplan gebruik werklik die handgeskrewe sorteerders, en die uitvoer is reg gesorteer."""
     invoeg = Mock(wraps=main.insertion_sort)
     smelt = Mock(wraps=main.merge_sort)
@@ -43,25 +42,23 @@ def test_admin_en_vloerplan_gebruik_sorteeralgoritmes(monkeypatch):
     monkeypatch.setattr(main, "insertion_sort", invoeg)
     monkeypatch.setattr(main, "merge_sort", smelt)
     monkeypatch.setattr(VloerPlan, "insertion_sort", vloer_invoeg)
-    with TestClient(main.app) as client:
-        assert client.post("/admin/login", json={"gebruikersnaam": "admin", "wagwoord": "admin"}).status_code == 200
-        kaart = client.get("/admin/map").json()
-        assert invoeg.call_count > 0
-        assert smelt.call_count > 0
-        geboue = kaart["geboue"]
-        assert [g["naam"] for g in geboue] == sorted(g["naam"] for g in geboue)
-        for gebou in geboue:
-            vlakke = [v["level_nommer"] for v in gebou["vloere"]]
-            assert vlakke == sorted(vlakke)
-            for vloer in gebou["vloere"]:
-                etikette = [n["etiket"] for n in vloer["nodes"]]
-                assert etikette == sorted(etikette)
-        gesluit = ["SYGEBOU-1-RAD", "MAIN-1-WARDA"]
-        assert client.post("/admin/incident", json={"kode_id": "ONDERHOUD", "node_ids": gesluit}).status_code == 200
-        assert client.get("/incident").json()["blocked_node_ids"] == sorted(gesluit)
-        prent = client.get("/route/image", params={"begin": "MAIN-G-ENT", "doel": "MAIN-G-ER"})
-        assert prent.status_code == 200
-        assert vloer_invoeg.call_count == 1
+    kaart = admin_client.get("/admin/map").json()
+    assert invoeg.call_count > 0
+    assert smelt.call_count > 0
+    geboue = kaart["geboue"]
+    assert [g["naam"] for g in geboue] == sorted(g["naam"] for g in geboue)
+    for gebou in geboue:
+        vlakke = [v["level_nommer"] for v in gebou["vloere"]]
+        assert vlakke == sorted(vlakke)
+        for vloer in gebou["vloere"]:
+            etikette = [n["etiket"] for n in vloer["nodes"]]
+            assert etikette == sorted(etikette)
+    gesluit = ["SYGEBOU-1-RAD", "MAIN-1-WARDA"]
+    assert admin_client.post("/admin/incident", json={"kode_id": "ONDERHOUD", "node_ids": gesluit}).status_code == 200
+    assert admin_client.get("/incident").json()["blocked_node_ids"] == sorted(gesluit)
+    prent = admin_client.get("/route/image", params={"begin": "MAIN-G-ENT", "doel": "MAIN-G-ER"})
+    assert prent.status_code == 200
+    assert vloer_invoeg.call_count == 1
 
 
 def test_selfstandige_spanboom_aanvaar_eenmalige_nodusiterator():
@@ -99,15 +96,13 @@ def test_selfstandige_vloei_verwerp_ongeldige_kapasiteit(kapasiteit):
         edmonds_karp([("S", "T", kapasiteit)], "S", "T")
 
 
-def test_grafiek_gebruik_die_algoritmes_in_mst_en_vloei(monkeypatch):
+def test_grafiek_gebruik_die_algoritmes_in_mst_en_vloei(admin_client, monkeypatch):
     """Kruskal en Edmonds-Karp mag net in mst_en_vloei.py bestaan, nie ook in HospitaalGrafiek nie."""
     kruskal = Mock(wraps=HospitaalGrafiek.kruskal_spanboom)
     vloei = Mock(wraps=HospitaalGrafiek.edmonds_karp)
     monkeypatch.setattr(HospitaalGrafiek, "kruskal_spanboom", kruskal)
     monkeypatch.setattr(HospitaalGrafiek, "edmonds_karp", vloei)
-    with TestClient(main.app) as client:
-        assert client.post("/admin/login", json={"gebruikersnaam": "admin", "wagwoord": "admin"}).status_code == 200
-        assert client.get("/analise/spanboom").status_code == 200
-        assert client.get("/analise/maks_vloei", params={"bron": "MAIN-G-ER"}).status_code == 200
+    assert admin_client.get("/analise/spanboom").status_code == 200
+    assert admin_client.get("/analise/maks_vloei", params={"bron": "MAIN-G-ER"}).status_code == 200
     assert kruskal.call_count == 1
     assert vloei.call_count == 1
